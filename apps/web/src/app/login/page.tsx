@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, type FormEvent } from "react";
 import { BootScreen } from "@/components/boot-screen";
@@ -51,6 +52,9 @@ export default function LoginPage() {
         <Button type="submit" variant="primary" disabled={login.isPending}>
           {login.isPending ? "Signing in…" : "Sign in"}
         </Button>
+        <p className="text-xs text-muted">
+          New affiliate? <Link href="/register" className="underline">Create an account</Link>
+        </p>
       </form>
     </main>
   );
