@@ -58,9 +58,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         Command::Worker => {
             let pool = bf_db::connect(&Config::from_env()?.database_url).await?;
             bf_db::migrate(&pool).await?;
+            let mailer = api::mail::Mailer::from_env()?;
             tracing::info!("worker running");
             tokio::select! {
-                () = api::worker::run(pool) => {}
+                () = api::worker::run(pool, mailer) => {}
                 _ = tokio::signal::ctrl_c() => {}
             }
         }
@@ -73,7 +74,8 @@ async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
     let cfg = Config::from_env()?;
     let pool = bf_db::connect(&cfg.database_url).await?;
     bf_db::migrate(&pool).await?;
-    let worker = with_worker.then(|| tokio::spawn(api::worker::run(pool.clone())));
+    let mailer = api::mail::Mailer::from_env()?;
+    let worker = with_worker.then(|| tokio::spawn(api::worker::run(pool.clone(), mailer)));
     let state = AppState {
         pool,
         jwt_secret: Arc::from(cfg.jwt_secret),

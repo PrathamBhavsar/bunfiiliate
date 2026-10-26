@@ -17,7 +17,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T18 | feat/payouts-reversals | todo |
 | T20 | feat/api-auth | done, merged (Sonnet); JWT hand-rolled HS256 (rsa advisory), review in T60 |
 | T21 | feat/api-programs-affiliates | done, merged (Sonnet); `cargo test -p api programs` 8 tests |
-| T22-T25 | api routes, analytics, ops, SDK | todo (SDK pipeline already in T30) |
+| T22, T23, T25 | money routes, analytics, SDK | todo (SDK pipeline already in T30) |
+| T24 | feat/ops-routes | done on branch (Sonnet); `cargo test -p api ops` 10 tests, `make openapi-check` |
 | T30 | feat/web-shell | done, merged (Sonnet); SDK pipeline + apps/web shell. CI uses pnpm 9: bump to 12 for the workspace lockfile |
 | T31-T34 | web pages | todo |
 | T40, T41, T43, T44 | fraud, observability, load test, deploy | todo |

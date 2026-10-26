@@ -8,10 +8,10 @@ publish.workspace = true
 [dependencies]
 serde.workspace = true
 serde_json.workspace = true
-sqlx = { workspace = true }
+sqlx = { workspace = true, features = ["json"] }
 uuid = { workspace = true }
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
-utoipa = { version = "5", features = ["uuid"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+utoipa = { version = "5", features = ["uuid", "chrono"] }
 
 [dev-dependencies]
 tokio = { workspace = true }

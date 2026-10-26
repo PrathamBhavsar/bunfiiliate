@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T24 ops routes
+
+- **Creation**: outbox dispatcher in the worker (`api::dispatch`): per-endpoint `webhook_deliveries`, HMAC-SHA256 `X-Bf-Signature`, exponential backoff, dead after 8 attempts; lettre `Mailer` (`SMTP_URL`/`SMTP_FROM`, unset = log-only) with `{{var}}` templates sent on `conversion.approved` / `payout.paid`; routes for webhook endpoints + deliveries + redeliver, email templates, notifications (own), contact requests (public create), settings, audit log. `bf_db::ops` repo. Details: [Ops Routes](/architecture/ops.md). `worker::run` now takes a `Mailer`.
+- **Update**: [Tasks](/tasks/index.md) T24 done on branch. `cargo test -p api ops` (8 integration tests with a local axum receiver + 2 unit): signature verifies, 500 then success, dead + redeliver, inactive/other-topic/other-workspace endpoints get nothing, email via lettre stub transport, templates, contact flow, role guards, tenancy, audit without secrets. SDK regenerated (`make openapi`). `deny.toml` allows 0BSD (lettre `quoted_printable`). Lessons: [Time-Traps](/wisdom/time-traps.md).
+
 ## [2026-10-26] T42 geoip
 
 - **Creation**: `tracker::geo::Geo` (optional DB-IP lite country mmdb via `maxminddb` 0.32, `country.iso_code`). Click country = `CF-IPCountry` (valid) first, then mmdb lookup of the same client ip used for `ip_hash`, else null. `BF_GEOIP_DB` env path in `tracker` main: unset = disabled, set but unreadable = startup error. `tracker::start` takes a `Geo`; `AppState.geo: Arc<Geo>`. `scripts/fetch-dbip.sh [YYYY-MM]` downloads the month's `dbip-country-lite` mmdb.gz into gitignored `data/`. CC BY 4.0 attribution in README License section; `.env.example` documents the var.

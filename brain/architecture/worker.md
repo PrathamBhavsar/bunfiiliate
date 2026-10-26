@@ -21,6 +21,6 @@ timestamp: 2026-10-26
 ## Auto-approve tick
 `pg_try_advisory_xact_lock`, then pending conversions of `auto_approve` programs with `occurred_at <= now() - hold_days`, active enrolled affiliates only (suspended stay pending for manual review), batch 100 `FOR UPDATE SKIP LOCKED`: `ConversionStatus::transition(Approve)`, ledger txn, outbox `conversion.approved`.
 
-Not here yet: fraud holds (T40), reversals/payouts (T18), outbox dispatch (T24).
+Outbox dispatch (webhooks, email, notifications) is [Ops Routes](/architecture/ops.md); the worker also runs its two 1s ticks. Not here yet: fraud holds (T40), reversals/payouts (T18).
 
 See [Ledger](/architecture/ledger.md).

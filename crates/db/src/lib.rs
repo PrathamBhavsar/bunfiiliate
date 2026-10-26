@@ -3,6 +3,7 @@
 pub mod affiliates;
 pub mod auth;
 pub mod ledger;
+pub mod ops;
 pub mod programs;
 pub mod tracker;
 pub mod workspaces;

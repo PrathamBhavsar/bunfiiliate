@@ -17,8 +17,13 @@ use serde_json::{Value, json};
 use sqlx::{Acquire, PgConnection, PgPool};
 use uuid::Uuid;
 
+use crate::dispatch;
+use crate::mail::Mailer;
+
 const INGEST_EVERY: Duration = Duration::from_secs(1);
 const APPROVE_EVERY: Duration = Duration::from_secs(60);
+const DISPATCH_EVERY: Duration = Duration::from_secs(1);
+const DELIVER_EVERY: Duration = Duration::from_secs(1);
 /// Predicate on an `affiliates a` row: active and enrolled in program `$2`.
 const ELIGIBLE: &str = "a.status = 'active' \
      AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = $2)";
@@ -26,10 +31,13 @@ const APPROVE_BATCH: i64 = 100;
 /// Arbitrary key shared by every worker so only one runs the approve tick at a time.
 const APPROVE_LOCK: i64 = 0x6266_6170;
 
-/// Run both loops until the task is dropped.
-pub async fn run(pool: PgPool) {
+/// Run the loops until the task is dropped.
+pub async fn run(pool: PgPool, mailer: Mailer) {
+    let http = dispatch::http_client();
     let mut ingest = tokio::time::interval(INGEST_EVERY);
     let mut approve = tokio::time::interval(APPROVE_EVERY);
+    let mut dispatch = tokio::time::interval(DISPATCH_EVERY);
+    let mut deliver = tokio::time::interval(DELIVER_EVERY);
     loop {
         tokio::select! {
             _ = ingest.tick() => match process_events(&pool).await {
@@ -41,6 +49,16 @@ pub async fn run(pool: PgPool) {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(conversions = n, "auto-approved"),
                 Err(e) => tracing::error!(error = %e, "approve tick failed"),
+            },
+            _ = dispatch.tick() => match dispatch::dispatch_outbox(&pool, &mailer).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(rows = n, "outbox dispatched"),
+                Err(e) => tracing::error!(error = %e, "dispatch tick failed"),
+            },
+            _ = deliver.tick() => match dispatch::deliver_due(&pool, &http).await {
+                Ok(0) => {}
+                Ok(n) => tracing::info!(deliveries = n, "webhooks attempted"),
+                Err(e) => tracing::error!(error = %e, "delivery tick failed"),
             },
         }
     }
