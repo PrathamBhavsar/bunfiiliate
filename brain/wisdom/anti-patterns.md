@@ -19,5 +19,6 @@ timestamp: 2026-10-26
 9. Committing `.env`, secrets, or the MaxMind DB. GeoIP = DB-IP lite or `CF-IPCountry`.
 10. PG18-only SQL (`uuidv7()`). CI pins PG16.
 11. Summing ledger legs with sequential i64 `checked_add`. Partial sums can overflow on a balanced set; sum in i128.
+12. `jsonwebtoken` with `rust_crypto` (or any RSA-capable JWT crate): `cargo deny` fails on RUSTSEC-2023-0071 (`rsa`, no fix). Access JWT is hand-rolled HS256 over `hmac` in `api::auth`.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).
