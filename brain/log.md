@@ -13,6 +13,10 @@
 
 - **Creation**: `/api/v1` workspaces, members, programs (+sites, conversion-types, plans, secrets/rotate), affiliates (public register, approve/suspend/reactivate, payout), enrollments, referral codes (admin + `/me`). `bf_db::{workspaces,programs,affiliates}` repos, `bf_db::tracker::notify_config`, `api::{page,error::AppJson}`, `AppError::{NotFound,Conflict}` (unique/FK violations map to 409). Details: [Programs & Affiliates API](/architecture/api-routes.md).
 - **Update**: [Tasks](/tasks/index.md) T21 done on branch. `cargo test -p api programs` (8 tests, real PG16): role guards, workspace isolation, plan validation, NOTIFY on code create/delete/enroll/rotate, pagination, audit without secrets. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 16, [Time-Traps](/wisdom/time-traps.md).
+## [2026-10-26] T30 web shell + TS SDK
+
+- **Creation**: `sdks/ts` (`openapi.json`, generated `src/schema.d.ts`, `createApi()`), `make openapi` / `make openapi-check`, `make web` (wired into `make ci`). `apps/web`: static-export Next 16 shell, login, cookie session with refresh-once-on-401, role guard + role nav, `ResourceView`/`useResource`/`FormDialog`/`ConfirmDialog`/`StatCard`/`StatusBadge`, placeholder pages for every nav item, light/dark theme. pnpm workspace at repo root. Details in [Web Shell](/architecture/web.md).
+- **Update**: [Tasks](/tasks/index.md) T30 done on branch. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 16-18. Verified: typecheck, lint, build, openapi-check, and the auth API contract through the dev proxy; the UI was not clicked through in a browser (extension unavailable).
 
 ## [2026-10-26] Wave 2 merged to staging
 

@@ -1,0 +1,6 @@
+packages:
+  - apps/web
+  - sdks/ts
+allowBuilds:
+  unrs-resolver: false
+  esbuild: false

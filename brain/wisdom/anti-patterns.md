@@ -24,7 +24,10 @@ timestamp: 2026-10-26
 14. Spool write + queue hand-off inside a cancellable handler future. A client disconnect strands a spooled record and stalls the checkpoint. Reserve the queue slot first (503 if full), then do both in a detached `tokio::spawn`.
 15. `jsonwebtoken` with `rust_crypto` (or any RSA-capable JWT crate): `cargo deny` fails on RUSTSEC-2023-0071 (`rsa`, no fix). Access JWT is hand-rolled HS256 over `hmac` in `api::auth`.
 16. Feeding unvalidated payloads to the retry-forever batch writer. One row Postgres rejects (e.g. a `\u0000` escape in jsonb) wedges the whole pipeline; reject at the handler (400) before spooling.
-16. Storing a NULL `referral_codes.landing_url`. The tracker snapshot decodes it as a non-null `String`, so one NULL row breaks every reload. Always set it, and keep its host on the program's sites (open-redirect guard).
-17. Calling `pg_notify` outside the mutating transaction. Notify inside it: delivery happens on commit and a rollback sends nothing.
+17. Storing a NULL `referral_codes.landing_url`. The tracker snapshot decodes it as a non-null `String`, so one NULL row breaks every reload. Always set it, and keep its host on the program's sites (open-redirect guard).
+18. Calling `pg_notify` outside the mutating transaction. Notify inside it: delivery happens on commit and a rollback sends nothing.
+19. Proxying `/api` with Next `rewrites` in dev. They replace `Host`, so the api Origin check returns 403 on every mutation. Use `apps/web/scripts/dev.mjs` (keeps `Host`).
+20. `pnpm` run in a sub-package when the repo root also has an npm `package.json`: the root is always part of a pnpm workspace and gets installed too. Keep one root `pnpm-workspace.yaml`; pnpm 12 fails install on unreviewed build scripts, so list them under `allowBuilds` (`esbuild`, `unrs-resolver`: false).
+21. Importing the SDK by `link:` or a path alias from `apps/web`: Turbopack refuses files outside its root and the SDK cannot find its own `node_modules`. Use `workspace:*` + `transpilePackages` + `turbopack.root`.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

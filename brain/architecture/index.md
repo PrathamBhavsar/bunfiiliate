@@ -5,3 +5,4 @@
 - [Ledger & State Machines](/architecture/ledger.md) — postings, conversion/payout transitions
 - [Auth & Tenancy](/architecture/auth.md) — cookies, refresh rotation, roles, workspace scope
 - [Programs & Affiliates API](/architecture/api-routes.md) — T21 routes, scoping, tracker NOTIFY, referral-code rules
+- [Web Shell & TS SDK](/architecture/web.md) — openapi pipeline, static-export app, dev proxy, ResourceView
