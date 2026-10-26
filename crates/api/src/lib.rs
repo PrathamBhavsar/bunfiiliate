@@ -6,6 +6,7 @@ pub mod auth;
 pub mod bootstrap;
 pub mod error;
 pub mod page;
+pub mod payouts;
 pub mod programs;
 pub mod routes;
 pub mod worker;
