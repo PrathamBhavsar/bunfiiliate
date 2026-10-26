@@ -17,6 +17,7 @@
 
 - **Creation**: `crates/api` lib+bin: axum app, utoipa OpenAPI (`/api/openapi.json`, `api openapi`), `AppError` -> `{error:{code,message}}`, `/api/v1/auth/{login,refresh,logout,me}`, `Auth<R: Role>` (`Any|Admin|SuperAdmin|Affiliate`), `Principal::workspace_scope`, Origin middleware, audit helper, `api bootstrap` (flags or `BF_ADMIN_EMAIL`/`BF_ADMIN_PASSWORD`/`BF_WORKSPACE_NAME`). `bf_db::auth` repo (users, refresh rotation, audit). `cargo test -p api auth` passes (15 tests, real PG16; bootstrap serialized by advisory lock).
 - **Update**: [Tasks](/tasks/index.md) T20 done on branch. Details in [Auth and Tenancy](/architecture/auth.md). Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 12.
+- **Review fixes**: client strings now strip control chars (NUL in a beacon `vid`/`url`/`ref` failed the whole batch insert and the writer retried forever); codes with NULL `landing_url` are skipped in the snapshot query (one NULL row broke the load). Still open: writer retries forever on any permanent DB error (quarantine/row-by-row fallback), and `CF-Connecting-IP`/`X-Forwarded-For` are trusted unconditionally (needs a trusted-proxy list; matters for T40 IP velocity).
 
 ## [2026-10-26] Wave 1 merged to staging
 
