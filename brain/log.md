@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T30 web shell + TS SDK
+
+- **Creation**: `sdks/ts` (`openapi.json`, generated `src/schema.d.ts`, `createApi()`), `make openapi` / `make openapi-check`, `make web` (wired into `make ci`). `apps/web`: static-export Next 16 shell, login, cookie session with refresh-once-on-401, role guard + role nav, `ResourceView`/`useResource`/`FormDialog`/`ConfirmDialog`/`StatCard`/`StatusBadge`, placeholder pages for every nav item, light/dark theme. pnpm workspace at repo root. Details in [Web Shell](/architecture/web.md).
+- **Update**: [Tasks](/tasks/index.md) T30 done on branch. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 16-18. Verified: typecheck, lint, build, openapi-check, and the auth API contract through the dev proxy; the UI was not clicked through in a browser (extension unavailable).
+
 ## [2026-10-26] Wave 2 merged to staging
 
 - **Update**: T11 state machines, T14 tracker hot path, T20 api auth merged. [Tasks](/tasks/index.md) synced.

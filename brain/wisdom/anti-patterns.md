@@ -23,5 +23,8 @@ timestamp: 2026-10-26
 13. Advancing the spool checkpoint to the highest flushed offset. Handlers finish spool writes out of order; move it only over a contiguous flushed prefix, else a crash loses the in-flight gap.
 14. Spool write + queue hand-off inside a cancellable handler future. A client disconnect strands a spooled record and stalls the checkpoint. Reserve the queue slot first (503 if full), then do both in a detached `tokio::spawn`.
 15. `jsonwebtoken` with `rust_crypto` (or any RSA-capable JWT crate): `cargo deny` fails on RUSTSEC-2023-0071 (`rsa`, no fix). Access JWT is hand-rolled HS256 over `hmac` in `api::auth`.
+16. Proxying `/api` with Next `rewrites` in dev. They replace `Host`, so the api Origin check returns 403 on every mutation. Use `apps/web/scripts/dev.mjs` (keeps `Host`).
+17. `pnpm` run in a sub-package when the repo root also has an npm `package.json`: the root is always part of a pnpm workspace and gets installed too. Keep one root `pnpm-workspace.yaml`; pnpm 12 fails install on unreviewed build scripts, so list them under `allowBuilds` (`esbuild`, `unrs-resolver`: false).
+18. Importing the SDK by `link:` or a path alias from `apps/web`: Turbopack refuses files outside its root and the SDK cannot find its own `node_modules`. Use `workspace:*` + `transpilePackages` + `turbopack.root`.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

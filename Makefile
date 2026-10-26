@@ -1,10 +1,11 @@
-.PHONY: ci fmt clippy test deny openapi openapi-check
+.PHONY: ci fmt clippy test deny web openapi openapi-check
 
 ci:
 	cargo fmt --check
 	cargo clippy --workspace -- -D warnings
 	cargo test --workspace
 	cargo deny check
+	$(MAKE) web openapi-check
 
 fmt:
 	cargo fmt
@@ -18,6 +19,12 @@ test:
 deny:
 	cargo deny check
 
+
+web:
+	pnpm install --frozen-lockfile
+	pnpm -C apps/web typecheck
+	pnpm -C apps/web lint
+	pnpm -C apps/web build
 
 openapi:
 	cargo run -q -p api -- openapi > sdks/ts/openapi.json
