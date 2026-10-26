@@ -8,7 +8,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T01 | feat/ci | todo |
 | T10 | feat/core-money-ledger | todo |
 | T11 | feat/core-state-machines | todo |
-| T12 | feat/db-schema | todo |
+| T12 | feat/db-schema | done |
 | T13 | feat/spool | todo |
 | T14 | feat/tracker-hot-path | todo |
 | T15 | feat/tracker-js | todo |
