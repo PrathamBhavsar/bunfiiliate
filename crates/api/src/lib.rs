@@ -8,6 +8,7 @@ pub mod bootstrap;
 pub mod dispatch;
 pub mod error;
 pub mod mail;
+pub mod metrics;
 pub mod ops;
 pub mod page;
 pub mod payouts;

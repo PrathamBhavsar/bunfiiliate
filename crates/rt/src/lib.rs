@@ -1,3 +1,5 @@
+pub mod metrics;
+
 use std::fmt;
 use std::path::PathBuf;
 
