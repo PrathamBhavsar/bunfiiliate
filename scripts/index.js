@@ -87,6 +87,26 @@ for (const file of ["tracker.src.js", "tracker.min.js"]) {
     assert.equal(sent[0].via, "fetch");
     assert.equal(sent[0].init.method, "POST");
     assert.equal(sent[0].init.keepalive, true);
+    assert.equal(sent[0].init.credentials, "omit");
+    assert.equal(sent[0].init.headers["content-type"], "text/plain");
+  });
+
+  test(`${file}: the beacon is a text/plain Blob (a simple request, no CORS preflight)`, () => {
+    const { sent } = load(file, { search: "?ref=x" });
+    assert.equal(sent[0].via, "beacon");
+    assert.equal(sent[0].blob.type, "text/plain");
+  });
+
+  test(`${file}: a click-only URL does not pair the new click with a stored code`, async () => {
+    // load() has no way to pre-seed cookies, so seed via a first visit, then re-run on the same jar.
+    const first = load(file, { search: "?ref=stale" });
+    const again = load(file, { search: "?bf_click=newclick" });
+    const body = JSON.parse(await again.sent[0].blob.text());
+    assert.equal(body.code, null);
+    assert.equal(body.click, "newclick");
+    // An explicit track() afterwards still falls back to the stored values.
+    first.window.bunfiiliate.track();
+    assert.equal(JSON.parse(await first.sent[1].blob.text()).code, "stale");
   });
 
   test(`${file}: ?ref= alone posts the code with a null click`, async () => {

@@ -7,11 +7,14 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use bf_spool::{SpoolConfig, SpoolWriter};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use sqlx::PgPool;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tower::ServiceExt;
 use tracker::geo::Geo;
+use tracker::proxy::Trust;
 use tracker::snapshot::Snapshot;
 use tracker::writer::Queued;
 use tracker::{AppState, router, start};
@@ -84,7 +87,7 @@ fn click_req(i: usize) -> Request<Body> {
             .header("user-agent", CHROME)
             .header("referer", "https://Blog.Example.org/post?id=1")
             .header("cf-ipcountry", "de")
-            .header("x-forwarded-for", "203.0.113.9, 10.0.0.1")
+            .header("cf-connecting-ip", "203.0.113.9")
             .body(Body::empty())
             .unwrap()
     } else {
@@ -153,6 +156,7 @@ async fn undrained(pool: &PgPool, dir: &Path, cap: usize) -> (AppState, mpsc::Re
         spool: SpoolWriter::open(SpoolConfig::new(dir)).await.unwrap(),
         queue,
         ip_salt: SALT.into(),
+        trust: Default::default(),
         geo: Arc::new(Geo::disabled()),
         fraud: bf_core::default_rules().into(),
     };
@@ -202,9 +206,13 @@ async fn thousand_clicks_thousand_rows(pool: PgPool) {
 async fn click_fields_are_normalized(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+    let mut t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
+    t.state.trust = Arc::new(Trust {
+        cf: true,
+        proxies: vec![],
+    });
     let app = router(t.state.clone());
 
     let res = app.oneshot(click_req(0)).await.unwrap();
@@ -506,7 +514,7 @@ async fn metrics_after_click_has_spool_lag(pool: PgPool) {
 fn click_from(ip: &str, ua: &str) -> Request<Body> {
     Request::get("/r/abc")
         .header("user-agent", ua)
-        .header("x-forwarded-for", ip)
+        .header("cf-connecting-ip", ip)
         .body(Body::empty())
         .unwrap()
 }
@@ -516,9 +524,13 @@ async fn fraud_flagged_clicks_are_stored_with_reason(pool: PgPool) {
     const BOT: &str = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+    let mut t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
+    t.state.trust = Arc::new(Trust {
+        cf: true,
+        proxies: vec![],
+    });
     let app = router(t.state.clone());
 
     // Flagged clicks redirect like any other: nothing is dropped.
@@ -552,5 +564,276 @@ async fn fraud_flagged_clicks_are_stored_with_reason(pool: PgPool) {
         [None, Some("duplicate".to_owned())]
     );
     assert_eq!(reason("198.51.100.3").await, [None]);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+fn spoofed_click(i: usize) -> Request<Body> {
+    Request::get("/r/abc")
+        .header("user-agent", CHROME)
+        .header(
+            "cf-connecting-ip",
+            format!("203.0.{}.{}", i / 250, i % 250 + 1),
+        )
+        .header("cf-ipcountry", "XX")
+        .header("x-forwarded-for", format!("198.51.100.{}", i + 1))
+        .body(Body::empty())
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn client_supplied_ip_headers_are_ignored_by_default(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .unwrap();
+    let app = router(t.state.clone());
+
+    // A fresh forged address on every click would sidestep the IP rules if it were believed.
+    for i in 0..6 {
+        let mut req = spoofed_click(i);
+        req.extensions_mut().insert(axum::extract::ConnectInfo(
+            "192.0.2.50:4000".parse::<std::net::SocketAddr>().unwrap(),
+        ));
+        assert_eq!(
+            app.clone().oneshot(req).await.unwrap().status(),
+            StatusCode::FOUND
+        );
+    }
+    wait_clicks(&pool, 6).await;
+    let (hashes, countries): (i64, i64) =
+        sqlx::query_as("SELECT count(DISTINCT ip_hash), count(country) FROM clicks")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(hashes, 1, "every click is attributed to the real peer");
+    assert_eq!(countries, 0, "CF-IPCountry is not believed either");
+    let reasons: Vec<Option<String>> =
+        sqlx::query_scalar("SELECT fraud_reason FROM clicks ORDER BY id")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert!(
+        reasons.iter().any(Option::is_some),
+        "repeat clicks from one peer are flagged"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn forwarded_for_is_believed_only_from_a_trusted_proxy(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let mut t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .unwrap();
+    t.state.trust = Arc::new(
+        Trust::from_lookup(|k| (k == "BF_TRUSTED_PROXIES").then(|| "172.16.0.0/12".to_string()))
+            .unwrap(),
+    );
+    let app = router(t.state.clone());
+    let from = |peer: &str| {
+        let mut req = Request::get("/r/abc")
+            .header("user-agent", CHROME)
+            .header("x-forwarded-for", "6.6.6.6, 203.0.113.77")
+            .body(Body::empty())
+            .unwrap();
+        req.extensions_mut().insert(axum::extract::ConnectInfo(
+            format!("{peer}:4000")
+                .parse::<std::net::SocketAddr>()
+                .unwrap(),
+        ));
+        req
+    };
+    // Via the proxy: the address the proxy appended. Direct: the peer itself.
+    app.clone().oneshot(from("172.18.0.2")).await.unwrap();
+    app.clone().oneshot(from("198.51.100.9")).await.unwrap();
+    wait_clicks(&pool, 2).await;
+    let hashes: Vec<Vec<u8>> = sqlx::query_scalar("SELECT ip_hash FROM clicks ORDER BY id")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(hashes[0], tracker::event::ip_hash(SALT, "203.0.113.77"));
+    assert_eq!(hashes[1], tracker::event::ip_hash(SALT, "198.51.100.9"));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+fn signed_event(i: usize) -> Request<Body> {
+    // Signed with the webhook secret `seed` gives the program ('s').
+    let body = format!(r#"{{"customer":"c{i}","amount_cents":100}}"#);
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        .to_string();
+    let key = format!("k{i}");
+    let mut mac = Hmac::<Sha256>::new_from_slice(b"s").unwrap();
+    for part in [ts.as_bytes(), b".", key.as_bytes(), b".", body.as_bytes()] {
+        mac.update(part);
+    }
+    let sig: String = mac
+        .finalize()
+        .into_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    Request::post("/v1/events/pk")
+        .header("content-type", "application/json")
+        .header("idempotency-key", key)
+        .header("x-bf-timestamp", ts)
+        .header("x-bf-signature", sig)
+        .body(Body::from(body))
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn click_flood_cannot_take_the_reserved_event_slots(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let (state, _rx) = undrained(&pool, &dir, 20).await; // 2 of 20 slots are reserved
+    let app = router(state);
+
+    let mut accepted = 0;
+    for _ in 0..30 {
+        if app.clone().oneshot(click_req(0)).await.unwrap().status() == StatusCode::FOUND {
+            accepted += 1;
+        }
+    }
+    assert_eq!(accepted, 18, "clicks stop at the reserve");
+    for i in 0..2 {
+        let res = app.clone().oneshot(signed_event(i)).await.unwrap();
+        assert_eq!(
+            res.status(),
+            StatusCode::ACCEPTED,
+            "signed event {i} still gets in"
+        );
+    }
+    let third = app.clone().oneshot(signed_event(2)).await.unwrap();
+    assert_eq!(
+        third.status(),
+        StatusCode::SERVICE_UNAVAILABLE,
+        "the queue is now full"
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+/// A click for a program that does not exist: Postgres rejects it for good (foreign key).
+fn orphan_click() -> tracker::writer::Record {
+    tracker::writer::Record::Click(bf_db::tracker::Click {
+        id: Uuid::now_v7(),
+        program_id: Uuid::now_v7(),
+        affiliate_id: Uuid::now_v7(),
+        code: "ghost".into(),
+        visitor_id: "v".into(),
+        ts_ms: 1_700_000_000_000,
+        ip_hash: None,
+        country: None,
+        device: None,
+        os: None,
+        browser: None,
+        referrer_host: None,
+        landing_path: None,
+        fraud_reason: None,
+    })
+}
+
+async fn spool_record(spool: &SpoolWriter, record: tracker::writer::Record) -> Queued {
+    let payload = serde_json::to_vec(&record).unwrap();
+    let end = spool.write(&payload).await.unwrap();
+    Queued {
+        start: end - bf_spool::HEADER_LEN as u64 - payload.len() as u64,
+        end,
+        record,
+    }
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn a_record_postgres_rejects_is_dead_lettered_not_retried_forever(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .unwrap();
+    let before = tracker::metrics::DEAD_LETTERED.get();
+
+    // The orphan and a good click land in one batch; the orphan must not take the click down.
+    let bad = spool_record(&t.state.spool, orphan_click()).await;
+    t.state.queue.send(bad).await.unwrap();
+    let app = router(t.state.clone());
+    assert_eq!(
+        app.oneshot(click_req(0)).await.unwrap().status(),
+        StatusCode::FOUND
+    );
+    wait_clicks(&pool, 1).await;
+
+    // The checkpoint moves past both, so nothing is replayed (and rejected again) at restart.
+    let end = spool_end(&dir);
+    for _ in 0..100 {
+        if t.state.spool.read_checkpoint().unwrap() == end {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert_eq!(t.state.spool.read_checkpoint().unwrap(), end);
+    assert!(tracker::metrics::DEAD_LETTERED.get() > before);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn startup_replay_skips_a_record_postgres_rejects(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    {
+        // A previous run spooled an orphan click and then a good one, and died before flushing.
+        let spool = SpoolWriter::open(SpoolConfig::new(&dir)).await.unwrap();
+        spool_record(&spool, orphan_click()).await;
+        let snap = Snapshot::load(&pool).await.unwrap();
+        let entry = &snap.codes["abc"];
+        let good = tracker::writer::Record::Click(bf_db::tracker::Click {
+            program_id: entry.program_id,
+            affiliate_id: entry.affiliate_id,
+            code: "abc".into(),
+            ..match orphan_click() {
+                tracker::writer::Record::Click(c) => c,
+                _ => unreachable!(),
+            }
+        });
+        spool_record(&spool, good).await;
+    }
+    // Before the fix this returned Err and the tracker crash-looped on the same record.
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .expect("replay survives the bad record");
+    assert_eq!(clicks(&pool).await, 1);
+    assert_eq!(t.state.spool.read_checkpoint().unwrap(), spool_end(&dir));
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn a_burst_of_config_changes_converges_on_the_new_snapshot(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .unwrap();
+    let first = t.state.snapshot.load_full();
+    add_code(&pool, "burst").await;
+    for _ in 0..50 {
+        sqlx::query("SELECT pg_notify('bf_config', '')")
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    for _ in 0..100 {
+        if t.state.snapshot.load().codes.contains_key("burst") {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    assert!(t.state.snapshot.load().codes.contains_key("burst"));
+    // 50 notifications inside the debounce window swap the snapshot a handful of times at
+    // most (it was a reload each before), and the final one holds the new code.
+    let swapped_once = !Arc::ptr_eq(&first, &t.state.snapshot.load_full());
+    assert!(swapped_once);
     std::fs::remove_dir_all(&dir).ok();
 }

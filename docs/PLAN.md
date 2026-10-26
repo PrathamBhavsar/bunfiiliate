@@ -105,7 +105,7 @@ Tracker (port 8081, metrics 9101 internal):
 - `GET /t.js` (<2KB min, ETag, long cache)
 - `GET /r/:code` records click, 302 to landing with `?bf_click=`; tracker.js sets first-party `bf_vid`, `bf_ref`
 - `POST /c` click beacon `{code, vid, url, ref}` -> 204
-- `POST /v1/events/:program_key` generic conversion; `X-Bf-Signature` HMAC + `Idempotency-Key`; 202
+- `POST /v1/events/:program_key` generic conversion; `X-Bf-Signature` HMAC-SHA256 over `<X-Bf-Timestamp>.<Idempotency-Key>.<body>` (5-minute tolerance) + `Idempotency-Key`; 202
 - `POST /v1/webhooks/stripe/:program_key`, `/v1/webhooks/paddle/:program_key`: signature verified (Stripe `t=,v1=` 5-min tolerance; Paddle `ts=;h1=`), 200 after spool fsync
 - `GET /healthz`, `/readyz`
 

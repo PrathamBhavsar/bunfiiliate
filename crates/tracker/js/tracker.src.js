@@ -26,11 +26,16 @@
       .join("");
   }
 
-  function track(code, click) {
+  // `fresh`: the page was just entered through a link, so only what that URL carries is sent.
+  // A stored bf_ref from an older visit must not ride along with a new bf_click: /r already
+  // recorded that click, and a code beside it would be counted a second time.
+  function track(code, click, fresh) {
     var vid = get("bf_vid");
     if (!vid) set("bf_vid", (vid = uid()), 365);
-    code = code || get("bf_ref");
-    click = click || get("bf_click");
+    if (!fresh) {
+      code = code || get("bf_ref");
+      click = click || get("bf_click");
+    }
     if (!(code || click) || !endpoint) return;
     if (code) set("bf_ref", code, days);
     if (click) set("bf_click", click, days);
@@ -41,18 +46,22 @@
       url: w.location.origin + w.location.pathname,
       ref: d.referrer && new URL(d.referrer).origin
     });
+    // text/plain keeps this a "simple" cross-origin request: no preflight, so the beacon is
+    // not dropped when the page and the tracker are on different origins. The server parses
+    // the body whatever its Content-Type.
     var n = w.navigator;
-    if (n.sendBeacon && n.sendBeacon(endpoint, new Blob([body], { type: "application/json" }))) return;
+    if (n.sendBeacon && n.sendBeacon(endpoint, new Blob([body], { type: "text/plain" }))) return;
     w.fetch(endpoint, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "text/plain" },
       body: body,
-      keepalive: true
+      keepalive: true,
+      credentials: "omit"
     }).catch(function () {});
   }
 
   w.bunfiiliate = { track: track };
   var ref = q.get("ref"), click = q.get("bf_click");
-  if (ref || click) track(ref, click);
+  if (ref || click) track(ref, click, true);
   else if (!get("bf_vid")) set("bf_vid", uid(), 365);
 })(window, document);

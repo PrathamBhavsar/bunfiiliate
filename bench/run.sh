@@ -118,7 +118,11 @@ PROGRAM_KEY="pk_bench"
 WEBHOOK_SECRET="whsec_bench_secret"
 CODE="benchcode"
 WEBHOOK_BODY='{"event":"conversion","customer_id":"cust_bench","amount":1000}'
-WEBHOOK_SIG=$(printf "%s" "$WEBHOOK_BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $NF}')
+WEBHOOK_KEY="bench-idemp-1"
+# Signature covers "<timestamp>.<idempotency key>.<body>"; the tolerance is 5 minutes, so one
+# timestamp is good for the whole run only if BENCH_DURATION stays well under that.
+WEBHOOK_TS=$(date +%s)
+WEBHOOK_SIG=$(printf "%s.%s.%s" "$WEBHOOK_TS" "$WEBHOOK_KEY" "$WEBHOOK_BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $NF}')
 BEACON_BODY='{"code":"benchcode","vid":"vid_bench","url":"https://example.com/target","ref":""}'
 
 echo "=== Running load benchmarks ==="
@@ -134,6 +138,7 @@ for FSYNC_MODE in always off; do
   API_PORT=8080 \
   TRACKER_PORT=8081 \
   JWT_SECRET="bench-secret-bench-secret-bench-secret" \
+  BF_IP_SALT="bench-ip-salt-bench-ip-salt" \
   SPOOL_DIR="$SPOOL_DIR" \
   BF_FSYNC="$FSYNC_MODE" \
   "$TRACKER_BIN" &
@@ -167,7 +172,8 @@ for FSYNC_MODE in always off; do
   echo "Benchmarking /v1/events/$PROGRAM_KEY (signed generic webhook)..."
   oha -z "$BENCH_DURATION" -c "$BENCH_CONCURRENCY" -w --no-tui --output-format json \
     -m POST -H "Content-Type: application/json" \
-    -H "Idempotency-Key: bench-idemp-1" \
+    -H "Idempotency-Key: $WEBHOOK_KEY" \
+    -H "X-Bf-Timestamp: $WEBHOOK_TS" \
     -H "X-Bf-Signature: $WEBHOOK_SIG" \
     -d "$WEBHOOK_BODY" \
     "http://127.0.0.1:8081/v1/events/$PROGRAM_KEY" > "$RESULTS_DIR/fsync_${FSYNC_MODE}_webhook.json"

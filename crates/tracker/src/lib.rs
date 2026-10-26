@@ -4,6 +4,7 @@
 pub mod event;
 pub mod geo;
 pub mod metrics;
+pub mod proxy;
 pub mod snapshot;
 pub mod webhook;
 pub mod writer;
@@ -38,12 +39,16 @@ use uuid::Uuid;
 
 use event::{clip, ip_hash, normalize_ua, referrer_host, url_path, with_click};
 use geo::Geo;
+use proxy::Trust;
 use snapshot::{CodeEntry, Snapshot};
 use webhook::Source;
 use writer::{Error, Queued, Record};
 
 const TRACKER_JS: &[u8] = include_bytes!("../js/tracker.min.js");
 const QUEUE_CAPACITY: usize = 10_000;
+/// Share of the queue (a tenth) clicks may not take: a click flood must not make Stripe or
+/// Paddle deliveries get 503 (they retry, but late conversions delay payouts).
+const EVENT_RESERVE_DIVISOR: usize = 10;
 const MAX_BODY: usize = 8 * 1024;
 const MAX_EVENT_BODY: usize = 256 * 1024;
 
@@ -60,6 +65,8 @@ pub struct AppState {
     pub spool: SpoolWriter,
     pub queue: mpsc::Sender<Queued>,
     pub ip_salt: Arc<str>,
+    /// Which headers may name the client; trusts none until the operator says so.
+    pub trust: Arc<Trust>,
     pub geo: Arc<Geo>,
     pub fraud: Arc<[Box<dyn FraudRule>]>,
 }
@@ -91,6 +98,7 @@ pub async fn start(
         spool,
         queue,
         ip_salt: ip_salt.into(),
+        trust: Arc::default(),
         geo: Arc::new(geo),
         fraud: default_rules().into(),
     };
@@ -342,16 +350,8 @@ impl AppState {
     ) -> Click {
         let id = Uuid::now_v7();
         let ua = normalize_ua(header(headers, USER_AGENT.as_str()).unwrap_or(""));
-        let peer = ext
-            .get::<ConnectInfo<SocketAddr>>()
-            .map(|c| c.0.ip().to_string());
-        let ip = header(headers, "cf-connecting-ip")
-            .map(str::to_owned)
-            .or_else(|| {
-                let xff = header(headers, "x-forwarded-for")?;
-                Some(xff.split(',').next()?.trim().to_owned())
-            })
-            .or(peer);
+        let peer = ext.get::<ConnectInfo<SocketAddr>>().map(|c| c.0.ip());
+        let ip = self.trust.client_ip(headers, peer).map(|ip| ip.to_string());
         let visitor = visitor.filter(|v| !v.is_empty());
         let ip_hash = ip.as_deref().map(|ip| ip_hash(&self.ip_salt, ip));
         let ts_ms = now_ms();
@@ -373,9 +373,7 @@ impl AppState {
             code: code.to_owned(),
             visitor_id: visitor.map_or_else(|| id.to_string(), |v| clip(v, 64)),
             ts_ms,
-            country: self
-                .geo
-                .country(header(headers, "cf-ipcountry"), ip.as_deref()),
+            country: self.geo.country(self.trust.country(headers), ip.as_deref()),
             ip_hash,
             device: ua.device,
             os: ua.os,
@@ -393,10 +391,18 @@ impl AppState {
 async fn ingest(state: AppState, record: Record) -> Result<(), StatusCode> {
     let started = Instant::now();
     let task = tokio::spawn(async move {
-        let permit = state.queue.try_reserve().map_err(|_| {
-            metrics::SHED.inc();
-            StatusCode::SERVICE_UNAVAILABLE
-        })?;
+        // Clicks leave the last tenth of the queue to signed conversion events.
+        let reserve = state.queue.max_capacity() / EVENT_RESERVE_DIVISOR;
+        let full = matches!(record, Record::Click(_)) && state.queue.capacity() <= reserve;
+        let permit = state
+            .queue
+            .try_reserve()
+            .ok()
+            .filter(|_| !full)
+            .ok_or_else(|| {
+                metrics::SHED.inc();
+                StatusCode::SERVICE_UNAVAILABLE
+            })?;
         let payload = serde_json::to_vec(&record).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         let end = state.spool.write(&payload).await.map_err(|e| {
             tracing::error!(error = %e, "spool write failed");

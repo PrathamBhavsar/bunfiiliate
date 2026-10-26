@@ -66,12 +66,20 @@ impl Source {
         now: i64,
     ) -> Result<(), VerifyError> {
         match self {
+            // X-Bf-Signature: <hex>, signed `<X-Bf-Timestamp>.<Idempotency-Key>.<body>`. The key
+            // is signed because it decides deduplication, and the timestamp bounds replay.
             Source::Generic => {
-                idempotency_key(headers).ok_or(VerifyError::Missing)?;
+                let key = idempotency_key(headers).ok_or(VerifyError::Missing)?;
+                let ts = header(headers, "x-bf-timestamp").ok_or(VerifyError::Missing)?;
                 let sig = header(headers, "x-bf-signature").ok_or(VerifyError::Missing)?;
                 let sig = hex_decode(sig).ok_or(VerifyError::Malformed)?;
-                let mac = mac(secret, &[body]);
-                mac.verify_slice(&sig).map_err(|_| VerifyError::Mismatch)
+                let secs: i64 = ts.parse().map_err(|_| VerifyError::Malformed)?;
+                let mac = mac(secret, &[ts.as_bytes(), b".", key.as_bytes(), b".", body]);
+                mac.verify_slice(&sig).map_err(|_| VerifyError::Mismatch)?;
+                if now.abs_diff(secs) > TOLERANCE_SECS as u64 {
+                    return Err(VerifyError::Stale);
+                }
+                Ok(())
             }
             // Stripe-Signature: t=<ts>,v1=<hex>[,v1=<hex>][,v0=<hex>]; signed `<ts>.<body>`.
             Source::Stripe => {
@@ -180,7 +188,9 @@ mod tests {
         br#"{"event_id":"evt_01hv8wptq8987qeqjtaqfc2g3c","event_type":"transaction.completed"}"#;
     const PADDLE_SIG: &str = "3590e53213c1a8c45bdbfd19fc064f8b8556a52fc2e7645fc3c08d97366a0c81";
     const GENERIC_BODY: &[u8] = br#"{"type":"sale","amount_cents":4900}"#;
-    const GENERIC_SIG: &str = "ea7c9e61d7e87e49d085428bf7affece4699c8a6a29a0663b392d5e049a8fed8";
+    const GENERIC_TS: i64 = 1_700_000_000;
+    // HMAC-SHA256("whsec_generic", "1700000000.order-1.<GENERIC_BODY>"), computed with Python.
+    const GENERIC_SIG: &str = "a18d4e38b44b600b8a3cfd6badfd79dea2fa77fba632ecffe72db424d6b4045f";
 
     fn headers(pairs: &[(&'static str, &str)]) -> HeaderMap {
         pairs
@@ -249,19 +259,78 @@ mod tests {
 
     #[test]
     fn generic_signature_and_key() {
-        let verify = |h: &[(&'static str, &str)], secret| {
-            Source::Generic.verify_at(&headers(h), GENERIC_BODY, secret, 0)
+        let verify = |h: &[(&'static str, &str)], secret, now| {
+            Source::Generic.verify_at(&headers(h), GENERIC_BODY, secret, now)
         };
+        let ts = GENERIC_TS.to_string();
         let ok = [
             ("x-bf-signature", GENERIC_SIG),
             ("idempotency-key", "order-1"),
+            ("x-bf-timestamp", ts.as_str()),
         ];
-        assert_eq!(verify(&ok, "whsec_generic"), Ok(()));
-        assert_eq!(verify(&ok, "nope"), Err(VerifyError::Mismatch));
-        assert_eq!(verify(&ok[..1], "whsec_generic"), Err(VerifyError::Missing));
-        assert_eq!(verify(&ok[1..], "whsec_generic"), Err(VerifyError::Missing));
-        let odd = [("x-bf-signature", "abc"), ("idempotency-key", "k")];
-        assert_eq!(verify(&odd, "whsec_generic"), Err(VerifyError::Malformed));
+        assert_eq!(verify(&ok, "whsec_generic", GENERIC_TS + 10), Ok(()));
+        assert_eq!(verify(&ok, "nope", GENERIC_TS), Err(VerifyError::Mismatch));
+        // Each header is required.
+        for skip in 0..3 {
+            let partial: Vec<_> = ok
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != skip)
+                .map(|(_, h)| *h)
+                .collect();
+            assert_eq!(
+                verify(&partial, "whsec_generic", GENERIC_TS),
+                Err(VerifyError::Missing)
+            );
+        }
+        let odd = [
+            ("x-bf-signature", "abc"),
+            ("idempotency-key", "k"),
+            ("x-bf-timestamp", ts.as_str()),
+        ];
+        assert_eq!(
+            verify(&odd, "whsec_generic", GENERIC_TS),
+            Err(VerifyError::Malformed)
+        );
+        let junk_ts = [
+            ("x-bf-signature", GENERIC_SIG),
+            ("idempotency-key", "order-1"),
+            ("x-bf-timestamp", "soon"),
+        ];
+        assert_eq!(
+            verify(&junk_ts, "whsec_generic", GENERIC_TS),
+            Err(VerifyError::Malformed)
+        );
+    }
+
+    #[test]
+    fn generic_signature_covers_the_key_and_expires() {
+        let ts = GENERIC_TS.to_string();
+        let verify = |key: &str, now| {
+            let h = [
+                ("x-bf-signature", GENERIC_SIG),
+                ("idempotency-key", key),
+                ("x-bf-timestamp", ts.as_str()),
+            ];
+            Source::Generic.verify_at(&headers(&h), GENERIC_BODY, "whsec_generic", now)
+        };
+        // A captured request replayed under a fresh Idempotency-Key no longer verifies.
+        assert_eq!(verify("order-2", GENERIC_TS), Err(VerifyError::Mismatch));
+        // Tolerance edges, both directions.
+        assert_eq!(verify("order-1", GENERIC_TS + 300), Ok(()));
+        assert_eq!(verify("order-1", GENERIC_TS + 301), Err(VerifyError::Stale));
+        assert_eq!(verify("order-1", GENERIC_TS - 301), Err(VerifyError::Stale));
+        // A moved timestamp is a different message.
+        let moved = (GENERIC_TS + 1).to_string();
+        let h = [
+            ("x-bf-signature", GENERIC_SIG),
+            ("idempotency-key", "order-1"),
+            ("x-bf-timestamp", moved.as_str()),
+        ];
+        assert_eq!(
+            Source::Generic.verify_at(&headers(&h), GENERIC_BODY, "whsec_generic", GENERIC_TS),
+            Err(VerifyError::Mismatch)
+        );
     }
 
     #[test]
