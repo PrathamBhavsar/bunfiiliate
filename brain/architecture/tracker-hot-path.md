@@ -17,6 +17,8 @@ timestamp: 2026-10-26
 
 Webhooks (generic/Stripe/Paddle): tracker only verifies signature (`tracker::webhook::Source::verify`, 5-minute tolerance for Stripe/Paddle) + spools to `inbound_events` through the same spool/queue/writer path as clicks (`Record::Event`). Dedup via `ON CONFLICT (program_id, source, external_id) DO NOTHING`, external_id = Idempotency-Key / Stripe `id` / Paddle `event_id`. Business logic lives in worker.
 
+Fraud flags (T40): `AppState::click` runs `bf_core::fraud` rules (`IpVelocity`, `BotUa`, `Dedupe`) on the in-memory state, O(1), no DB. A flagged click is never dropped: it is spooled, stored and counted with `clicks.fraud_reason` (`ip_velocity|bot_ua|duplicate`, first match). All rules see every click so stateful windows stay accurate. Key maps rotate in two generations, so memory is bounded (about 2 x 50k keys per rule). Limits are `default_rules()` constants, not configurable yet. Known trade-off: a human double click inside the dedupe window flags the second click, and last-touch may attribute to it (the conversion is held until released).
+
 fsync mode `always|off`, both benchmarked.
 
 Related: [ADR-0001](/decisions/0001-wal-spool.md), [System Layout](/architecture/system.md).

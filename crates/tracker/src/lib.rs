@@ -24,6 +24,7 @@ use axum::http::{Extensions, HeaderMap, HeaderValue, StatusCode};
 use axum::middleware::map_response;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use bf_core::{ClickFacts, FraudRule, default_rules, first_flag};
 use bf_db::tracker::{Click, InboundEvent};
 use bf_spool::{HEADER_LEN, SpoolConfig, SpoolWriter};
 use serde::Deserialize;
@@ -59,6 +60,7 @@ pub struct AppState {
     pub queue: mpsc::Sender<Queued>,
     pub ip_salt: Arc<str>,
     pub geo: Arc<Geo>,
+    pub fraud: Arc<[Box<dyn FraudRule>]>,
 }
 
 pub struct Tracker {
@@ -87,6 +89,7 @@ pub async fn start(
         queue,
         ip_salt: ip_salt.into(),
         geo: Arc::new(geo),
+        fraud: default_rules().into(),
     };
     Ok(Tracker {
         state,
@@ -347,22 +350,36 @@ impl AppState {
             })
             .or(peer);
         let visitor = visitor.filter(|v| !v.is_empty());
+        let ip_hash = ip.as_deref().map(|ip| ip_hash(&self.ip_salt, ip));
+        let ts_ms = now_ms();
+        // O(1) in-memory rules; a flagged click is still recorded.
+        let fraud_reason = first_flag(
+            &self.fraud,
+            &ClickFacts {
+                ip_hash: ip_hash.as_deref(),
+                ua: header(headers, USER_AGENT.as_str()).unwrap_or(""),
+                device: ua.device.as_deref(),
+                code,
+                ts_ms,
+            },
+        );
         Click {
             id,
             program_id: entry.program_id,
             affiliate_id: entry.affiliate_id,
             code: code.to_owned(),
             visitor_id: visitor.map_or_else(|| id.to_string(), |v| clip(v, 64)),
-            ts_ms: now_ms(),
+            ts_ms,
             country: self
                 .geo
                 .country(header(headers, "cf-ipcountry"), ip.as_deref()),
-            ip_hash: ip.map(|ip| ip_hash(&self.ip_salt, &ip)),
+            ip_hash,
             device: ua.device,
             os: ua.os,
             browser: ua.browser,
             referrer_host: referrer.and_then(referrer_host).map(|h| clip(&h, 255)),
             landing_path: Some(clip(&url_path(landing), 512)),
+            fraud_reason: fraud_reason.map(str::to_owned),
         }
     }
 }

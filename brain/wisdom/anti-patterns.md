@@ -34,5 +34,6 @@ timestamp: 2026-10-26
 24. Using the typed SDK for list query params as generated: utoipa `IntoParams` without `parameter_in = Query` emits `page`, `limit`, `status`, `program_id` as path params, so `params.query` is untyped and typed calls send no query string. Web code goes through `listParams()` (sends both). Real fix: `#[into_params(parameter_in = Query)]` in the api, then `make openapi`; drop the helper after.
 25. Writing client-controlled strings (referrer host) into a CSV unescaped. Quote per RFC 4180 and defuse leading `= + - @`, or the export becomes a spreadsheet formula injection.
 26. Sizing a payout from the sum of approved conversions. Clawbacks (reversed paid conversions) live only in the ledger, so size it from the `aff_payable` balance minus open payouts, and shrink an open payout when one of its conversions is reversed. Never pay a negative balance.
+27. Evicting expired keys by scanning a map on the tracker hot path, or short-circuiting fraud rules. Rotate key maps by generation (O(1) amortized, bounded) and run every rule on every click, or a stateful window misses clicks another rule flagged.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

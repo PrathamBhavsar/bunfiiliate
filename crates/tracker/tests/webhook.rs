@@ -154,6 +154,7 @@ async fn undrained(
         queue,
         ip_salt: SALT.into(),
         geo: Arc::new(Geo::disabled()),
+        fraud: bf_core::default_rules().into(),
     };
     (state, rx)
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T40 fraud rules
+
+- **Creation**: `bf_core::fraud`: `FraudRule` trait (`check(&ClickFacts) -> Verdict`), `IpVelocity` (N clicks per ip hash per sliding window), `BotUa` (woothee category `crawler`), `Dedupe` (same ip+ua+code within a window), `first_flag`, `default_rules` (30 clicks/60s per ip, 5s dedupe). State is in-memory, bounded (two-generation key maps), one mutex, no DB. Tracker `AppState.fraud` runs the rules in `AppState::click`: a flagged click is stored and counted with `clicks.fraud_reason` (column already in 0001; `Click.fraud_reason` is `serde(default)` so old spool records replay). Migration `0040_conversion_hold.sql`: `conversions.hold_reason`. Worker ingest copies `click_flagged:<reason>` onto a new conversion whose customer's `first_click_id` is a flagged click (recurring sales of that customer too); `approve_due` skips held rows; `worker::release_hold(pool, conversion)` clears it (no route yet, not workspace scoped: the route must check). Details: [Tracker Hot Path](/architecture/tracker-hot-path.md), [Worker & Ingest](/architecture/worker.md).
+- **Update**: [Tasks](/tasks/index.md) T40 done on branch. `cargo test fraud`: window expiry, sliding (not fixed) window, bounded keys/history, missing ip, all-rules-run, tracker flagged-but-stored (bot, duplicate), worker hold + auto-approve skip + release. `AppState` gained a field (tests that build it by hand updated). Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 27.
+
 ## [2026-10-26] T23 analytics rollups
 
 - **Creation**: `api::analytics`: `rollup` tick (advisory-locked, per-program watermark = last rolled-up day minus 1, delete + upsert, folds clicks and conversions into `daily_rollups` for dims total|country|os|browser|device|referrer) run every 60s by `worker::run`; `GET /analytics/summary`, `/analytics/timeseries`, `/reports/analytics.csv`. `programs::{viewer,require_program}` now `pub(crate)`. Details: [Analytics](/architecture/analytics.md).
