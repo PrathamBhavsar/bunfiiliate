@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-bunfiiliate}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-bunfiiliate}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["api", "serve", "--with-worker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
+      API_PORT: 8080
+      TRACKER_PORT: 8081
+      JWT_SECRET: ${JWT_SECRET:-insecure-default-jwt-secret-replace-me}
+      SPOOL_DIR: /var/spool/bunfiiliate
+      SMTP_URL: ${SMTP_URL:-}
+      SMTP_FROM: ${SMTP_FROM:-bunfiiliate <noreply@example.com>}
+      COOKIE_SECURE: ${COOKIE_SECURE:-1}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - spool_data:/var/spool/bunfiiliate
+      - web_static:/var/www/html
+
+  tracker:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    command: ["tracker"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
+      API_PORT: 8080
+      TRACKER_PORT: 8081
+      JWT_SECRET: ${JWT_SECRET:-insecure-default-jwt-secret-replace-me}
+      SPOOL_DIR: /var/spool/bunfiiliate
+      BF_FSYNC: ${BF_FSYNC:-always}
+      BF_GEOIP_DB: ${BF_GEOIP_DB:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - spool_data:/var/spool/bunfiiliate
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      API_UPSTREAM: api:8080
+      TRACKER_UPSTREAM: tracker:8081
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - web_static:/srv/web:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - tracker
+
+volumes:
+  pgdata:
+  spool_data:
+  web_static:
+  caddy_data:
+  caddy_config:

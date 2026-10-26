@@ -4,6 +4,11 @@
 
 - **Creation**: `bf_rt::metrics` (hand-rolled Prometheus text registry: static atomics `Counter`/`Gauge`/`Histogram`, `router`, `serve`; no new crates, only `axum` + `tokio/net` on `bf-rt`), `tracker::metrics`, `api::metrics`. Tracker: `bf_ingest_latency_seconds`, `bf_batch_size`, `bf_shed_total`, `bf_spool_bytes`, `bf_spool_lag`. API/worker: `bf_outbox_depth`, `bf_webhook_delivery_failures_total`, `bf_ingest_events_processed_total`, `bf_rollup_tick_seconds`, `bf_approve_tick_seconds`. Details: [Observability](/architecture/observability.md).
 - **Update**: [Tasks](/tasks/index.md) T41 done on branch. `cargo test --workspace metrics` (4): histogram cumulative buckets, bearer-token route, api series present, tracker `/metrics` text has `bf_spool_lag` after a click. `crash_before_flush_replays_exactly_once` hit the known shared-PG `_sqlx_test_*` clash in a full run (passes alone): see [Time-Traps](/wisdom/time-traps.md).
+## [2026-10-26] T44 deploy assets & self-hosting docs
+
+- **Creation**: `deploy/` directory containing multi-stage `Dockerfile` (builds `api` and `tracker` release binaries plus web static export into a lean Debian Bookworm runtime with `libssl3` and `ca-certificates`), `deploy/docker-compose.yml` and symlink `deploy/compose.yml` (`postgres:16`, `tracker`, `api` with `--with-worker`, `caddy` serving web static export and reverse proxying `/api` to port 8080 and tracker routes `/r/*`, `/c`, `/t.js`, `/v1/events/*`, `/v1/webhooks/*` to port 8081), `deploy/Caddyfile`, systemd units (`deploy/systemd/bunfiiliate-api.service`, `bunfiiliate-tracker.service`, `bunfiiliate-worker.service`), comprehensive `.env.example` documenting all 14 environment variables read by the codebase, and `docs/self-hosting.md` covering VPS requirements, first-run `api bootstrap`, automatic TLS, same-origin reverse proxying, GeoIP/CF-IPCountry, backups, upgrades, and systemd installations.
+- **Update**: [Tasks](/tasks/index.md) T44 done on branch. Acceptance passed: `caddy validate --config deploy/Caddyfile` (Valid configuration), `npx markdownlint-cli2 "**/*.md" "#node_modules" "#brain"` (0 issues). `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` all pass.
+
 
 ## [2026-10-26] T23 analytics rollups
 
