@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/action-button";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { StatusBadge } from "@/components/status-badge";
 import { formatTime, ok, refresh, toPage } from "@/lib/admin";
@@ -36,15 +36,15 @@ const config: ResourceConfig<Notification> = {
         n.read_at ? (
           <StatusBadge status="read" />
         ) : (
-          <Button
+          <ActionButton
             size="sm"
-            onClick={async () => {
+            onAction={async () => {
               await ok(api.POST("/api/v1/notifications/{id}/read", { params: { path: { id: n.id } } }));
               await refresh();
             }}
           >
             Mark read
-          </Button>
+          </ActionButton>
         ),
     },
   ],

@@ -91,7 +91,7 @@ function AffiliateDetail({ affiliate: a }: { affiliate: Affiliate }) {
                 api.PATCH("/api/v1/affiliates/{id}", {
                   params: { path: { id: a.id } },
                   body: {
-                    payout_email: email || undefined,
+                    payout_email: email || null,
                     payout_min_cents: wholeNumber(v.payout_min_cents ?? "", "Minimum payout", 0, Number.MAX_SAFE_INTEGER),
                   },
                 }),

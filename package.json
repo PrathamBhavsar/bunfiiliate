@@ -2,6 +2,7 @@
   "name": "bunfiiliate",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.15.9",
   "scripts": {
     "build:js": "esbuild crates/tracker/js/tracker.src.js --minify --target=es2017 --outfile=crates/tracker/js/tracker.min.js",
     "test:js": "node scripts/size-check.mjs && node --test scripts/"
