@@ -12,6 +12,9 @@ import type { ListFn } from "@/lib/use-resource";
 type Contact = components["schemas"]["ContactRequest"];
 
 const STATUSES = ["new", "read", "closed"];
+// The address is public input: only a plain single addr-spec becomes a mailto link (no `?`, `&`, `%`, spaces or commas).
+const SAFE_EMAIL = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
+
 const tone = (s: string) => (s === "new" ? ("accent" as const) : ("neutral" as const));
 
 const list: ListFn<Contact> = async ({ page, pageSize, filters }, signal) =>
@@ -42,7 +45,7 @@ const config: ResourceConfig<Contact> = {
         <Facts
           rows={[
             ["Name", c.name],
-            ["Email", <a key="e" className="underline" href={`mailto:${c.email}`}>{c.email}</a>],
+            ["Email", SAFE_EMAIL.test(c.email) ? <a key="e" className="underline" href={`mailto:${c.email}`}>{c.email}</a> : c.email],
             ["Received", formatTime(c.created_at)],
             ["Status", <StatusBadge key="s" status={c.status} tone={tone(c.status)} />],
           ]}
