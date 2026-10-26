@@ -9,7 +9,7 @@ timestamp: 2026-10-26
 # Tracker Hot Path
 
 1. Validate against in-memory `Snapshot` (`ArcSwap`): code -> program/affiliate/landing, program key -> secrets. Reload on Postgres `LISTEN bf_config`.
-2. Mint UUIDv7 event id in Rust (not PG18 `uuidv7()`). Normalize UA, referrer, country.
+2. Mint UUIDv7 event id in Rust (not PG18 `uuidv7()`). Normalize UA, referrer, country (`CF-IPCountry`, else optional DB-IP lite mmdb via `BF_GEOIP_DB`, else null: `tracker::geo`).
 3. Send to spool writer, await oneshot ack. Writer drains queue, writes, fsyncs once per group, acks (group commit).
 4. Acked batches -> bounded mpsc -> DB batch writer: `INSERT ... SELECT UNNEST(...) ON CONFLICT DO NOTHING`, then advance checkpoint. Delete segments below checkpoint.
 5. Crash: replay from checkpoint. At-least-once + unique keys = effectively-once.

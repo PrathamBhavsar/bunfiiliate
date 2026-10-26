@@ -200,3 +200,5 @@ make deny      # Run cargo-deny dependency and license audit
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+Optional country lookup uses the free [IP Geolocation by DB-IP](https://db-ip.com) lite database, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Fetch it with `scripts/fetch-dbip.sh` (into the gitignored `data/`) and set `BF_GEOIP_DB`; it is never committed. `CF-IPCountry` takes priority when present.

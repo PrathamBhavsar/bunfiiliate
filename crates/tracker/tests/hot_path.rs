@@ -11,6 +11,7 @@ use sqlx::PgPool;
 use tokio::sync::mpsc;
 use tokio::task::JoinSet;
 use tower::ServiceExt;
+use tracker::geo::Geo;
 use tracker::snapshot::Snapshot;
 use tracker::writer::Queued;
 use tracker::{AppState, router, start};
@@ -152,6 +153,7 @@ async fn undrained(pool: &PgPool, dir: &Path, cap: usize) -> (AppState, mpsc::Re
         spool: SpoolWriter::open(SpoolConfig::new(dir)).await.unwrap(),
         queue,
         ip_salt: SALT.into(),
+        geo: Arc::new(Geo::disabled()),
     };
     (state, rx)
 }
@@ -173,7 +175,7 @@ struct Row {
 async fn thousand_clicks_thousand_rows(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     let app = router(t.state.clone());
@@ -199,7 +201,7 @@ async fn thousand_clicks_thousand_rows(pool: PgPool) {
 async fn click_fields_are_normalized(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     let app = router(t.state.clone());
@@ -249,7 +251,7 @@ async fn crash_before_flush_replays_exactly_once(pool: PgPool) {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Run 2: startup replays the spool.
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     assert_eq!(clicks(&pool).await, 1000);
@@ -258,7 +260,7 @@ async fn crash_before_flush_replays_exactly_once(pool: PgPool) {
 
     // Crash after the DB flush but before the checkpoint moved: replay again, no dupes.
     bf_spool::write_checkpoint(&dir, 0).unwrap();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     assert_eq!(clicks(&pool).await, 1000);
@@ -277,7 +279,7 @@ async fn nul_bytes_and_null_landing_do_not_wedge_pipeline(pool: PgPool) {
     .await
     .unwrap();
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     let app = router(t.state.clone());
@@ -304,7 +306,7 @@ async fn nul_bytes_and_null_landing_do_not_wedge_pipeline(pool: PgPool) {
 async fn unknown_code_is_404(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     let app = router(t.state.clone());
@@ -331,7 +333,7 @@ async fn unknown_code_is_404(pool: PgPool) {
 async fn beacon_click_field_is_accepted(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     let app = router(t.state.clone());
@@ -382,7 +384,7 @@ async fn full_queue_sheds_load_with_503(pool: PgPool) {
 async fn snapshot_reloads_on_notify(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     let app = router(t.state.clone());
@@ -414,7 +416,7 @@ async fn snapshot_reloads_on_notify(pool: PgPool) {
 #[sqlx::test(migrations = "../db/migrations")]
 async fn static_endpoints(pool: PgPool) {
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
         .await
         .unwrap();
     let app = router(t.state.clone());

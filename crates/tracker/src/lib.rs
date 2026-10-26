@@ -2,6 +2,7 @@
 //! then batches it into Postgres. No DB call on the request path.
 
 pub mod event;
+pub mod geo;
 pub mod snapshot;
 pub mod webhook;
 pub mod writer;
@@ -33,7 +34,8 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-use event::{clip, country, ip_hash, normalize_ua, referrer_host, url_path, with_click};
+use event::{clip, ip_hash, normalize_ua, referrer_host, url_path, with_click};
+use geo::Geo;
 use snapshot::{CodeEntry, Snapshot};
 use webhook::Source;
 use writer::{Error, Queued, Record};
@@ -56,6 +58,7 @@ pub struct AppState {
     pub spool: SpoolWriter,
     pub queue: mpsc::Sender<Queued>,
     pub ip_salt: Arc<str>,
+    pub geo: Arc<Geo>,
 }
 
 pub struct Tracker {
@@ -66,7 +69,12 @@ pub struct Tracker {
 }
 
 /// Open the spool, replay it into Postgres, load the snapshot, start the writer.
-pub async fn start(pool: PgPool, spool: SpoolConfig, ip_salt: &str) -> Result<Tracker, Error> {
+pub async fn start(
+    pool: PgPool,
+    spool: SpoolConfig,
+    ip_salt: &str,
+    geo: Geo,
+) -> Result<Tracker, Error> {
     let spool = SpoolWriter::open(spool).await?;
     let checkpoint = writer::replay(&pool, &spool).await?;
     let (snapshot, watcher) = snapshot::load_and_watch(pool.clone()).await?;
@@ -78,6 +86,7 @@ pub async fn start(pool: PgPool, spool: SpoolConfig, ip_salt: &str) -> Result<Tr
         spool,
         queue,
         ip_salt: ip_salt.into(),
+        geo: Arc::new(geo),
     };
     Ok(Tracker {
         state,
@@ -345,8 +354,10 @@ impl AppState {
             code: code.to_owned(),
             visitor_id: visitor.map_or_else(|| id.to_string(), |v| clip(v, 64)),
             ts_ms: now_ms(),
+            country: self
+                .geo
+                .country(header(headers, "cf-ipcountry"), ip.as_deref()),
             ip_hash: ip.map(|ip| ip_hash(&self.ip_salt, &ip)),
-            country: header(headers, "cf-ipcountry").and_then(country),
             device: ua.device,
             os: ua.os,
             browser: ua.browser,
