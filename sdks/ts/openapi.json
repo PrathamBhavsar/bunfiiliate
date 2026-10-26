@@ -437,6 +437,217 @@
         ]
       }
     },
+    "/api/v1/analytics/summary": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Totals for a day range, optionally broken down by a dimension.",
+        "operationId": "summary",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "affiliate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "dim",
+            "in": "path",
+            "description": "Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`.",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/Dim"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Summary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program or other affiliate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/timeseries": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Totals per day, every day of the range (zeros when idle).",
+        "operationId": "timeseries",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "path",
+            "description": "Only this program (must be in the workspace). Default: all programs.",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "affiliate_id",
+            "in": "path",
+            "description": "Admins only: one affiliate. Affiliates always see their own data.",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "path",
+            "description": "First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "description": "Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Point"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program or other affiliate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
@@ -2293,6 +2504,116 @@
         ]
       }
     },
+    "/api/v1/reports/analytics.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "CSV of rollup rows per day and value of `dim` (default `total`).",
+        "operationId": "report_csv",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "affiliate_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "dim",
+            "in": "path",
+            "description": "Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`.",
+            "required": true,
+            "schema": {
+              "oneOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "$ref": "#/components/schemas/Dim"
+                }
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/csv",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program or other affiliate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/workspaces": {
       "get": {
         "tags": [
@@ -2500,6 +2821,17 @@
           }
         }
       },
+      "Dim": {
+        "type": "string",
+        "enum": [
+          "total",
+          "country",
+          "os",
+          "browser",
+          "device",
+          "referrer"
+        ]
+      },
       "Enrollment": {
         "type": "object",
         "required": [
@@ -2582,6 +2914,40 @@
           },
           "role": {
             "type": "string"
+          }
+        }
+      },
+      "Metrics": {
+        "type": "object",
+        "required": [
+          "clicks",
+          "conversions",
+          "revenue_cents",
+          "commission_cents",
+          "conversion_rate_bps"
+        ],
+        "properties": {
+          "clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversion_rate_bps": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Conversions per 10000 clicks (can exceed 10000: recurring conversions have no click)."
+          },
+          "conversions": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revenue_cents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sum of conversion amounts in the program currency's minor unit."
           }
         }
       },
@@ -3455,6 +3821,25 @@
           "flat"
         ]
       },
+      "Point": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          {
+            "type": "object",
+            "required": [
+              "day"
+            ],
+            "properties": {
+              "day": {
+                "type": "string",
+                "description": "`YYYY-MM-DD` (UTC)."
+              }
+            }
+          }
+        ]
+      },
       "Program": {
         "type": "object",
         "required": [
@@ -3639,6 +4024,65 @@
             "type": "string"
           }
         }
+      },
+      "Slice": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          {
+            "type": "object",
+            "required": [
+              "dim_value"
+            ],
+            "properties": {
+              "dim_value": {
+                "type": "string",
+                "description": "Value of the dimension; empty = unknown."
+              }
+            }
+          }
+        ]
+      },
+      "Summary": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          {
+            "type": "object",
+            "required": [
+              "from",
+              "to",
+              "breakdown"
+            ],
+            "properties": {
+              "breakdown": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Slice"
+                },
+                "description": "Top 200 values of `dim` by clicks; their sums equal the totals when there are fewer."
+              },
+              "dim": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Dim"
+                  }
+                ]
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              }
+            }
+          }
+        ]
       },
       "UserView": {
         "type": "object",

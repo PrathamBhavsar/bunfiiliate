@@ -2,7 +2,7 @@
 //!
 //! Events are claimed one per transaction with `FOR UPDATE SKIP LOCKED`; the conversion,
 //! its ledger txn and the outbox row commit together with the event's `processed_at`.
-//! Ticks are guarded by a transaction-scoped advisory lock.
+//! Ticks (approve, rollup) are guarded by a transaction-scoped advisory lock.
 
 use std::time::Duration;
 
@@ -17,8 +17,11 @@ use serde_json::{Value, json};
 use sqlx::{Acquire, PgConnection, PgPool};
 use uuid::Uuid;
 
+use crate::analytics;
+
 const INGEST_EVERY: Duration = Duration::from_secs(1);
 const APPROVE_EVERY: Duration = Duration::from_secs(60);
+const ROLLUP_EVERY: Duration = Duration::from_secs(60);
 /// Predicate on an `affiliates a` row: active and enrolled in program `$2`.
 const ELIGIBLE: &str = "a.status = 'active' \
      AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = $2)";
@@ -30,6 +33,7 @@ const APPROVE_LOCK: i64 = 0x6266_6170;
 pub async fn run(pool: PgPool) {
     let mut ingest = tokio::time::interval(INGEST_EVERY);
     let mut approve = tokio::time::interval(APPROVE_EVERY);
+    let mut rollup = tokio::time::interval(ROLLUP_EVERY);
     loop {
         tokio::select! {
             _ = ingest.tick() => match process_events(&pool).await {
@@ -41,6 +45,9 @@ pub async fn run(pool: PgPool) {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(conversions = n, "auto-approved"),
                 Err(e) => tracing::error!(error = %e, "approve tick failed"),
+            },
+            _ = rollup.tick() => if let Err(e) = analytics::rollup(&pool).await {
+                tracing::error!(error = %e, "rollup tick failed");
             },
         }
     }

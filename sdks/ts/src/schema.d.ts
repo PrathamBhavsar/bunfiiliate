@@ -107,6 +107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analytics/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Totals for a day range, optionally broken down by a dimension. */
+        get: operations["summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/timeseries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Totals per day, every day of the range (zeros when idle). */
+        get: operations["timeseries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -475,6 +509,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/analytics.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** CSV of rollup rows per day and value of `dim` (default `total`). */
+        get: operations["report_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -521,6 +572,8 @@ export interface components {
             /** Format: uuid */
             program_id: string;
         };
+        /** @enum {string} */
+        Dim: "total" | "country" | "os" | "browser" | "device" | "referrer";
         Enrollment: {
             /** Format: uuid */
             affiliate_id: string;
@@ -545,6 +598,24 @@ export interface components {
             /** Format: uuid */
             id: string;
             role: string;
+        };
+        Metrics: {
+            /** Format: int64 */
+            clicks: number;
+            /** Format: int64 */
+            commission_cents: number;
+            /**
+             * Format: int64
+             * @description Conversions per 10000 clicks (can exceed 10000: recurring conversions have no click).
+             */
+            conversion_rate_bps: number;
+            /** Format: int64 */
+            conversions: number;
+            /**
+             * Format: int64
+             * @description Sum of conversion amounts in the program currency's minor unit.
+             */
+            revenue_cents: number;
         };
         NewCode: {
             /** Format: uuid */
@@ -851,6 +922,10 @@ export interface components {
         PlanDuration: "one_month" | "x_months" | "lifetime";
         /** @enum {string} */
         PlanKind: "percent" | "flat";
+        Point: components["schemas"]["Metrics"] & {
+            /** @description `YYYY-MM-DD` (UTC). */
+            day: string;
+        };
         Program: {
             attribution_model: string;
             auto_approve: boolean;
@@ -904,6 +979,17 @@ export interface components {
         };
         Site: {
             domain: string;
+        };
+        Slice: components["schemas"]["Metrics"] & {
+            /** @description Value of the dimension; empty = unknown. */
+            dim_value: string;
+        };
+        Summary: components["schemas"]["Metrics"] & {
+            /** @description Top 200 values of `dim` by clicks; their sums equal the totals when there are fewer. */
+            breakdown: components["schemas"]["Slice"][];
+            dim?: null | components["schemas"]["Dim"];
+            from: string;
+            to: string;
         };
         UserView: {
             email: string;
@@ -1189,6 +1275,94 @@ export interface operations {
                 };
             };
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: string | null;
+                affiliate_id: string | null;
+                from: string | null;
+                to: string | null;
+                /** @description Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`. */
+                dim: null | components["schemas"]["Dim"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Summary"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown program or other affiliate */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    timeseries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Only this program (must be in the workspace). Default: all programs. */
+                program_id: string | null;
+                /** @description Admins only: one affiliate. Affiliates always see their own data. */
+                affiliate_id: string | null;
+                /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
+                from: string | null;
+                /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
+                to: string | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Point"][];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown program or other affiliate */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2314,6 +2488,50 @@ export interface operations {
                 };
                 content?: never;
             };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    report_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                program_id: string | null;
+                affiliate_id: string | null;
+                from: string | null;
+                to: string | null;
+                /** @description Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`. */
+                dim: null | components["schemas"]["Dim"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description text/csv */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown program or other affiliate */
             404: {
                 headers: {
                     [name: string]: unknown;

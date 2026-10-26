@@ -1,6 +1,7 @@
 //! bunfiiliate API: auth, roles, OpenAPI.
 
 pub mod affiliates;
+pub mod analytics;
 pub mod audit;
 pub mod auth;
 pub mod bootstrap;
