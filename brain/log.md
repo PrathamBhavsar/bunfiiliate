@@ -12,6 +12,10 @@
 
 - **Creation**: `api worker` and `api serve --with-worker` (`api::worker::{run, process_events, approve_due}`); `bf_core::{Attribution, FirstTouch, LastTouch, Touch}`; `bf_db::ledger::insert_entries` (txn-aware, `insert_txn` reuses it). Ingest claims events `FOR UPDATE SKIP LOCKED`, attributes by customer then touches, resolves plan (override, type, default) and duration window, writes conversion + pending ledger txn + outbox, marks the event; auto-approve tick moves pending to approved after `hold_days`. Details: [Worker & Ingest](/architecture/worker.md).
 - **Update**: [Tasks](/tasks/index.md) T17 done on branch. `cargo test -p api flow_click_to_approved` plus `--test worker` (7: click to approved, hold/flag, duplicate, recurring windows, first vs last touch, code + override, bad events). Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 22.
+## [2026-10-26] T31 web admin core
+
+- **Creation**: admin pages on the T30 blocks. `/programs` (list, create, detail sheet on `?id=`: edit settings, keys and secrets reveal + rotate, sites, commission plans, enrolled affiliates, delete), `/affiliates` (status filter, approve/suspend/reactivate, payout settings), new `/referral-codes` (program + affiliate filters, create, delete; added to `NAV`). Helpers in `src/lib/admin.ts` (`listParams`, `ok`, `refresh`, integer parsers, cents/bps formatters), `admin-ui.tsx`, `program-detail.tsx`. Cents and bps are parsed as whole numbers client-side and mirror the API ranges. No routes beyond the API's; conversion types and provider-secret edits have no UI.
+- **Update**: [Tasks](/tasks/index.md) T31 done on branch. Verified in Chrome against `api serve` on a fresh DB (bootstrap admin, two registered affiliates): login, approve, create program (client validation shown), add site, add plan (range error then ok), enroll, rotate (secret changed), create referral code. Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 22.
 
 ## [2026-10-26] T50 feat/oss-docs
 
