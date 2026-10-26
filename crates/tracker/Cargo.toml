@@ -1,0 +1,10 @@
+[package]
+name = "tracker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+bf-rt.workspace = true
+tracing.workspace = true
