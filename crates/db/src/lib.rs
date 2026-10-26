@@ -1,5 +1,6 @@
 //! Postgres access: pool, migrations, repos.
 
+pub mod auth;
 pub mod ledger;
 pub mod tracker;
 

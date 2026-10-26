@@ -15,7 +15,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T16 | feat/ingest-webhooks | todo |
 | T17 | feat/worker-ingest | todo |
 | T18 | feat/payouts-reversals | todo |
-| T20-T25 | api routes, analytics, ops, SDK | todo |
+| T20 | feat/api-auth | done on branch (Sonnet); seed-demo + worker still stubs |
+| T21-T25 | api routes, analytics, ops, SDK | todo |
 | T30-T34 | web shell + pages | todo |
 | T40-T44 | fraud, observability, geoip, load test, deploy | todo |
 | T50-T51 | oss docs, release page | todo |

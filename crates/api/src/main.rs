@@ -1,4 +1,10 @@
+use std::error::Error;
+use std::sync::Arc;
+
+use api::{AppState, app, bootstrap::bootstrap, routes::ApiDoc};
+use bf_rt::Config;
 use clap::{Parser, Subcommand};
+use utoipa::OpenApi;
 
 #[derive(Parser)]
 #[command(name = "api", version)]
@@ -9,22 +15,62 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Run the HTTP API.
     Serve,
     Worker,
+    /// Print the OpenAPI document.
     Openapi,
-    Bootstrap,
+    /// Create the first workspace and its super_admin.
+    Bootstrap {
+        #[arg(long, env = "BF_ADMIN_EMAIL")]
+        email: String,
+        #[arg(long, env = "BF_ADMIN_PASSWORD", hide_env_values = true)]
+        password: String,
+        #[arg(long, env = "BF_WORKSPACE_NAME", default_value = "Default")]
+        workspace: String,
+    },
     SeedDemo,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
     bf_rt::init_tracing();
-    let cli = Cli::parse();
-    let name = match cli.command {
-        Command::Serve => "serve",
-        Command::Worker => "worker",
-        Command::Openapi => "openapi",
-        Command::Bootstrap => "bootstrap",
-        Command::SeedDemo => "seed-demo",
+    match Cli::parse().command {
+        Command::Serve => serve().await?,
+        Command::Openapi => println!("{}", ApiDoc::openapi().to_pretty_json()?),
+        Command::Bootstrap {
+            email,
+            password,
+            workspace,
+        } => {
+            let pool = bf_db::connect(&Config::from_env()?.database_url).await?;
+            bf_db::migrate(&pool).await?;
+            let id = bootstrap(&pool, &email, &password, &workspace)
+                .await
+                .map_err(|e| format!("bootstrap failed: {e:?}"))?;
+            println!("created super_admin {id}");
+        }
+        Command::Worker => println!("worker: not implemented"),
+        Command::SeedDemo => println!("seed-demo: not implemented"),
+    }
+    Ok(())
+}
+
+async fn serve() -> Result<(), Box<dyn Error>> {
+    let cfg = Config::from_env()?;
+    let pool = bf_db::connect(&cfg.database_url).await?;
+    bf_db::migrate(&pool).await?;
+    let state = AppState {
+        pool,
+        jwt_secret: Arc::from(cfg.jwt_secret),
+        secure_cookies: !matches!(std::env::var("COOKIE_SECURE").as_deref(), Ok("0" | "false")),
     };
-    println!("{name}: not implemented");
+    let listener = tokio::net::TcpListener::bind(("0.0.0.0", cfg.api_port)).await?;
+    tracing::info!(port = cfg.api_port, "api listening");
+    axum::serve(listener, app(state))
+        .with_graceful_shutdown(async {
+            let _ = tokio::signal::ctrl_c().await;
+        })
+        .await?;
+    Ok(())
 }

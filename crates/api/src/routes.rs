@@ -1,0 +1,250 @@
+//! `/api/v1/auth/*` and the OpenAPI document.
+
+use axum::extract::State;
+use axum::extract::rejection::JsonRejection;
+use axum::http::header::SET_COOKIE;
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use bf_db::auth::{Rotation, User, UserRole};
+use chrono::{Duration, Utc};
+use serde::{Deserialize, Serialize};
+use utoipa::openapi::security::{ApiKey, ApiKeyValue, SecurityScheme};
+use utoipa::{Modify, OpenApi, ToSchema};
+use uuid::Uuid;
+
+use crate::AppState;
+use crate::audit;
+use crate::auth::{
+    ACCESS_COOKIE, ACCESS_TTL_SECS, Any, Auth, Principal, REFRESH_COOKIE, REFRESH_TTL_SECS, cookie,
+    hash_refresh_token, issue_access, new_refresh_token, verify_password,
+};
+use crate::error::{AppError, ErrorBody, ErrorDetail};
+
+const REFRESH_PATH: &str = "/api/v1/auth";
+
+struct CookieAuth;
+
+impl Modify for CookieAuth {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(c) = openapi.components.as_mut() {
+            c.add_security_scheme(
+                "cookie",
+                SecurityScheme::ApiKey(ApiKey::Cookie(ApiKeyValue::new(ACCESS_COOKIE))),
+            );
+        }
+    }
+}
+
+#[derive(OpenApi)]
+#[openapi(
+    paths(login, refresh, logout, me),
+    components(schemas(LoginRequest, UserView, ErrorBody, ErrorDetail)),
+    modifiers(&CookieAuth),
+    info(title = "bunfiiliate API", version = "0.1.0")
+)]
+pub struct ApiDoc;
+
+pub fn routes() -> Router<AppState> {
+    Router::new()
+        .route("/api/openapi.json", get(openapi))
+        .route("/api/v1/auth/login", post(login))
+        .route("/api/v1/auth/refresh", post(refresh))
+        .route("/api/v1/auth/logout", post(logout))
+        .route("/api/v1/auth/me", get(me))
+}
+
+async fn openapi() -> Json<utoipa::openapi::OpenApi> {
+    Json(ApiDoc::openapi())
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct LoginRequest {
+    email: String,
+    password: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct UserView {
+    id: Uuid,
+    email: String,
+    #[schema(value_type = String, example = "admin")]
+    role: UserRole,
+    workspace_id: Option<Uuid>,
+}
+
+impl From<User> for UserView {
+    fn from(u: User) -> Self {
+        Self {
+            id: u.id,
+            email: u.email,
+            role: u.role,
+            workspace_id: u.workspace_id,
+        }
+    }
+}
+
+fn set_cookie(name: &str, value: &str, path: &str, max_age: i64, secure: bool) -> HeaderValue {
+    let secure = if secure { "; Secure" } else { "" };
+    let c = format!(
+        "{name}={value}; HttpOnly; SameSite=Strict; Path={path}; Max-Age={max_age}{secure}"
+    );
+    HeaderValue::from_str(&c).expect("cookie is ascii")
+}
+
+fn session_cookies(s: &AppState, access: &str, refresh: &str) -> HeaderMap {
+    let mut h = HeaderMap::new();
+    h.append(
+        SET_COOKIE,
+        set_cookie(
+            ACCESS_COOKIE,
+            access,
+            "/",
+            ACCESS_TTL_SECS,
+            s.secure_cookies,
+        ),
+    );
+    h.append(
+        SET_COOKIE,
+        set_cookie(
+            REFRESH_COOKIE,
+            refresh,
+            REFRESH_PATH,
+            REFRESH_TTL_SECS,
+            s.secure_cookies,
+        ),
+    );
+    h
+}
+
+fn clear_cookies(s: &AppState) -> HeaderMap {
+    let mut h = HeaderMap::new();
+    h.append(
+        SET_COOKIE,
+        set_cookie(ACCESS_COOKIE, "", "/", 0, s.secure_cookies),
+    );
+    h.append(
+        SET_COOKIE,
+        set_cookie(REFRESH_COOKIE, "", REFRESH_PATH, 0, s.secure_cookies),
+    );
+    h
+}
+
+fn refresh_expiry() -> chrono::DateTime<Utc> {
+    Utc::now() + Duration::seconds(REFRESH_TTL_SECS)
+}
+
+/// Sign in with email and password; sets `bf_at` and `bf_rt` cookies.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/login",
+    tag = "auth",
+    request_body = LoginRequest,
+    responses(
+        (status = 200, description = "Signed in", body = UserView),
+        (status = 401, description = "Bad credentials", body = ErrorBody),
+    )
+)]
+async fn login(
+    State(s): State<AppState>,
+    body: Result<Json<LoginRequest>, JsonRejection>,
+) -> Result<(HeaderMap, Json<UserView>), AppError> {
+    let Json(req) = body?;
+    let bad = AppError::Unauthorized("invalid credentials");
+    let user = bf_db::auth::user_by_email(&s.pool, &req.email)
+        .await?
+        .ok_or(bad)?;
+    let (password, hash) = (req.password, user.password_hash.clone());
+    let ok = tokio::task::spawn_blocking(move || verify_password(&password, &hash))
+        .await
+        .map_err(|_| AppError::Internal)?;
+    if !ok {
+        return Err(AppError::Unauthorized("invalid credentials"));
+    }
+    let principal = Principal::from(&user);
+    let access = issue_access(&s.jwt_secret, &principal)?;
+    let refresh = new_refresh_token();
+    bf_db::auth::issue_refresh(
+        &s.pool,
+        user.id,
+        &hash_refresh_token(&refresh),
+        refresh_expiry(),
+    )
+    .await?;
+    audit::record(&s.pool, &principal, "auth.login", "user", user.id, None).await?;
+    Ok((session_cookies(&s, &access, &refresh), Json(user.into())))
+}
+
+/// Exchange the `bf_rt` cookie for a fresh pair. Reusing an old token revokes the family.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/refresh",
+    tag = "auth",
+    responses(
+        (status = 200, description = "Rotated", body = UserView),
+        (status = 401, description = "Missing, expired or reused token", body = ErrorBody),
+    )
+)]
+async fn refresh(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+) -> Result<(HeaderMap, Json<UserView>), AppError> {
+    let old =
+        cookie(&headers, REFRESH_COOKIE).ok_or(AppError::Unauthorized("missing refresh token"))?;
+    let new = new_refresh_token();
+    let rotation = bf_db::auth::rotate_refresh(
+        &s.pool,
+        &hash_refresh_token(old),
+        &hash_refresh_token(&new),
+        refresh_expiry(),
+    )
+    .await?;
+    let Rotation::Rotated { user_id } = rotation else {
+        let msg = if rotation == Rotation::Reuse {
+            "refresh token reused"
+        } else {
+            "invalid refresh token"
+        };
+        return Err(AppError::Unauthorized(msg));
+    };
+    let user = bf_db::auth::user_by_id(&s.pool, user_id)
+        .await?
+        .ok_or(AppError::Unauthorized("invalid refresh token"))?;
+    let access = issue_access(&s.jwt_secret, &Principal::from(&user))?;
+    Ok((session_cookies(&s, &access, &new), Json(user.into())))
+}
+
+/// Revoke the refresh-token family and clear both cookies.
+#[utoipa::path(
+    post,
+    path = "/api/v1/auth/logout",
+    tag = "auth",
+    responses((status = 204, description = "Signed out"))
+)]
+async fn logout(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+) -> Result<(StatusCode, HeaderMap), AppError> {
+    if let Some(token) = cookie(&headers, REFRESH_COOKIE) {
+        bf_db::auth::revoke_family_of(&s.pool, &hash_refresh_token(token)).await?;
+    }
+    Ok((StatusCode::NO_CONTENT, clear_cookies(&s)))
+}
+
+/// The signed-in user.
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/me",
+    tag = "auth",
+    security(("cookie" = [])),
+    responses(
+        (status = 200, body = UserView),
+        (status = 401, body = ErrorBody),
+    )
+)]
+async fn me(State(s): State<AppState>, auth: Auth<Any>) -> Result<Json<UserView>, AppError> {
+    let user = bf_db::auth::user_by_id(&s.pool, auth.principal.user_id)
+        .await?
+        .ok_or(AppError::Unauthorized("user no longer exists"))?;
+    Ok(Json(user.into()))
+}
