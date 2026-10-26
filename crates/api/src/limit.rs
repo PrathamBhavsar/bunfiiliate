@@ -11,14 +11,22 @@ use axum::http::HeaderMap;
 use crate::error::AppError;
 
 const WINDOW: Duration = Duration::from_secs(60);
-/// Distinct keys tracked at once; when full (after dropping idle keys) the longest-quiet key is
-/// evicted, so a flood of made-up emails cannot lock real users out.
+/// Distinct keys tracked at once. When full, idle keys go first, then the longest-quiet key that
+/// is not currently blocked; a blocked key is evicted only if every key is blocked. So a flood
+/// of made-up emails can neither lock real users out nor lift a block that is in force.
 const MAX_KEYS: usize = 10_000;
+
+#[derive(Default)]
+struct Entry {
+    /// The limit this key was last checked against.
+    max: usize,
+    hits: VecDeque<Instant>,
+}
 
 pub struct Limiter {
     window: Duration,
     max_keys: usize,
-    hits: Mutex<HashMap<String, VecDeque<Instant>>>,
+    hits: Mutex<HashMap<String, Entry>>,
 }
 
 impl Default for Limiter {
@@ -43,33 +51,37 @@ impl Limiter {
 
     fn allow_at(&self, key: &str, max: usize, now: Instant) -> bool {
         let mut hits = self.hits.lock().unwrap_or_else(|e| e.into_inner());
-        let live = |q: &mut VecDeque<Instant>| {
-            while q
+        let live = |e: &mut Entry| {
+            while e
+                .hits
                 .front()
                 .is_some_and(|t| now.duration_since(*t) >= self.window)
             {
-                q.pop_front();
+                e.hits.pop_front();
             }
-            !q.is_empty()
+            !e.hits.is_empty()
         };
         if !hits.contains_key(key) && hits.len() >= self.max_keys {
-            hits.retain(|_, q| live(q));
+            hits.retain(|_, e| live(e));
             if hits.len() >= self.max_keys {
-                let quietest = hits
-                    .iter()
-                    .min_by_key(|(_, q)| q.back().copied())
-                    .map(|(k, _)| k.clone());
-                if let Some(k) = quietest {
+                let quietest = |blocked: bool| {
+                    hits.iter()
+                        .filter(|(_, e)| (e.hits.len() >= e.max) == blocked)
+                        .min_by_key(|(_, e)| e.hits.back().copied())
+                        .map(|(k, _)| k.clone())
+                };
+                if let Some(k) = quietest(false).or_else(|| quietest(true)) {
                     hits.remove(&k);
                 }
             }
         }
-        let q = hits.entry(key.to_string()).or_default();
-        live(q);
-        if q.len() >= max {
+        let e = hits.entry(key.to_string()).or_default();
+        live(e);
+        e.max = max;
+        if e.hits.len() >= max {
             return false;
         }
-        q.push_back(now);
+        e.hits.push_back(now);
         true
     }
 }
@@ -112,8 +124,9 @@ pub fn check(l: &Limiter, rule: &Rule, headers: &HeaderMap, email: &str) -> Resu
     let route = rule.route;
     let ip_ok =
         client_ip(headers).is_none_or(|ip| l.allow(&format!("{route}:ip:{ip}"), rule.per_ip));
+    // An address already over its limit does not also spend the email's allowance (or a slot).
     let email = email.trim().to_ascii_lowercase();
-    let email_ok = l.allow(&format!("{route}:email:{email}"), rule.per_email);
+    let email_ok = ip_ok && l.allow(&format!("{route}:email:{email}"), rule.per_email);
     if ip_ok && email_ok {
         Ok(())
     } else {
@@ -158,6 +171,22 @@ mod tests {
             "idle keys evicted"
         );
         assert!(l.hits.lock().unwrap().len() <= 2);
+    }
+
+    #[test]
+    fn limit_flood_of_new_keys_does_not_lift_a_block() {
+        let l = Limiter::new(Duration::from_secs(60), 3);
+        let t0 = Instant::now();
+        assert!(l.allow_at("victim", 1, t0));
+        assert!(!l.allow_at("victim", 1, t0), "blocked");
+        // An attacker rotates through fresh keys; the blocked key is the oldest of them all.
+        for i in 0..20 {
+            assert!(l.allow_at(&format!("fresh{i}"), 5, t0 + Duration::from_secs(1 + i)));
+        }
+        assert!(
+            !l.allow_at("victim", 1, t0 + Duration::from_secs(30)),
+            "still blocked after the flood"
+        );
     }
 
     #[test]
