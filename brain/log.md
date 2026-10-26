@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-10-27] Review fixes F1-F4
+
+- **Update**: three review reports (auth/api, money/tracker, web/deploy) fixed on four branches, see [Tasks](/tasks/index.md) F1-F4. Workers hit a usage limit part-way; the coordinator finished and merged them.
+- **Behaviour changes**: JWT_SECRET must be >=32 bytes; `BF_IP_SALT` required by tracker; client IP is the TCP peer unless `BF_TRUSTED_PROXIES` / `BF_TRUST_CF` say otherwise; generic webhook signature is now HMAC over `<X-Bf-Timestamp>.<Idempotency-Key>.<body>` (breaking); webhook targets block private IPs unless `BF_ALLOW_PRIVATE_WEBHOOKS`; migration 0050.
+- **Validation**: `make ci` and `make e2e` pass on staging. See [Tracker Hot Path](/architecture/tracker-hot-path.md).
+- **Known limits**: partial refunds are ignored, not prorated; the login/register limiter is best-effort per process; docker compose was not validated (no docker locally).
+
 ## [2026-10-26] T51 standalone release datasheet page
 
 - **Creation**: `site/index.html` standalone engineering release datasheet following the Plan Section 5 visual direction (warm paper `#F4F1EA`, ink `#111111`, hairline rules, safety-orange `#FF5A1F` exclusively for measured numbers, IBM Plex Mono tabular numbers, Space Grotesk headings, responsive inline SVG architecture schematic tracker -> spool -> batch writer -> PG -> worker -> outbox, benchmark metrics table matching JSON measurements, double-entry ledger posting matrix, quickstart runbook, repository links; zero JS runtime, zero gradients, zero emoji, dark-mode-agnostic paper aesthetic).

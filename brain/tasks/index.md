@@ -34,6 +34,10 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
 | T51 | feat/release-page | done, merged (agy/antigravity); site/index.html datasheet, scripts/check-bench-numbers.sh, browser-verified |
 | T60a | feat/e2e-suite | done, merged (Sonnet); `make e2e` exits 0, repeatable; 6 serial browser tests, deterministic, no LLM |
-| T60 | final gate (make ci, ocr, e2e) | todo |
+| F1 | feat/fix-deploy-web | done, merged (Sonnet worker, coordinator-finished); compose required secrets, Caddy header strip, non-root image, CI jobs, web error display, mixed-currency /me |
+| F2 | feat/fix-api-hardening | done, merged (worker + coordinator); JWT secret check, limiter, bounded Argon2, body limit, refresh reuse grace, SSRF guard, webhook lease delivery |
+| F3 | feat/fix-money-worker | done, merged (coordinator-finished); migration 0050, Stripe/Paddle dedup + retry, payout email snapshot, rollup state |
+| F4 | feat/fix-tracker-spool | done, merged (coordinator); spool all-or-nothing + poison, dead-letter, trusted proxies, event queue lane, signed-timestamp generic webhook, tracker.js |
+| T60 | final gate (make ci, ocr, e2e) | `make ci` and `make e2e` green on staging; prod merge pending |
 
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).
