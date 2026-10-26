@@ -482,3 +482,20 @@ pub async fn plan_in_program(
     .fetch_one(db)
     .await
 }
+
+/// Drop codes of a program whose landing host is no longer one of its sites (or a subdomain).
+pub async fn delete_offsite_codes(
+    db: impl PgExecutor<'_>,
+    program_id: Uuid,
+) -> Result<u64, sqlx::Error> {
+    let res = sqlx::query(
+        "DELETE FROM referral_codes c WHERE c.program_id = $1 AND NOT EXISTS ( \
+           SELECT 1 FROM program_sites s WHERE s.program_id = c.program_id AND ( \
+             lower(substring(c.landing_url from '^https?://([^/?#:]*)')) = s.domain \
+             OR lower(substring(c.landing_url from '^https?://([^/?#:]*)')) LIKE '%.' || s.domain))",
+    )
+    .bind(program_id)
+    .execute(db)
+    .await?;
+    Ok(res.rows_affected())
+}

@@ -313,3 +313,20 @@ pub async fn delete_code(
     .await?;
     Ok(res.rows_affected() > 0)
 }
+
+/// Drop every code of an affiliate (used on suspend, so the tracker stops attributing).
+pub async fn delete_codes_of_affiliate(
+    db: impl PgExecutor<'_>,
+    workspace_id: Uuid,
+    affiliate_id: Uuid,
+) -> Result<u64, sqlx::Error> {
+    let res = sqlx::query(
+        "DELETE FROM referral_codes c USING programs p \
+         WHERE p.id = c.program_id AND p.workspace_id = $1 AND c.affiliate_id = $2",
+    )
+    .bind(workspace_id)
+    .bind(affiliate_id)
+    .execute(db)
+    .await?;
+    Ok(res.rows_affected())
+}
