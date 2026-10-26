@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-26] T50 feat/oss-docs
+
+- **Creation**: `CONTRIBUTING.md` (clean-room rules, 3-tier git flow `prod` <- `staging` <- `feat/*`, short commit message style, `make ci`, local Postgres 16 on port 5433, `brain/` upkeep, doc linting); `SECURITY.md` (private vulnerability disclosure via GitHub Security Advisories, response SLA, version support table, threat model scope & exclusions); `docs/architecture.md` (system layout, crate dependency graph mermaid, tracker hot path sequence mermaid, double-entry ledger postings table & state transitions, background worker loops, auth & tenancy model derived strictly from `docs/PLAN.md` and `brain/architecture/*`); `.markdownlint.json` (MD013 disabled, MD024 siblings_only).
+- **Update**: `README.md` (replaced stub with what/why, feature list, mermaid architecture diagram, quickstart with Makefile/CLAUDE.md commands, pre-release status, AGPL-3.0 license note, links to docs); `docs/PLAN.md` and `docs/ledger.md` table and heading lint fixes.
+- **Validation**: `npx markdownlint-cli2 "**/*.md" "#node_modules" "#brain"` passes (0 issues across 7 files); `cargo fmt --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` passes with 0 warnings/failures. [Tasks](/tasks/index.md) T50 marked done.
+
 ## [2026-10-26] Wave 2 merged to staging
 
 - **Update**: T11 state machines, T14 tracker hot path, T20 api auth merged. [Tasks](/tasks/index.md) synced.

@@ -19,7 +19,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T21-T25 | api routes, analytics, ops, SDK | todo |
 | T30-T34 | web shell + pages | todo |
 | T40-T44 | fraud, observability, geoip, load test, deploy | todo |
-| T50-T51 | oss docs, release page | todo |
+| T50 | feat/oss-docs | done on branch (agy/antigravity) |
+| T51 | feat/release-page | todo |
 | T60 | final gate (make ci, ocr, e2e) | todo |
 
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).
