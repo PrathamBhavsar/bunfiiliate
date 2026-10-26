@@ -28,7 +28,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T34 | feat/web-affiliate-portal | done, merged (Sonnet); `/me` dashboard, links, earnings, payouts, profile, public `/register`. Browser-verified; no per-code stats (API has none) |
 | T40 | feat/fraud-rules | done, merged (Sonnet); `cargo test fraud` 10 tests |
 | T41 | feat/observability | done, merged (Sonnet); `cargo test --workspace metrics` 4 tests |
-| T43 | feat/load-test | todo |
+| T43 | feat/load-test | done on branch (agy/antigravity); `bench/run.sh` exits 0, writes results/*.json, generates docs/benchmarks.md |
 | T44 | feat/deploy | done, merged (agy/antigravity); Dockerfile, compose, Caddyfile, systemd, self-hosting.md |
 | T42 | feat/geoip | done, merged (Sonnet); `cargo test -p tracker geo` 6 tests |
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
