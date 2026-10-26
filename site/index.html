@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>bunfiiliate &mdash; Technical Specification &amp; Release Datasheet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #F4F1EA;
+      --paper-dim: #ECE8DF;
+      --paper-bar: #E2DDD2;
+      --ink: #111111;
+      --ink-muted: #444444;
+      --measure: #FF5A1F;
+      --rule: #111111;
+      --rule-hair: 1px solid var(--rule);
+      --font-mono: "IBM Plex Mono", "SF Mono", Consolas, Monaco, monospace;
+      --font-sans: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background-color: var(--paper);
+      color: var(--ink);
+      color-scheme: light;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .sheet {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 32px 24px 64px 24px;
+    }
+
+    /* Datasheet Header Block */
+    .header-frame {
+      border: var(--rule-hair);
+      margin-bottom: 28px;
+    }
+
+    .header-top {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      border-bottom: var(--rule-hair);
+      background-color: var(--paper-bar);
+      padding: 12px 16px;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .doc-classification {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+
+    .doc-id {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-align: right;
+    }
+
+    .header-main {
+      padding: 24px 20px 20px 20px;
+      border-bottom: var(--rule-hair);
+    }
+
+    h1 {
+      font-family: var(--font-sans);
+      font-size: 32px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--ink-muted);
+      max-width: 820px;
+    }
+
+    .header-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background-color: var(--paper);
+    }
+
+    .meta-cell {
+      padding: 10px 16px;
+      border-right: var(--rule-hair);
+    }
+
+    .meta-cell:last-child {
+      border-right: none;
+    }
+
+    .meta-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 2px;
+    }
+
+    .meta-val {
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    /* Section Typography & Rules */
+    section {
+      margin-bottom: 36px;
+    }
+
+    .section-title-bar {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      border-bottom: var(--rule-hair);
+      padding-bottom: 6px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .section-idx {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-muted);
+    }
+
+    p {
+      margin-bottom: 12px;
+      color: var(--ink);
+    }
+
+    .lead {
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    /* Schematic Box */
+    .schematic-box {
+      border: var(--rule-hair);
+      background-color: var(--paper-dim);
+      padding: 20px 16px 16px 16px;
+      margin-bottom: 20px;
+    }
+
+    .schematic-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+      margin-bottom: 12px;
+    }
+
+    .schematic-svg-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .schematic-svg {
+      display: block;
+      width: 100%;
+      min-width: 720px;
+      height: auto;
+    }
+
+    /* Spec Grid */
+    .spec-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .spec-card {
+      border: var(--rule-hair);
+      background-color: var(--paper);
+      padding: 16px;
+    }
+
+    .spec-card-title {
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border-bottom: var(--rule-hair);
+      padding-bottom: 6px;
+      margin-bottom: 10px;
+    }
+
+    .spec-card ul {
+      list-style-type: none;
+    }
+
+    .spec-card li {
+      position: relative;
+      padding-left: 14px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+
+    .spec-card li::before {
+      content: "-";
+      position: absolute;
+      left: 0;
+      font-weight: 600;
+    }
+
+    /* Tables */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin-bottom: 16px;
+      border: var(--rule-hair);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    thead th {
+      background-color: var(--paper-bar);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      padding: 8px 12px;
+      border-bottom: var(--rule-hair);
+      border-right: var(--rule-hair);
+    }
+
+    thead th:last-child {
+      border-right: none;
+    }
+
+    tbody td {
+      padding: 7px 12px;
+      border-bottom: var(--rule-hair);
+      border-right: var(--rule-hair);
+      background-color: var(--paper);
+    }
+
+    tbody td:last-child {
+      border-right: none;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    tbody tr:hover td {
+      background-color: var(--paper-dim);
+    }
+
+    .tar {
+      text-align: right;
+    }
+
+    /* Measured Numbers styling: Safety Orange ONLY */
+    .num {
+      color: var(--measure);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      font-family: var(--font-mono);
+    }
+
+    /* Notes / Disclosures */
+    .disclosure {
+      border: var(--rule-hair);
+      background-color: var(--paper-dim);
+      padding: 12px 14px;
+      font-size: 11px;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+
+    .disclosure-title {
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    /* Code & Runbook */
+    pre {
+      background-color: var(--paper-dim);
+      border: var(--rule-hair);
+      padding: 14px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.5;
+      overflow-x: auto;
+      margin-bottom: 14px;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    p code, li code {
+      background-color: var(--paper-bar);
+      padding: 1px 4px;
+      border: 1px solid #c8c3b8;
+    }
+
+    /* Links */
+    a {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+
+    a:hover {
+      background-color: var(--ink);
+      color: var(--paper);
+      text-decoration: none;
+    }
+
+    .links-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .link-item {
+      border: var(--rule-hair);
+      background-color: var(--paper);
+      padding: 10px 14px;
+      font-size: 12px;
+    }
+
+    .link-item span {
+      display: block;
+      font-size: 10px;
+      color: var(--ink-muted);
+      margin-top: 2px;
+    }
+
+    /* Footer */
+    footer {
+      border-top: var(--rule-hair);
+      padding-top: 16px;
+      margin-top: 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--ink-muted);
+    }
+
+    /* Responsive */
+    @media (max-width: 820px) {
+      .header-meta-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .meta-cell:nth-child(2) {
+        border-right: none;
+      }
+      .meta-cell:nth-child(1), .meta-cell:nth-child(2) {
+        border-bottom: var(--rule-hair);
+      }
+      .spec-grid {
+        grid-template-columns: 1fr;
+      }
+      .links-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 540px) {
+      .sheet {
+        padding: 16px 12px 32px 12px;
+      }
+      h1 {
+        font-size: 24px;
+      }
+      .header-meta-grid {
+        grid-template-columns: 1fr;
+      }
+      .meta-cell {
+        border-right: none;
+        border-bottom: var(--rule-hair);
+      }
+      .meta-cell:last-child {
+        border-bottom: none;
+      }
+      footer {
+        flex-direction: column;
+        gap: 8px;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+
+    <!-- Header Frame -->
+    <header class="header-frame">
+      <div class="header-top">
+        <div class="doc-classification">Engineering Datasheet &mdash; Release Specification</div>
+        <div class="doc-id">DOC-ID: BF-DS-2026-01</div>
+      </div>
+      <div class="header-main">
+        <h1>bunfiiliate</h1>
+        <p class="subtitle">Open-source affiliate tracking and commission engine in Rust. High-throughput zero-DB hot-path ingestion via WAL spool and double-entry integer-cents financial ledger.</p>
+      </div>
+      <div class="header-meta-grid">
+        <div class="meta-cell">
+          <div class="meta-label">Status</div>
+          <div class="meta-val">Pre-release (Active)</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">License</div>
+          <div class="meta-val">GNU AGPL-3.0</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">Implementation</div>
+          <div class="meta-val">Rust, edition 2024 (1.85+)</div>
+        </div>
+        <div class="meta-cell">
+          <div class="meta-label">Ledger Integrity</div>
+          <div class="meta-val">Balanced Zero-Sum (cents: i64)</div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <!-- Section 1: Architecture Schematic -->
+      <section>
+        <div class="section-title-bar">
+          <h2>1. System Architecture &amp; Ingestion Pipeline</h2>
+          <span class="section-idx">SEC-01</span>
+        </div>
+        <p class="lead">
+          Requests are ingested without synchronous database calls. Hot-path lookups read from an in-memory <code>Snapshot</code> (in <code>ArcSwap</code>) refreshed via PostgreSQL <code>LISTEN bf_config</code>. Events write directly to a segmented Write-Ahead Log (WAL) with group-commit fsync, then flush asynchronously into PostgreSQL.
+        </p>
+
+        <div class="schematic-box">
+          <div class="schematic-label">Schematic: Ingestion Hot Path &rarr; Storage &rarr; Outbox Processing</div>
+          <div class="schematic-svg-container">
+            <svg class="schematic-svg" viewBox="0 0 960 140" width="960" height="140" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M 0 1 L 9 5 L 0 9 z" fill="#111111" />
+                </marker>
+              </defs>
+
+              <!-- Node 1: Tracker -->
+              <rect x="8" y="24" width="134" height="88" fill="#F4F1EA" stroke="#111111" stroke-width="1.2" />
+              <text x="75" y="48" font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="middle">TRACKER</text>
+              <text x="75" y="66" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#111111" text-anchor="middle">axum :8081</text>
+              <text x="75" y="82" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">ArcSwap Snapshot</text>
+              <text x="75" y="96" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Zero-DB Ingress</text>
+
+              <!-- Arrow 1 -> 2 -->
+              <line x1="142" y1="68" x2="168" y2="68" stroke="#111111" stroke-width="1.2" marker-end="url(#arrow)" />
+
+              <!-- Node 2: Spool -->
+              <rect x="172" y="24" width="134" height="88" fill="#F4F1EA" stroke="#111111" stroke-width="1.2" />
+              <text x="239" y="48" font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="middle">SPOOL</text>
+              <text x="239" y="66" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#111111" text-anchor="middle">bf-spool</text>
+              <text x="239" y="82" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Segmented WAL</text>
+              <text x="239" y="96" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">CRC32 + fsync</text>
+
+              <!-- Arrow 2 -> 3 -->
+              <line x1="306" y1="68" x2="332" y2="68" stroke="#111111" stroke-width="1.2" marker-end="url(#arrow)" />
+
+              <!-- Node 3: Batch Writer -->
+              <rect x="336" y="24" width="134" height="88" fill="#F4F1EA" stroke="#111111" stroke-width="1.2" />
+              <text x="403" y="48" font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="middle">BATCH WRITER</text>
+              <text x="403" y="66" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#111111" text-anchor="middle">Bounded MPSC</text>
+              <text x="403" y="82" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">INSERT ... UNNEST</text>
+              <text x="403" y="96" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Checkpoint GC</text>
+
+              <!-- Arrow 3 -> 4 -->
+              <line x1="470" y1="68" x2="496" y2="68" stroke="#111111" stroke-width="1.2" marker-end="url(#arrow)" />
+
+              <!-- Node 4: PG -->
+              <rect x="500" y="24" width="134" height="88" fill="#F4F1EA" stroke="#111111" stroke-width="1.2" />
+              <text x="567" y="48" font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="middle">POSTGRESQL 16</text>
+              <text x="567" y="66" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#111111" text-anchor="middle">Single Truth</text>
+              <text x="567" y="82" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Immutable Ledger</text>
+              <text x="567" y="96" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Zero-Sum Triggers</text>
+
+              <!-- Arrow 4 -> 5 -->
+              <line x1="634" y1="68" x2="660" y2="68" stroke="#111111" stroke-width="1.2" marker-end="url(#arrow)" />
+
+              <!-- Node 5: Worker -->
+              <rect x="664" y="24" width="134" height="88" fill="#F4F1EA" stroke="#111111" stroke-width="1.2" />
+              <text x="731" y="48" font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="middle">WORKER</text>
+              <text x="731" y="66" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#111111" text-anchor="middle">api worker</text>
+              <text x="731" y="82" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">SKIP LOCKED</text>
+              <text x="731" y="96" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Attribution &amp; Fraud</text>
+
+              <!-- Arrow 5 -> 6 -->
+              <line x1="798" y1="68" x2="824" y2="68" stroke="#111111" stroke-width="1.2" marker-end="url(#arrow)" />
+
+              <!-- Node 6: Outbox -->
+              <rect x="828" y="24" width="124" height="88" fill="#F4F1EA" stroke="#111111" stroke-width="1.2" />
+              <text x="890" y="48" font-family="'Space Grotesk', sans-serif" font-size="12" font-weight="700" fill="#111111" text-anchor="middle">OUTBOX</text>
+              <text x="890" y="66" font-family="'IBM Plex Mono', monospace" font-size="10" fill="#111111" text-anchor="middle">Dispatcher</text>
+              <text x="890" y="82" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Signed Webhooks</text>
+              <text x="890" y="96" font-family="'IBM Plex Mono', monospace" font-size="9" fill="#444444" text-anchor="middle">Lettre Emails</text>
+            </svg>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Key Specifications -->
+      <section>
+        <div class="section-title-bar">
+          <h2>2. Technical Capabilities &amp; Specifications</h2>
+          <span class="section-idx">SEC-02</span>
+        </div>
+
+        <div class="spec-grid">
+          <div class="spec-card">
+            <div class="spec-card-title">Ingestion &amp; Hot-Path Pipeline</div>
+            <ul>
+              <li><strong>Zero-DB validation:</strong> In-memory snapshot in <code>ArcSwap</code>, dynamically refreshed on Postgres <code>LISTEN bf_config</code>.</li>
+              <li><strong>Durable WAL spool:</strong> <code>bf-spool</code> segmented write-ahead log with <code>[len u32|crc32|json]</code> framing and group-commit fsync.</li>
+              <li><strong>Batched database ingest:</strong> Flushes acked batches over a bounded MPSC channel using <code>INSERT ... SELECT UNNEST(...) ON CONFLICT DO NOTHING</code>.</li>
+              <li><strong>Load shedding:</strong> Bounded memory channels return HTTP 503 backpressure rather than unbounded memory allocation.</li>
+              <li><strong>Compact client script:</strong> <code>tracker.min.js</code> (&lt;2 KB) handles first-party cookies (<code>bf_vid</code>, <code>bf_ref</code>) and beacon payloads.</li>
+              <li><strong>Webhook verification:</strong> Constant-time HMAC-SHA256 signature verification for Stripe (<code>t=,v1=</code>), Paddle (<code>ts=;h1=</code>), and generic events.</li>
+            </ul>
+          </div>
+
+          <div class="spec-card">
+            <div class="spec-card-title">Financial Ledger &amp; Accounting</div>
+            <ul>
+              <li><strong>Pure domain core:</strong> <code>bf-core</code> contains all financial rules, currency types, and state machines without I/O dependencies.</li>
+              <li><strong>Double-entry bookkeeping:</strong> Four accounts (<code>Expense</code>, <code>AffPending</code>, <code>AffPayable</code>, <code>Cash</code>).</li>
+              <li><strong>Append-only immutability:</strong> Postgres triggers forbid <code>UPDATE</code> and <code>DELETE</code> operations on <code>ledger_entries</code>.</li>
+              <li><strong>Balanced by construction:</strong> <code>LedgerTxn</code> requires debits equal credits per currency. Deferrable constraint triggers verify <code>sum(amount_cents) = 0</code>.</li>
+              <li><strong>Integer cents:</strong> All money is stored in integer minor units (<code>cents: i64</code>). Floats are strictly prohibited.</li>
+              <li><strong>Basis-point math:</strong> Exact commission calculation in basis points (1 bps = 0.01%) using round-half-up math in <code>i128</code>.</li>
+            </ul>
+          </div>
+
+          <div class="spec-card">
+            <div class="spec-card-title">Multi-Tenancy &amp; Security</div>
+            <ul>
+              <li><strong>Workspace scoping:</strong> Strict multi-tenant isolation across Workspaces, Programs, Affiliates, and Referral Codes.</li>
+              <li><strong>Role-based access:</strong> Scoped authorization for <code>super_admin</code>, <code>admin</code>, and <code>affiliate</code>.</li>
+              <li><strong>HttpOnly cookie sessions:</strong> Short-lived 15-minute JWT access cookies (<code>bf_at</code>) with <code>SameSite=Strict</code>.</li>
+              <li><strong>Rotating refresh tokens:</strong> Opaque 30-day tokens (<code>bf_rt</code>) stored as SHA-256 hashes; reuse immediately revokes the family.</li>
+              <li><strong>CSRF prevention:</strong> Strict origin validation on all state-mutating HTTP requests.</li>
+              <li><strong>Argon2 password hashing:</strong> Robust password derivation for all stored user credentials.</li>
+            </ul>
+          </div>
+
+          <div class="spec-card">
+            <div class="spec-card-title">Operations &amp; Background Processing</div>
+            <ul>
+              <li><strong>Single-image deployment:</strong> Compiles to two binaries (<code>tracker</code> and <code>api</code>); worker is embedded via <code>api serve --with-worker</code>.</li>
+              <li><strong>Concurrency control:</strong> Inbound events and outbox messages claimed via <code>FOR UPDATE SKIP LOCKED</code>.</li>
+              <li><strong>Advisory locks:</strong> Periodic auto-approve and rollup ticks coordinated via <code>pg_try_advisory_lock</code>.</li>
+              <li><strong>Transactional outbox:</strong> Outbound webhooks dispatched with exponential backoff and retry counters; emails sent via Lettre.</li>
+              <li><strong>Attribution engines:</strong> Configurable first-touch and last-touch attribution models.</li>
+              <li><strong>Traffic hygiene &amp; fraud rules:</strong> In-memory sliding-window IP velocity limiting, Woothee bot filtering, and click deduplication.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Empirical Benchmarks -->
+      <section>
+        <div class="section-title-bar">
+          <h2>3. Empirical Load Benchmarks</h2>
+          <span class="section-idx">SEC-03</span>
+        </div>
+        <p class="lead">
+          Load test measurements generated by <code>oha 1.16.0</code> against the <code>tracker</code> HTTP ingress daemon. Testing continuous concurrency with 20 parallel connections for 5 seconds per target.
+        </p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Ingress Endpoint</th>
+                <th><code>BF_FSYNC</code></th>
+                <th class="tar">Requests / Sec</th>
+                <th class="tar">Latency p50</th>
+                <th class="tar">Latency p95</th>
+                <th class="tar">Latency p99</th>
+                <th class="tar">Errors</th>
+                <th>Status Distribution</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-benchmark="fsync_always_c">
+                <td><code>/c</code> (click beacon)</td>
+                <td><code>always</code></td>
+                <td class="tar"><span class="num" data-metric="rps">1455.74</span></td>
+                <td class="tar"><span class="num" data-metric="p50">13.942 ms</span></td>
+                <td class="tar"><span class="num">18.848 ms</span></td>
+                <td class="tar"><span class="num" data-metric="p99">23.123 ms</span></td>
+                <td class="tar"><span class="num">0</span></td>
+                <td>204: <span class="num">7301</span></td>
+              </tr>
+              <tr data-benchmark="fsync_always_r">
+                <td><code>/r/:code</code> (redirect)</td>
+                <td><code>always</code></td>
+                <td class="tar"><span class="num" data-metric="rps">1528.31</span></td>
+                <td class="tar"><span class="num" data-metric="p50">13.107 ms</span></td>
+                <td class="tar"><span class="num">17.168 ms</span></td>
+                <td class="tar"><span class="num" data-metric="p99">19.788 ms</span></td>
+                <td class="tar"><span class="num">0</span></td>
+                <td>302: <span class="num">7663</span></td>
+              </tr>
+              <tr data-benchmark="fsync_always_webhook">
+                <td><code>/v1/events/:key</code> (signed webhook)</td>
+                <td><code>always</code></td>
+                <td class="tar"><span class="num" data-metric="rps">1548.84</span></td>
+                <td class="tar"><span class="num" data-metric="p50">12.857 ms</span></td>
+                <td class="tar"><span class="num">17.228 ms</span></td>
+                <td class="tar"><span class="num" data-metric="p99">22.878 ms</span></td>
+                <td class="tar"><span class="num">0</span></td>
+                <td>202: <span class="num">7760</span></td>
+              </tr>
+              <tr data-benchmark="fsync_off_c">
+                <td><code>/c</code> (click beacon)</td>
+                <td><code>off</code></td>
+                <td class="tar"><span class="num" data-metric="rps">16993.22</span></td>
+                <td class="tar"><span class="num" data-metric="p50">0.645 ms</span></td>
+                <td class="tar"><span class="num">4.203 ms</span></td>
+                <td class="tar"><span class="num" data-metric="p99">4.78 ms</span></td>
+                <td class="tar"><span class="num">0</span></td>
+                <td>204: <span class="num">84993</span></td>
+              </tr>
+              <tr data-benchmark="fsync_off_r">
+                <td><code>/r/:code</code> (redirect)</td>
+                <td><code>off</code></td>
+                <td class="tar"><span class="num" data-metric="rps">27591.99</span></td>
+                <td class="tar"><span class="num" data-metric="p50">0.405 ms</span></td>
+                <td class="tar"><span class="num">3.695 ms</span></td>
+                <td class="tar"><span class="num" data-metric="p99">4.33 ms</span></td>
+                <td class="tar"><span class="num">0</span></td>
+                <td>302: <span class="num">138041</span></td>
+              </tr>
+              <tr data-benchmark="fsync_off_webhook">
+                <td><code>/v1/events/:key</code> (signed webhook)</td>
+                <td><code>off</code></td>
+                <td class="tar"><span class="num" data-metric="rps">9039.3</span></td>
+                <td class="tar"><span class="num" data-metric="p50">1.377 ms</span></td>
+                <td class="tar"><span class="num">4.844 ms</span></td>
+                <td class="tar"><span class="num" data-metric="p99">5.449 ms</span></td>
+                <td class="tar"><span class="num">0</span></td>
+                <td>202: <span class="num">45241</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="disclosure">
+          <div class="disclosure-title">Test Environment &amp; Localhost Disclosure</div>
+          <div>
+            Hardware: Apple M4 (10 cores), 16 GB RAM, macOS 26.5.1. Database: PostgreSQL 16.15 (Homebrew). Load Generator: oha 1.16.0.
+            All measurements were recorded on a single development workstation where load generator, tracker daemon, and database engine shared physical CPU cores, memory, and SSD I/O. Results represent a single-node baseline.
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Double-Entry Ledger Posting Matrix -->
+      <section>
+        <div class="section-title-bar">
+          <h2>4. Double-Entry Ledger Posting Matrix</h2>
+          <span class="section-idx">SEC-04</span>
+        </div>
+        <p class="lead">
+          All financial movements post to immutable ledger rows. The sum of signed postings in every <code>LedgerTxn</code> strictly equals zero by construction and database verification.
+        </p>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Lifecycle Trigger Event</th>
+                <th>Debit Account (+)</th>
+                <th>Credit Account (&minus;)</th>
+                <th>Financial Meaning</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Conversion Created</strong></td>
+                <td><code>Expense</code></td>
+                <td><code>AffPending</code></td>
+                <td>Commission liability created; held pending verification window</td>
+              </tr>
+              <tr>
+                <td><strong>Hold Approval</strong></td>
+                <td><code>AffPending</code></td>
+                <td><code>AffPayable</code></td>
+                <td>Hold period expires; commission balance is eligible for payout</td>
+              </tr>
+              <tr>
+                <td><strong>Pre-Approval Rejection</strong></td>
+                <td><code>AffPending</code></td>
+                <td><code>Expense</code></td>
+                <td>Conversion rejected or refunded prior to approval; cancels liability</td>
+              </tr>
+              <tr>
+                <td><strong>Post-Approval Chargeback</strong></td>
+                <td><code>AffPayable</code></td>
+                <td><code>Expense</code></td>
+                <td>Approved commission reversed (payable balance may become negative)</td>
+              </tr>
+              <tr>
+                <td><strong>Payout Batch Paid</strong></td>
+                <td><code>AffPayable</code></td>
+                <td><code>Cash</code></td>
+                <td>Funds disbursed to affiliate; liability cleared against merchant cash</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Section 5: Quickstart Runbook -->
+      <section>
+        <div class="section-title-bar">
+          <h2>5. Quickstart Runbook</h2>
+          <span class="section-idx">SEC-05</span>
+        </div>
+
+        <p>Prerequisites: Rust 1.80+ (via rustup), PostgreSQL 16 on port 5433, and Node.js 20+.</p>
+
+        <pre><code># 1. Configure toolchain environment
+export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH
+export DATABASE_URL=postgres://pratham@localhost:5433/postgres
+
+# 2. Start PostgreSQL 16 cluster
+/opt/homebrew/opt/postgresql@16/bin/pg_ctl -D ~/.bunfiiliate/pg16 -o "-p 5433 -k /tmp" start
+
+# 3. Execute test suite &amp; lint checks
+make ci
+
+# 4. Bootstrap initial workspace and super admin user
+cargo run -p api -- bootstrap \
+  --email admin@example.com \
+  --password "SuperSecretPassword123!" \
+  --workspace "Acme Corp"
+
+# 5. Start API server with embedded background worker (port 8080)
+cargo run -p api -- serve --with-worker
+
+# 6. Start hot-path tracker daemon (port 8081)
+cargo run -p tracker</code></pre>
+      </section>
+
+      <!-- Section 6: Specification References -->
+      <section>
+        <div class="section-title-bar">
+          <h2>6. Repository References &amp; Specifications</h2>
+          <span class="section-idx">SEC-06</span>
+        </div>
+
+        <div class="links-grid">
+          <div class="link-item">
+            <a href="../README.md">README.md</a>
+            <span>Primary repository overview &amp; documentation index</span>
+          </div>
+          <div class="link-item">
+            <a href="../docs/architecture.md">docs/architecture.md</a>
+            <span>Crate layout, tracker hot path, &amp; security architecture</span>
+          </div>
+          <div class="link-item">
+            <a href="../docs/benchmarks.md">docs/benchmarks.md</a>
+            <span>Empirical benchmark harness &amp; detailed oha metrics</span>
+          </div>
+          <div class="link-item">
+            <a href="../docs/ledger.md">docs/ledger.md</a>
+            <span>Formal double-entry postings &amp; BPS rounding math</span>
+          </div>
+          <div class="link-item">
+            <a href="../docs/self-hosting.md">docs/self-hosting.md</a>
+            <span>Single-VPS deployment with Docker Compose &amp; systemd</span>
+          </div>
+          <div class="link-item">
+            <a href="../docs/PLAN.md">docs/PLAN.md</a>
+            <span>System roadmap, PostgreSQL schema, &amp; task DAG</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer>
+      <div>BUNFIILIATE &mdash; Open-Source Affiliate Tracking Engine &bull; GNU AGPL-3.0</div>
+      <div>ENGINEERING DATASHEET &bull; NO TRACKING COOKIES &bull; ZERO CLIENT JS</div>
+    </footer>
+
+  </div>
+</body>
+</html>

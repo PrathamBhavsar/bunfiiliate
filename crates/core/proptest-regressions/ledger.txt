@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 5c25f0d7d53899fc529923ad4d700ed2dcec536d19fe4fdbbb955f8137896928 # shrinks to legs = [Posting { account: Expense, amount: Money { cents: 347784524600370323, currency: Currency([85, 83, 68]) } }, Posting { account: Expense, amount: Money { cents: 8875587512254405485, currency: Currency([85, 83, 68]) } }]

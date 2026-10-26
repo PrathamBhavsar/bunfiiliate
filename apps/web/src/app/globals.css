@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Neutral grayscale plus one safety-orange accent. Orange carries primary actions and key numbers. */
+:root {
+  --background: #fafafa;
+  --surface: #ffffff;
+  --subtle: #f4f4f5;
+  --border: #e4e4e7;
+  --foreground: #0a0a0a;
+  --muted: #52525b;
+  --accent: #ff5a1f;
+  --accent-foreground: #0a0a0a;
+  --accent-text: #c2410c;
+  --danger: #b91c1c;
+  --success: #15803d;
+  --warning: #b45309;
+  /* Chart series, fixed order: blue, orange, aqua. Dark steps are chosen for the dark surface. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --surface: #121212;
+  --subtle: #1c1c1e;
+  --border: #2a2a2e;
+  --foreground: #fafafa;
+  --muted: #a1a1aa;
+  --accent-text: #ff5a1f;
+  --danger: #f87171;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-text: var(--accent-text);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --animate-fade-in: fade-in 120ms ease-out;
+  --animate-slide-in-right: slide-in-right 160ms ease-out;
+  --animate-slide-in-left: slide-in-left 160ms ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+}
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+}
+
+@layer base {
+  html {
+    font-size: 13px;
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "summary": {
+    "requestsPerSec": 27591.99
+  },
+  "metrics": {
+    "latency_ms": {
+      "p50": 0.405,
+      "p95": 3.695,
+      "p99": 4.33
+    }
+  },
+  "statusCodeDistribution": {
+    "302": 138041
+  },
+  "errorDistribution": {}
+}

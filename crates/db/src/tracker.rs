@@ -1,0 +1,158 @@
+//! Tracker queries: config snapshot rows and the click and inbound-event batch inserts.
+
+use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
+use uuid::Uuid;
+
+/// Postgres NOTIFY channel the API fires after code/program changes.
+pub const CONFIG_CHANNEL: &str = "bf_config";
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct CodeRow {
+    pub code: String,
+    pub program_id: Uuid,
+    pub affiliate_id: Uuid,
+    pub landing_url: String,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ProgramKeyRow {
+    pub public_key: String,
+    pub program_id: Uuid,
+    pub webhook_secret: String,
+    pub stripe_secret: Option<String>,
+    pub paddle_secret: Option<String>,
+}
+
+pub async fn load_codes(pool: &PgPool) -> Result<Vec<CodeRow>, sqlx::Error> {
+    // `landing_url` is nullable in the schema; a code without one cannot redirect.
+    sqlx::query_as(
+        "SELECT code, program_id, affiliate_id, landing_url FROM referral_codes \
+         WHERE landing_url IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+pub async fn load_program_keys(pool: &PgPool) -> Result<Vec<ProgramKeyRow>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT public_key, id AS program_id, webhook_secret, stripe_secret, paddle_secret \
+         FROM programs",
+    )
+    .fetch_all(pool)
+    .await
+}
+
+/// One recorded click; also the spool payload (JSON). `ts_ms` is unix millis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Click {
+    pub id: Uuid,
+    pub program_id: Uuid,
+    pub affiliate_id: Uuid,
+    pub code: String,
+    pub visitor_id: String,
+    pub ts_ms: i64,
+    pub ip_hash: Option<Vec<u8>>,
+    pub country: Option<String>,
+    pub device: Option<String>,
+    pub os: Option<String>,
+    pub browser: Option<String>,
+    pub referrer_host: Option<String>,
+    pub landing_path: Option<String>,
+    /// Why a fraud rule flagged the click; the click is kept either way.
+    #[serde(default)]
+    pub fraud_reason: Option<String>,
+}
+
+/// Batch insert; replays and retries are no-ops on the primary key.
+pub async fn insert_clicks(pool: &PgPool, clicks: &[Click]) -> Result<u64, sqlx::Error> {
+    macro_rules! col {
+        ($f:ident) => {
+            clicks.iter().map(|c| c.$f.clone()).collect::<Vec<_>>()
+        };
+    }
+    let res = sqlx::query(
+        "INSERT INTO clicks (id, program_id, affiliate_id, code, visitor_id, ts, ip_hash, \
+                             country, device, os, browser, referrer_host, landing_path, \
+                             fraud_reason) \
+         SELECT id, program_id, affiliate_id, code, visitor_id, \
+                TIMESTAMPTZ 'epoch' + ts_ms * INTERVAL '1 millisecond', \
+                ip_hash, country, device, os, browser, referrer_host, landing_path, fraud_reason \
+         FROM UNNEST($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::text[], $6::bigint[], \
+                     $7::bytea[], $8::text[], $9::text[], $10::text[], $11::text[], \
+                     $12::text[], $13::text[], $14::text[]) \
+              AS t(id, program_id, affiliate_id, code, visitor_id, ts_ms, ip_hash, country, \
+                   device, os, browser, referrer_host, landing_path, fraud_reason) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(col!(id))
+    .bind(col!(program_id))
+    .bind(col!(affiliate_id))
+    .bind(col!(code))
+    .bind(col!(visitor_id))
+    .bind(col!(ts_ms))
+    .bind(col!(ip_hash))
+    .bind(col!(country))
+    .bind(col!(device))
+    .bind(col!(os))
+    .bind(col!(browser))
+    .bind(col!(referrer_host))
+    .bind(col!(landing_path))
+    .bind(col!(fraud_reason))
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected())
+}
+
+/// One verified conversion delivery; also the spool payload (JSON).
+/// `source` is an `event_source` label, `received_ms` is unix millis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboundEvent {
+    pub id: Uuid,
+    pub program_id: Uuid,
+    pub source: String,
+    pub external_id: String,
+    pub payload: serde_json::Value,
+    pub received_ms: i64,
+}
+
+/// Batch insert; redeliveries and spool replays are no-ops on the dedup key.
+pub async fn insert_events(pool: &PgPool, events: &[InboundEvent]) -> Result<u64, sqlx::Error> {
+    let res = sqlx::query(
+        "INSERT INTO inbound_events (id, program_id, source, external_id, payload, received_at) \
+         SELECT id, program_id, source::event_source, external_id, payload::jsonb, \
+                TIMESTAMPTZ 'epoch' + received_ms * INTERVAL '1 millisecond' \
+         FROM UNNEST($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::bigint[]) \
+              AS t(id, program_id, source, external_id, payload, received_ms) \
+         ON CONFLICT (program_id, source, external_id) DO NOTHING",
+    )
+    .bind(events.iter().map(|e| e.id).collect::<Vec<_>>())
+    .bind(events.iter().map(|e| e.program_id).collect::<Vec<_>>())
+    .bind(events.iter().map(|e| e.source.clone()).collect::<Vec<_>>())
+    .bind(
+        events
+            .iter()
+            .map(|e| e.external_id.clone())
+            .collect::<Vec<_>>(),
+    )
+    .bind(
+        events
+            .iter()
+            .map(|e| e.payload.to_string())
+            .collect::<Vec<_>>(),
+    )
+    .bind(events.iter().map(|e| e.received_ms).collect::<Vec<_>>())
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected())
+}
+
+/// Tell the tracker to reload its snapshot. Delivered on commit, so call it inside the
+/// transaction that changed codes, enrollments or program keys.
+pub async fn notify_config(db: impl sqlx::PgExecutor<'_>) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_notify($1, '')")
+        .bind(CONFIG_CHANNEL)
+        .execute(db)
+        .await?;
+    Ok(())
+}

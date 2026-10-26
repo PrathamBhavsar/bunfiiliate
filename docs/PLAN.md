@@ -6,7 +6,7 @@ Env notes: macOS arm64, Rust via brew rustup (prepend `/opt/homebrew/opt/rustup/
 
 ## 1. Architecture
 
-```
+```text
 bunfiiliate/
   Cargo.toml rust-toolchain.toml deny.toml Makefile .env.example
   crates/
@@ -28,6 +28,7 @@ bunfiiliate/
 Dependency direction: `core <- db <- {tracker, api}`, `spool <- tracker`, `rt <- {tracker, api}`. `core` does no IO, so money and state logic are proptest-able without a DB.
 
 ### Tracker hot path (no DB call per request)
+
 1. Request validated against an in-memory `Snapshot` in an `ArcSwap` (code -> program/affiliate/landing; program key -> secrets). Loaded at startup, reloaded on Postgres `LISTEN bf_config`.
 2. Tracker creates event id (UUIDv7), normalizes UA, referrer, country.
 3. Event goes to the spool writer; handler awaits a oneshot ack. Writer drains queue, writes, fsyncs once per group (group commit), then acks.
@@ -38,15 +39,19 @@ Dependency direction: `core <- db <- {tracker, api}`, `spool <- tracker`, `rt <-
 fsync mode `always|off`, both benchmarked. Stripe/Paddle/generic conversions are only verified and spooled into `inbound_events` by the tracker; all business logic runs in the worker.
 
 ### Worker
+
 A mode of `api` (`api worker`, or embedded `api serve --with-worker`), not a third binary. Loops claim jobs with `FOR UPDATE SKIP LOCKED`; periodic ticks take `pg_try_advisory_lock`. Plain `tokio` intervals: no job-queue or cron crate.
+
 - Ingest processor: inbound event -> customer -> attribution -> fraud check -> commission -> conversion + ledger txn + outbox row, one DB transaction.
 - Outbox dispatcher: signed webhooks (HMAC-SHA256, exponential backoff, max attempts, then dead), emails via lettre + minijinja, notifications.
 - Ticks: auto-approve after hold period; daily rollups (idempotent upsert of yesterday and today).
 
 ### Auth
+
 Caddy serves UI and `/api` same-origin (no CORS). Access JWT (15 min) in httpOnly `SameSite=Strict` cookie `bf_at`. Refresh token opaque httpOnly cookie `bf_rt` (path `/api/v1/auth`), rotates every use; reuse of an old token revokes the whole family. Origin check on every mutation. argon2 passwords. `Auth<R: Role>` extractor + workspace scope on every query.
 
 ### Key types (names only)
+
 - `Money{cents:i64, currency}`, `Bps`, ID newtypes.
 - `Account` (`Expense | AffPending | AffPayable | Cash`), `Posting`, `LedgerTxn::new() -> Result<_, Unbalanced>` (balanced by construction).
 - `ConversionStatus` + `ConversionEvent` with `transition(self, ev) -> Result<(Status, LedgerTxn), InvalidTransition>`; `PayoutStatus`. Enum + transition table, not typestate generics (entities load from DB).
@@ -57,6 +62,7 @@ Caddy serves UI and `/api` same-origin (no CORS). Access JWT (15 min) in httpOnl
 - `NormalizedUa` (woothee), `SpoolRecord`, `Snapshot`.
 
 ### Ledger postings
+
 - Conversion: debit Expense, credit AffPending.
 - Approve: debit AffPending, credit AffPayable.
 - Reject/refund before approval: debit AffPending, credit Expense.
@@ -70,6 +76,7 @@ Commission = integer bps math, round-half-up, documented in `docs/ledger.md`.
 Enums: `user_role(super_admin, admin, affiliate)`, `affiliate_status(pending, active, suspended)`, `commission_kind(percent, flat)`, `commission_duration(one_month, x_months, lifetime)`, `attribution_model(first_touch, last_touch)`, `conversion_status(pending, approved, rejected, reversed, paid)`, `payout_status(draft, approved, paid, cancelled)`, `event_source(generic, stripe, paddle)`, `ledger_account(expense, aff_pending, aff_payable, cash)`, `rollup_dim(total, country, os, browser, device, referrer)`.
 
 Tables:
+
 - `workspaces(id, name, slug, settings jsonb)` (settings live here; no settings table)
 - `users(id, workspace_id null, email citext uniq, password_hash, role)`
 - `refresh_tokens(id, user_id, family_id, token_hash, expires_at, revoked_at, replaced_by)`
@@ -94,10 +101,11 @@ Tables:
 ## 3. API surface
 
 Tracker (port 8081, metrics 9101 internal):
+
 - `GET /t.js` (<2KB min, ETag, long cache)
 - `GET /r/:code` records click, 302 to landing with `?bf_click=`; tracker.js sets first-party `bf_vid`, `bf_ref`
 - `POST /c` click beacon `{code, vid, url, ref}` -> 204
-- `POST /v1/events/:program_key` generic conversion; `X-Bf-Signature` HMAC + `Idempotency-Key`; 202
+- `POST /v1/events/:program_key` generic conversion; `X-Bf-Signature` HMAC-SHA256 over `<X-Bf-Timestamp>.<Idempotency-Key>.<body>` (5-minute tolerance) + `Idempotency-Key`; 202
 - `POST /v1/webhooks/stripe/:program_key`, `/v1/webhooks/paddle/:program_key`: signature verified (Stripe `t=,v1=` 5-min tolerance; Paddle `ts=;h1=`), 200 after spool fsync
 - `GET /healthz`, `/readyz`
 
@@ -110,7 +118,7 @@ Every `feat/*` branch merges into `staging` with `--no-ff` once its acceptance c
 `make ci` = `cargo fmt --check`, `cargo clippy --workspace -- -D warnings`, `cargo test --workspace`, `cargo deny check`, web build, OpenAPI drift check, tracker.js size check.
 
 | id | branch | owner | inputs | acceptance | deps |
-|---|---|---|---|---|---|
+| --- | --- | --- | --- | --- | --- |
 | T00 | feat/workspace-scaffold | codex | tree above, empty crates, bf-rt tracing, Makefile, toolchain, deny.toml | `cargo clippy --workspace -- -D warnings && cargo test --workspace` | - |
 | T01 | feat/ci | agy | ci.yml: fmt/clippy/test (pg16 service)/deny/web/openapi drift/compose config | `actionlint && cargo deny check` | T00 |
 | T10 | feat/core-money-ledger | codex | Money, Bps, Account, Posting, LedgerTxn, commission math, proptest (balanced, no overflow, rounding bounds) | `cargo test -p bf-core` | T00 |
@@ -147,9 +155,11 @@ Check ocr and e2e README flags and any LLM key needs at the start of T60.
 Parallel: T10, T12, T13, T15 right after T00. T20, T21 alongside T14-T18. T31-T34 in parallel. Demo checkpoint after T18: `api seed-demo` + curl drives the showpiece flow.
 
 ## 5. Release page direction
+
 "Engineering datasheet": warm paper `#F4F1EA`, ink `#111`, hairline rules, one safety-orange accent `#FF5A1F` used only for measured numbers. IBM Plex Mono tabular figures for data, one grotesk for headings. Architecture diagram as inline SVG schematic: tracker -> spool -> batch writer -> PG -> worker -> outbox. Benchmark table straight from `bench/results`. One self-contained HTML file, no JS framework, no gradients, no emoji.
 
 ## 6. Risks and cuts
+
 1. Spool/batch-writer correctness: per-record CRC, torn-tail replay test, kill-restart test, DB unique keys as backstop. Cut: segment rotation (one file). Never cut idempotency keys.
 2. Commission semantics: pure functions in `core` + proptest + golden table. Cut: per-conversion-type plans.
 3. Static-export limits: `?id=` routes, client guard, API is the auth boundary. No BFF.

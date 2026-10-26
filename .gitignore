@@ -8,3 +8,7 @@ node_modules/
 dist/
 .next/
 out/
+data/
+bench/results/*.json
+!bench/results/.gitkeep
+.reports/

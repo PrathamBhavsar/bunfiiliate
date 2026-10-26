@@ -1,0 +1,52 @@
+# Tracker upstream. Caddy is not behind Cloudflare by default, so client-sent
+# CF-* headers are stripped (they would let a client forge its IP and country).
+# If Cloudflare fronts this server, set BF_TRUST_CF=1 and delete the two
+# request_header lines below.
+(tracker) {
+	request_header -CF-Connecting-IP
+	request_header -CF-IPCountry
+	# No trusted_proxies is set, so Caddy overwrites X-Forwarded-For with the
+	# real peer address. Keep it that way unless a trusted proxy fronts Caddy.
+	reverse_proxy {$TRACKER_UPSTREAM:tracker:8081}
+}
+
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Tracker endpoints
+	handle /r/* {
+		import tracker
+	}
+	handle /c {
+		import tracker
+	}
+	handle /t.js {
+		import tracker
+	}
+	handle /v1/events/* {
+		import tracker
+	}
+	handle /v1/webhooks/* {
+		import tracker
+	}
+
+	# API endpoints
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# Static web app export (Next.js static export)
+	handle {
+		root * {$WEB_ROOT:/srv/web}
+		try_files {path} {path}.html {path}/ /index.html
+		file_server
+	}
+}

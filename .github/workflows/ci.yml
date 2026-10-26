@@ -1,0 +1,112 @@
+name: ci
+
+on:
+  push:
+    branches: [staging, prod, "feat/**"]
+  pull_request:
+    branches: [staging, prod]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: rust
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:password@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Format check
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+      - name: Test
+        run: cargo test --workspace
+      - name: Cargo deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check if apps/web exists
+        id: check_web
+        run: |
+          if [ -d "apps/web" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "apps/web does not exist; skipping web checks"
+          fi
+      - uses: pnpm/action-setup@v4
+        if: steps.check_web.outputs.exists == 'true'
+      - uses: actions/setup-node@v4
+        if: steps.check_web.outputs.exists == 'true'
+        with:
+          node-version: 20
+      - name: Install dependencies
+        if: steps.check_web.outputs.exists == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        if: steps.check_web.outputs.exists == 'true'
+        run: pnpm --dir apps/web typecheck
+      - name: Lint
+        if: steps.check_web.outputs.exists == 'true'
+        run: pnpm --dir apps/web lint
+      - name: Build
+        if: steps.check_web.outputs.exists == 'true'
+        run: pnpm --dir apps/web build
+
+  js:
+    name: js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Size check
+        run: node scripts/size-check.mjs
+      - name: Tracker tests
+        run: node --test scripts/
+      - name: tracker.min.js is fresh
+        run: |
+          pnpm build:js
+          git diff --exit-code crates/tracker/js/tracker.min.js
+
+  openapi:
+    name: openapi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: OpenAPI drift check
+        run: make openapi-check
