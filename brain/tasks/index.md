@@ -9,7 +9,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T10 | feat/core-money-ledger | todo |
 | T11 | feat/core-state-machines | todo |
 | T12 | feat/db-schema | todo |
-| T13 | feat/spool | todo |
+| T13 | feat/spool | done (bf-spool WAL, CRC framing, group commit, checkpoint atomic write+rename, replay iterator, GC; tests pass) |
 | T14 | feat/tracker-hot-path | todo |
 | T15 | feat/tracker-js | todo |
 | T16 | feat/ingest-webhooks | todo |
