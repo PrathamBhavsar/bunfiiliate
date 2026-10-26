@@ -51,10 +51,11 @@ function DayBars({ label, days, value }: { label: string; days: Day[]; value: (d
 export default function MeDashboardPage() {
   const q = useOverview();
   const programs = usePrograms().data;
-  // Metrics carry no currency; name one only when every program shares it.
+  // Metrics carry no currency, so summing across programs is only meaningful when they all share one.
   const currencies = new Set(programs?.map((p) => p.currency));
-  const currency = (currencies.size === 1 ? [...currencies][0] : "") ?? "";
-  const money = (cents: number) => formatCents(cents, currency);
+  const currency = currencies.size === 1 ? [...currencies][0] : null;
+  const mixed = currencies.size > 1;
+  const money = (cents: number) => formatCents(cents, currency ?? "");
 
   return (
     <section aria-labelledby="page-title" className="grid gap-3">
@@ -94,7 +95,13 @@ export default function MeDashboardPage() {
             <StatCard label="Clicks" value={q.data.summary.clicks} icon={MousePointerClick} />
             <StatCard label="Conversions" value={q.data.summary.conversions} icon={ReceiptText} />
             <StatCard label="Conversion rate" value={formatBps(q.data.summary.conversion_rate_bps)} icon={Percent} />
-            <StatCard label="Commission" value={money(q.data.summary.commission_cents)} icon={Banknote} accent />
+            <StatCard
+              label="Commission"
+              value={mixed ? "Mixed currencies" : money(q.data.summary.commission_cents)}
+              hint={mixed ? "Your programs pay in different currencies, so there is no single total." : undefined}
+              icon={Banknote}
+              accent
+            />
           </div>
           {q.data.summary.clicks === 0 && q.data.summary.conversions === 0 && (
             <p className="rounded-lg border border-dashed border-border px-4 py-3 text-xs text-muted">
@@ -103,11 +110,13 @@ export default function MeDashboardPage() {
           )}
           <div className="grid gap-3 lg:grid-cols-2">
             <DayBars label="Clicks per day" days={q.data.days} value={(d) => ({ n: d.clicks, text: String(d.clicks) })} />
-            <DayBars
-              label="Commission per day"
-              days={q.data.days}
-              value={(d) => ({ n: d.commission_cents, text: money(d.commission_cents) })}
-            />
+            {!mixed && (
+              <DayBars
+                label="Commission per day"
+                days={q.data.days}
+                value={(d) => ({ n: d.commission_cents, text: money(d.commission_cents) })}
+              />
+            )}
           </div>
         </>
       )}

@@ -1,10 +1,12 @@
+# Run from the repo root so .env is found:
+#   docker compose --env-file .env -f deploy/docker-compose.yml up -d
 services:
   postgres:
     image: postgres:16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:-bunfiiliate}
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -25,13 +27,14 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
       API_PORT: 8080
       TRACKER_PORT: 8081
-      JWT_SECRET: ${JWT_SECRET:-insecure-default-jwt-secret-replace-me}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
       SPOOL_DIR: /var/spool/bunfiiliate
       SMTP_URL: ${SMTP_URL:-}
       SMTP_FROM: ${SMTP_FROM:-bunfiiliate <noreply@example.com>}
+      # Secure cookies need https; set COOKIE_SECURE=0 only with SITE_ADDRESS=:80 for local use.
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
@@ -48,13 +51,15 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
       API_PORT: 8080
       TRACKER_PORT: 8081
-      JWT_SECRET: ${JWT_SECRET:-insecure-default-jwt-secret-replace-me}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
       SPOOL_DIR: /var/spool/bunfiiliate
       BF_FSYNC: ${BF_FSYNC:-always}
       BF_GEOIP_DB: ${BF_GEOIP_DB:-}
+      BF_IP_SALT: ${BF_IP_SALT:?set BF_IP_SALT in .env (openssl rand -hex 32)}
+      BF_TRUST_CF: ${BF_TRUST_CF:-0}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - spool_data:/var/spool/bunfiiliate
@@ -67,7 +72,7 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env (your https hostname)}
       API_UPSTREAM: api:8080
       TRACKER_UPSTREAM: tracker:8081
     volumes:

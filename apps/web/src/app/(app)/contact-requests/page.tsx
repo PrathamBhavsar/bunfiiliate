@@ -3,7 +3,7 @@
 import { Facts, Section } from "@/components/admin-ui";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { StatusBadge } from "@/components/status-badge";
-import { Button } from "@/components/ui/button";
+import { ActionButton } from "@/components/action-button";
 import { formatTime, ok, refresh, toPage } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { components } from "@bunfiiliate/sdk";
@@ -55,17 +55,17 @@ const config: ResourceConfig<Contact> = {
       <Section title="Mark as">
         <div className="flex gap-1">
           {STATUSES.map((s) => (
-            <Button
+            <ActionButton
               key={s}
               size="sm"
               disabled={s === c.status}
-              onClick={async () => {
+              onAction={async () => {
                 await ok(api.PATCH("/api/v1/contact-requests/{id}", { params: { path: { id: c.id } }, body: { status: s } }));
                 await refresh();
               }}
             >
               {s}
-            </Button>
+            </ActionButton>
           ))}
         </div>
       </Section>

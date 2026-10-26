@@ -68,6 +68,6 @@ export async function downloadReport(range: Range, scope: Scope, dim: Dim) {
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: name });
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url));
   return name;
 }

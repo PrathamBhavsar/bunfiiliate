@@ -59,15 +59,13 @@ jobs:
           fi
       - uses: pnpm/action-setup@v4
         if: steps.check_web.outputs.exists == 'true'
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         if: steps.check_web.outputs.exists == 'true'
         with:
           node-version: 20
       - name: Install dependencies
         if: steps.check_web.outputs.exists == 'true'
-        run: pnpm --dir apps/web install
+        run: pnpm install --frozen-lockfile
       - name: Typecheck
         if: steps.check_web.outputs.exists == 'true'
         run: pnpm --dir apps/web typecheck
@@ -83,13 +81,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Run size-check.mjs if present
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Size check
+        run: node scripts/size-check.mjs
+      - name: Tracker tests
+        run: node --test scripts/
+      - name: tracker.min.js is fresh
         run: |
-          if [ -f "scripts/size-check.mjs" ]; then
-            node scripts/size-check.mjs
-          else
-            echo "scripts/size-check.mjs not present; skipping"
-          fi
+          pnpm build:js
+          git diff --exit-code crates/tracker/js/tracker.min.js
+
+  openapi:
+    name: openapi
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: OpenAPI drift check
+        run: make openapi-check

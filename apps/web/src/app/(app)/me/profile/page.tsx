@@ -46,7 +46,7 @@ export default function ProfilePage() {
               const email = (v.payout_email ?? "").trim();
               await ok(
                 api.PATCH("/api/v1/me/affiliate", {
-                  body: { payout_email: email || undefined, payout_min_cents: wholeNumber(v.payout_min_cents ?? "", "Minimum payout", 0) },
+                  body: { payout_email: email || null, payout_min_cents: wholeNumber(v.payout_min_cents ?? "", "Minimum payout", 0) },
                 }),
               );
               await refresh();

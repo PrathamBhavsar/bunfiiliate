@@ -67,13 +67,16 @@ cp .env.example .env
 Edit `.env` to configure your production settings:
 
 ```dotenv
-# Generate a random secret with: openssl rand -hex 32
+# Generate a random secret with: openssl rand -hex 32 (at least 32 bytes)
 JWT_SECRET=your-secure-random-secret-key-at-least-32-chars
 
-# PostgreSQL password
+# PostgreSQL password (used inside DATABASE_URL, so keep it URL-safe: openssl rand -hex 16)
 POSTGRES_PASSWORD=your-strong-db-password
 
-# Domain for Caddy automatic TLS
+# Secret salt for IP hashing in the tracker (required): openssl rand -hex 32
+BF_IP_SALT=your-random-ip-salt
+
+# Domain for Caddy automatic TLS (required, an https hostname)
 SITE_ADDRESS=affiliates.example.com
 
 # Optional outbound SMTP
@@ -86,8 +89,10 @@ SITE_ADDRESS=affiliates.example.com
 Run the stack in the background:
 
 ```bash
-docker compose -f deploy/docker-compose.yml up -d
+docker compose --env-file .env -f deploy/docker-compose.yml up -d
 ```
+
+Run it from the repo root. Compose looks for `.env` next to the compose file (`deploy/`), not in your shell's directory, so `--env-file .env` is required for the root `.env` to be read. `JWT_SECRET`, `POSTGRES_PASSWORD`, `BF_IP_SALT` and `SITE_ADDRESS` have no defaults: Compose refuses to start if any is unset. `deploy/docker-compose.yml` is the one canonical file; `deploy/compose.yml` is a symlink to it. Check your configuration with `docker compose --env-file .env -f deploy/docker-compose.yml config`.
 
 Compose launches four services:
 
@@ -105,7 +110,7 @@ Database schema migrations execute automatically when the `api` service starts.
 Before logging in, initialize the root workspace and super-administrator account using `api bootstrap`:
 
 ```bash
-docker compose -f deploy/docker-compose.yml exec api \
+docker compose --env-file .env -f deploy/docker-compose.yml exec api \
   api bootstrap \
   --email admin@example.com \
   --password "YourSecureAdminPassword123!" \
@@ -134,6 +139,8 @@ Ensure:
 - Your domain's DNS `A`/`AAAA` record points directly to the server.
 - The `SITE_ADDRESS` variable in your environment matches your public domain (e.g. `affiliates.example.com`).
 
+Auth cookies are `Secure`, so the dashboard only works over HTTPS. For local testing over plain HTTP only, set `SITE_ADDRESS=:80` and `COOKIE_SECURE=0`; without `COOKIE_SECURE=0` the browser drops the cookies and login silently bounces back to `/login`. Never use `COOKIE_SECURE=0` in production.
+
 ### Same-Origin Security Model
 
 Caddy routes requests as follows:
@@ -153,7 +160,7 @@ Because the web frontend and API share the exact same origin, the API enforces s
 
 The tracker assigns country codes to incoming click and conversion traffic:
 
-1. **Cloudflare**: If traffic routes through Cloudflare, Cloudflare appends the `CF-IPCountry` header. The tracker reads this header directly with zero external database dependencies.
+1. **Cloudflare**: If traffic routes through Cloudflare, Cloudflare appends the `CF-IPCountry` and `CF-Connecting-IP` headers. Set `BF_TRUST_CF=1` so the tracker reads them with zero external database dependencies, and delete the two `request_header -CF-...` lines in `deploy/Caddyfile`. Without Cloudflare, leave `BF_TRUST_CF` unset: the Caddyfile strips client-supplied `CF-Connecting-IP` and `CF-IPCountry` from tracker routes so a client cannot forge its IP or country. If another trusted proxy sits in front of Caddy, set `BF_TRUSTED_PROXIES` for the tracker.
 2. **Direct Edge (DB-IP Lite)**: When running directly on the Internet without Cloudflare, download the free DB-IP Lite country database:
 
 ```bash
@@ -254,7 +261,7 @@ Create a nightly compressed backup using `pg_dump`:
 
 ```bash
 # Docker Compose
-docker compose -f deploy/docker-compose.yml exec -T postgres \
+docker compose --env-file .env -f deploy/docker-compose.yml exec -T postgres \
   pg_dump -U postgres bunfiiliate | gzip > /backups/bunfiiliate-$(date +%F).sql.gz
 
 # Bare metal
@@ -265,7 +272,7 @@ Restore with:
 
 ```bash
 gunzip -c /backups/bunfiiliate-2026-10-26.sql.gz | \
-  docker compose -f deploy/docker-compose.yml exec -T postgres psql -U postgres -d bunfiiliate
+  docker compose --env-file .env -f deploy/docker-compose.yml exec -T postgres psql -U postgres -d bunfiiliate
 ```
 
 ### WAL Spool Directory
@@ -285,7 +292,7 @@ cd /opt/bunfiiliate
 git pull origin staging
 
 # Rebuild and restart services
-docker compose -f deploy/docker-compose.yml up -d --build
+docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
 ```
 
 When `api` restarts, `bf_db::migrate(&pool)` runs automatically, ensuring the database schema matches the updated application version before traffic resumes.
