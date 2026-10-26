@@ -98,6 +98,7 @@ pub async fn list_workspaces(
 }
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct WorkspaceQuery {
     /// Super admins only: act on another workspace.
     workspace_id: Option<Uuid>,

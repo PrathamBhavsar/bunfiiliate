@@ -248,6 +248,7 @@ pub async fn delete_endpoint(
 }
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct DeliveryFilter {
     endpoint_id: Option<Uuid>,
 }

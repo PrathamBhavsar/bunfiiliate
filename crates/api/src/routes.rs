@@ -20,7 +20,7 @@ use crate::auth::{
     hash_refresh_token, issue_access, new_refresh_token, verify_password,
 };
 use crate::error::{AppError, ErrorBody, ErrorDetail};
-use crate::{affiliates, analytics, mail, ops, programs, webhooks, workspaces};
+use crate::{affiliates, analytics, mail, money, ops, payouts, programs, webhooks, workspaces};
 
 const REFRESH_PATH: &str = "/api/v1/auth";
 
@@ -64,8 +64,17 @@ impl Modify for CookieAuth {
         ops::list_notifications, ops::mark_read,
         ops::create_contact, ops::list_contacts, ops::update_contact,
         ops::get_settings, ops::put_settings, ops::list_audit,
+        money::list_customers, money::get_customer,
+        money::list_conversions, money::get_conversion,
+        money::approve, money::reject, money::reverse,
+        money::list_entries, money::list_balances, money::me_earnings,
+        payouts::create_batch_route, payouts::list_batches, payouts::get_batch,
+        payouts::approve, payouts::mark_paid_route, payouts::cancel, payouts::export,
+        payouts::me_payouts,
     ),
-    components(schemas(LoginRequest, UserView, ErrorBody, ErrorDetail)),
+    components(schemas(
+        LoginRequest, UserView, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account
+    )),
     modifiers(&CookieAuth),
     info(title = "bunfiiliate API", version = "0.1.0")
 )]
@@ -85,6 +94,8 @@ pub fn routes() -> Router<AppState> {
         .merge(webhooks::routes())
         .merge(mail::routes())
         .merge(ops::routes())
+        .merge(money::routes())
+        .merge(payouts::routes())
 }
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {

@@ -20,40 +20,31 @@
         "parameters": [
           {
             "name": "status",
-            "in": "path",
+            "in": "query",
             "description": "`pending`, `active` or `suspended`.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -447,64 +438,45 @@
         "parameters": [
           {
             "name": "program_id",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "affiliate_id",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "from",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "to",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "dim",
-            "in": "path",
+            "in": "query",
             "description": "Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`.",
-            "required": true,
+            "required": false,
             "schema": {
-              "oneOf": [
-                {
-                  "type": "null"
-                },
-                {
-                  "$ref": "#/components/schemas/Dim"
-                }
-              ]
+              "$ref": "#/components/schemas/Dim"
             }
           }
         ],
@@ -557,52 +529,40 @@
         "parameters": [
           {
             "name": "program_id",
-            "in": "path",
+            "in": "query",
             "description": "Only this program (must be in the workspace). Default: all programs.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "affiliate_id",
-            "in": "path",
+            "in": "query",
             "description": "Admins only: one affiliate. Affiliates always see their own data.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "from",
-            "in": "path",
+            "in": "query",
             "description": "First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "to",
-            "in": "path",
+            "in": "query",
             "description": "Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           }
         ],
@@ -658,52 +618,40 @@
         "parameters": [
           {
             "name": "entity",
-            "in": "path",
+            "in": "query",
             "description": "Entity type, e.g. `program`.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "action",
-            "in": "path",
+            "in": "query",
             "description": "Action, e.g. `program.create`.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -870,40 +818,31 @@
         "parameters": [
           {
             "name": "status",
-            "in": "path",
+            "in": "query",
             "description": "`new`, `read` or `closed`.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -1055,6 +994,470 @@
         ]
       }
     },
+    "/api/v1/conversions": {
+      "get": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "List conversions, newest first.",
+        "operationId": "list_conversions",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "affiliate_id",
+            "in": "query",
+            "description": "Admins only: one affiliate.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ConversionStatus"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day of `occurred_at`, `YYYY-MM-DD` UTC, inclusive.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day of `occurred_at`, `YYYY-MM-DD` UTC, inclusive.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number (default 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page (default 50, max 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Paged_Conversion"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/conversions/{id}": {
+      "get": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "One conversion.",
+        "operationId": "get_conversion",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Conversion id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/conversions/{id}/approve": {
+      "post": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "Approve a pending conversion: its commission moves from pending to payable.",
+        "operationId": "approve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Conversion id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/conversions/{id}/reject": {
+      "post": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "Reject a pending conversion: its commission returns to expense.",
+        "operationId": "reject",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Conversion id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not pending",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/conversions/{id}/reverse": {
+      "post": {
+        "tags": [
+          "conversions"
+        ],
+        "summary": "Reverse an approved or paid conversion (refund, chargeback). After payout the affiliate's\npayable goes negative and nets against their next batch.",
+        "operationId": "reverse",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Conversion id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversion"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not approved or paid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/customers": {
+      "get": {
+        "tags": [
+          "customers"
+        ],
+        "summary": "List customers, newest first.",
+        "operationId": "list_customers",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "affiliate_id",
+            "in": "query",
+            "description": "The affiliate the customer is attributed to.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number (default 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page (default 50, max 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Paged_Customer"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/customers/{id}": {
+      "get": {
+        "tags": [
+          "customers"
+        ],
+        "summary": "One customer.",
+        "operationId": "get_customer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Customer id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Customer"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/email-templates": {
       "get": {
         "tags": [
@@ -1065,28 +1468,22 @@
         "parameters": [
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -1338,6 +1735,181 @@
         ]
       }
     },
+    "/api/v1/ledger/balances": {
+      "get": {
+        "tags": [
+          "ledger"
+        ],
+        "summary": "Pending and payable commission per affiliate and program, derived from the ledger.",
+        "operationId": "list_balances",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "affiliate_id",
+            "in": "query",
+            "description": "Admins only: one affiliate. Affiliates always get their own balances.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number (default 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page (default 50, max 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Paged_Balance"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program or other affiliate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/ledger/entries": {
+      "get": {
+        "tags": [
+          "ledger"
+        ],
+        "summary": "Ledger legs, newest first.",
+        "operationId": "list_entries",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "affiliate_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "account",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Account"
+            }
+          },
+          {
+            "name": "txn_id",
+            "in": "query",
+            "description": "All legs of one transaction.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number (default 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page (default 50, max 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Paged_Entry"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/me/affiliate": {
       "get": {
         "tags": [
@@ -1428,6 +2000,169 @@
         ]
       }
     },
+    "/api/v1/me/earnings": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "The signed-in affiliate's conversions, newest first.",
+        "operationId": "me_earnings",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ConversionStatus"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number (default 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page (default 50, max 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Paged_Earning"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/me/payouts": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "The signed-in affiliate's approved and paid payouts, newest first.",
+        "operationId": "me_payouts",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number (default 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page (default 50, max 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Paged_MyPayout"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/me/referral-codes": {
       "get": {
         "tags": [
@@ -1438,28 +2173,22 @@
         "parameters": [
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -1598,41 +2327,32 @@
         "parameters": [
           {
             "name": "workspace_id",
-            "in": "path",
+            "in": "query",
             "description": "Super admins only: act on another workspace.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -1675,14 +2395,11 @@
         "parameters": [
           {
             "name": "workspace_id",
-            "in": "path",
+            "in": "query",
             "description": "Super admins only: act on another workspace.",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           }
@@ -1756,37 +2473,31 @@
         "parameters": [
           {
             "name": "unread",
-            "in": "path",
+            "in": "query",
             "description": "Only unread notifications.",
-            "required": true,
+            "required": false,
             "schema": {
               "type": "boolean"
             }
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -1869,6 +2580,408 @@
         ]
       }
     },
+    "/api/v1/payouts/batches": {
+      "get": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "List batches, newest first.",
+        "operationId": "list_batches",
+        "parameters": [
+          {
+            "name": "program_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "`draft`, `approved`, `paid` or `cancelled`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "1-based page number (default 1).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Items per page (default 50, max 200).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Paged_BatchView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "Draft a batch paying every active affiliate of the program who is owed at least their\nminimum. `409` when nobody is.",
+        "operationId": "create_batch_route",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nobody is owed a payout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/batches/{id}": {
+      "get": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "One batch with its payouts.",
+        "operationId": "get_batch",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "BatchView id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/batches/{id}/approve": {
+      "post": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "`draft -> approved`.",
+        "operationId": "approve",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "BatchView id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/batches/{id}/cancel": {
+      "post": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "`draft -> cancelled`: releases the batch's conversions.",
+        "operationId": "cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "BatchView id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not a draft",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/batches/{id}/export.csv": {
+      "get": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "`email,amount,currency` CSV for the bank or payout tool.",
+        "operationId": "export",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "BatchView id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/csv",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/batches/{id}/mark-paid": {
+      "post": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "`approved -> paid`: posts payable -> cash per payout.",
+        "operationId": "mark_paid_route",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "BatchView id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/programs": {
       "get": {
         "tags": [
@@ -1879,28 +2992,22 @@
         "parameters": [
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -2172,28 +3279,22 @@
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -2385,28 +3486,22 @@
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -2568,28 +3663,22 @@
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -2819,28 +3908,22 @@
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -3011,52 +4094,40 @@
         "parameters": [
           {
             "name": "affiliate_id",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "program_id",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -3205,64 +4276,45 @@
         "parameters": [
           {
             "name": "program_id",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "affiliate_id",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "from",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "to",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string"
             }
           },
           {
             "name": "dim",
-            "in": "path",
+            "in": "query",
             "description": "Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`.",
-            "required": true,
+            "required": false,
             "schema": {
-              "oneOf": [
-                {
-                  "type": "null"
-                },
-                {
-                  "$ref": "#/components/schemas/Dim"
-                }
-              ]
+              "$ref": "#/components/schemas/Dim"
             }
           }
         ],
@@ -3406,40 +4458,31 @@
         "parameters": [
           {
             "name": "endpoint_id",
-            "in": "path",
-            "required": true,
+            "in": "query",
+            "required": false,
             "schema": {
-              "type": [
-                "string",
-                "null"
-              ],
+              "type": "string",
               "format": "uuid"
             }
           },
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -3542,28 +4585,22 @@
         "parameters": [
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -3815,28 +4852,22 @@
         "parameters": [
           {
             "name": "page",
-            "in": "path",
+            "in": "query",
             "description": "1-based page number (default 1).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
           },
           {
             "name": "limit",
-            "in": "path",
+            "in": "query",
             "description": "Items per page (default 50, max 200).",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": "integer",
               "format": "int32",
               "minimum": 0
             }
@@ -3938,6 +4969,15 @@
   },
   "components": {
     "schemas": {
+      "Account": {
+        "type": "string",
+        "enum": [
+          "expense",
+          "aff_pending",
+          "aff_payable",
+          "cash"
+        ]
+      },
       "Affiliate": {
         "type": "object",
         "required": [
@@ -4029,6 +5069,118 @@
           }
         }
       },
+      "Balance": {
+        "type": "object",
+        "required": [
+          "program_id",
+          "affiliate_id",
+          "currency",
+          "pending_cents",
+          "payable_cents"
+        ],
+        "properties": {
+          "affiliate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "payable_cents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Approved and not yet paid out; negative after a clawback."
+          },
+          "pending_cents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Commission awaiting approval."
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "BatchDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BatchView"
+          },
+          {
+            "type": "object",
+            "required": [
+              "payouts"
+            ],
+            "properties": {
+              "payouts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Payout"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BatchView": {
+        "type": "object",
+        "required": [
+          "id",
+          "program_id",
+          "status",
+          "currency",
+          "created_by",
+          "created_at",
+          "payout_count",
+          "total_cents"
+        ],
+        "properties": {
+          "approved_by": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paid_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payout_count": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "`draft`, `approved`, `paid` or `cancelled`."
+          },
+          "total_cents": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "ContactPatch": {
         "type": "object",
         "required": [
@@ -4087,6 +5239,99 @@
           }
         }
       },
+      "Conversion": {
+        "type": "object",
+        "required": [
+          "id",
+          "program_id",
+          "customer_id",
+          "affiliate_id",
+          "external_id",
+          "amount_cents",
+          "commission_cents",
+          "currency",
+          "status",
+          "occurred_at"
+        ],
+        "properties": {
+          "affiliate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Sale amount in the currency's minor unit."
+          },
+          "approved_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversion_type_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "customer_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The sale's id in the merchant's or payment provider's system."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string"
+          },
+          "payout_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The payout that claimed it, once batched."
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `approved`, `rejected`, `reversed` or `paid`."
+          }
+        }
+      },
+      "ConversionStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected",
+          "reversed",
+          "paid"
+        ]
+      },
       "ConversionType": {
         "type": "object",
         "required": [
@@ -4112,6 +5357,48 @@
           }
         }
       },
+      "Customer": {
+        "type": "object",
+        "required": [
+          "id",
+          "program_id",
+          "external_id"
+        ],
+        "properties": {
+          "affiliate_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "attributed_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "external_id": {
+            "type": "string",
+            "description": "The customer's id in the merchant's system."
+          },
+          "first_click_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
       "Dim": {
         "type": "string",
         "enum": [
@@ -4122,6 +5409,53 @@
           "device",
           "referrer"
         ]
+      },
+      "Earning": {
+        "type": "object",
+        "description": "An affiliate's view of a conversion: no customer, no provider ids.",
+        "required": [
+          "id",
+          "program_id",
+          "amount_cents",
+          "commission_cents",
+          "currency",
+          "status",
+          "occurred_at"
+        ],
+        "properties": {
+          "amount_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "approved_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occurred_at": {
+            "type": "string"
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "`pending`, `approved`, `rejected`, `reversed` or `paid`."
+          }
+        }
       },
       "EmailTemplate": {
         "type": "object",
@@ -4200,6 +5534,69 @@
           "program_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "Entry": {
+        "type": "object",
+        "required": [
+          "id",
+          "txn_id",
+          "account",
+          "program_id",
+          "amount_cents",
+          "currency",
+          "created_at"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "description": "`expense`, `aff_pending`, `aff_payable` or `cash`."
+          },
+          "affiliate_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Debit positive, credit negative."
+          },
+          "conversion_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "payout_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "txn_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Legs sharing a `txn_id` sum to zero."
           }
         }
       },
@@ -4295,6 +5692,60 @@
             "type": "integer",
             "format": "int64",
             "description": "Sum of conversion amounts in the program currency's minor unit."
+          }
+        }
+      },
+      "MyPayout": {
+        "type": "object",
+        "required": [
+          "id",
+          "batch_id",
+          "program_id",
+          "amount_cents",
+          "currency",
+          "status"
+        ],
+        "properties": {
+          "amount_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "batch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paid_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "`approved` (owed, not yet sent) or `paid`."
+          }
+        }
+      },
+      "NewBatch": {
+        "type": "object",
+        "required": [
+          "program_id"
+        ],
+        "properties": {
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       },
@@ -4778,6 +6229,153 @@
           }
         }
       },
+      "Paged_Balance": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "program_id",
+                "affiliate_id",
+                "currency",
+                "pending_cents",
+                "payable_cents"
+              ],
+              "properties": {
+                "affiliate_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "payable_cents": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Approved and not yet paid out; negative after a clawback."
+                },
+                "pending_cents": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Commission awaiting approval."
+                },
+                "program_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching rows across all pages."
+          }
+        }
+      },
+      "Paged_BatchView": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "program_id",
+                "status",
+                "currency",
+                "created_by",
+                "created_at",
+                "payout_count",
+                "total_cents"
+              ],
+              "properties": {
+                "approved_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "created_by": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "paid_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "payout_count": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "program_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "`draft`, `approved`, `paid` or `cancelled`."
+                },
+                "total_cents": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching rows across all pages."
+          }
+        }
+      },
       "Paged_ContactRequest": {
         "type": "object",
         "required": [
@@ -4852,6 +6450,117 @@
           }
         }
       },
+      "Paged_Conversion": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "program_id",
+                "customer_id",
+                "affiliate_id",
+                "external_id",
+                "amount_cents",
+                "commission_cents",
+                "currency",
+                "status",
+                "occurred_at"
+              ],
+              "properties": {
+                "affiliate_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "amount_cents": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Sale amount in the currency's minor unit."
+                },
+                "approved_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "commission_cents": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "conversion_type_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "customer_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "external_id": {
+                  "type": "string",
+                  "description": "The sale's id in the merchant's or payment provider's system."
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "occurred_at": {
+                  "type": "string"
+                },
+                "payout_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid",
+                  "description": "The payout that claimed it, once batched."
+                },
+                "program_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "reversed_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "description": "`pending`, `approved`, `rejected`, `reversed` or `paid`."
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching rows across all pages."
+          }
+        }
+      },
       "Paged_ConversionType": {
         "type": "object",
         "required": [
@@ -4885,6 +6594,151 @@
                 "program_id": {
                   "type": "string",
                   "format": "uuid"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching rows across all pages."
+          }
+        }
+      },
+      "Paged_Customer": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "program_id",
+                "external_id"
+              ],
+              "properties": {
+                "affiliate_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "attributed_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "external_id": {
+                  "type": "string",
+                  "description": "The customer's id in the merchant's system."
+                },
+                "first_click_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "program_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching rows across all pages."
+          }
+        }
+      },
+      "Paged_Earning": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "description": "An affiliate's view of a conversion: no customer, no provider ids.",
+              "required": [
+                "id",
+                "program_id",
+                "amount_cents",
+                "commission_cents",
+                "currency",
+                "status",
+                "occurred_at"
+              ],
+              "properties": {
+                "amount_cents": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "approved_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "commission_cents": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "occurred_at": {
+                  "type": "string"
+                },
+                "program_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "`pending`, `approved`, `rejected`, `reversed` or `paid`."
                 }
               }
             }
@@ -5014,6 +6868,97 @@
           }
         }
       },
+      "Paged_Entry": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "txn_id",
+                "account",
+                "program_id",
+                "amount_cents",
+                "currency",
+                "created_at"
+              ],
+              "properties": {
+                "account": {
+                  "type": "string",
+                  "description": "`expense`, `aff_pending`, `aff_payable` or `cash`."
+                },
+                "affiliate_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "amount_cents": {
+                  "type": "integer",
+                  "format": "int64",
+                  "description": "Debit positive, credit negative."
+                },
+                "conversion_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "payout_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "program_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "txn_id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "description": "Legs sharing a `txn_id` sum to zero."
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching rows across all pages."
+          }
+        }
+      },
       "Paged_Member": {
         "type": "object",
         "required": [
@@ -5042,6 +6987,76 @@
                 },
                 "role": {
                   "type": "string"
+                }
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Matching rows across all pages."
+          }
+        }
+      },
+      "Paged_MyPayout": {
+        "type": "object",
+        "required": [
+          "items",
+          "page",
+          "limit",
+          "total"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "batch_id",
+                "program_id",
+                "amount_cents",
+                "currency",
+                "status"
+              ],
+              "properties": {
+                "amount_cents": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "batch_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "paid_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "program_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "status": {
+                  "type": "string",
+                  "description": "`approved` (owed, not yet sent) or `paid`."
                 }
               }
             }
@@ -5583,6 +7598,46 @@
             "type": "integer",
             "format": "int64",
             "description": "Matching rows across all pages."
+          }
+        }
+      },
+      "Payout": {
+        "type": "object",
+        "required": [
+          "id",
+          "affiliate_id",
+          "email",
+          "amount_cents",
+          "status"
+        ],
+        "properties": {
+          "affiliate_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "email": {
+            "type": "string",
+            "description": "Payout email, else the affiliate's account email."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ledger_txn_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The `AffPayable -> Cash` ledger txn, once paid."
+          },
+          "status": {
+            "type": "string",
+            "description": "`draft`, `approved`, `paid` or `cancelled`."
           }
         }
       },

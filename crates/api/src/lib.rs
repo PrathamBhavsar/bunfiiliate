@@ -9,6 +9,7 @@ pub mod dispatch;
 pub mod error;
 pub mod mail;
 pub mod metrics;
+pub mod money;
 pub mod ops;
 pub mod page;
 pub mod payouts;

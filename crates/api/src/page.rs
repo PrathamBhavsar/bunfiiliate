@@ -7,6 +7,7 @@ const DEFAULT_LIMIT: u32 = 50;
 const MAX_LIMIT: u32 = 200;
 
 #[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct PageQuery {
     /// 1-based page number (default 1).
     page: Option<u32>,

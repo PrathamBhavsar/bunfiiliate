@@ -134,6 +134,7 @@ impl Dim {
 }
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct RangeQuery {
     /// Only this program (must be in the workspace). Default: all programs.
     program_id: Option<Uuid>,
@@ -146,6 +147,7 @@ pub struct RangeQuery {
 }
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct DimQuery {
     program_id: Option<Uuid>,
     affiliate_id: Option<Uuid>,
@@ -164,7 +166,7 @@ struct Scope {
     to: NaiveDate,
 }
 
-fn parse_day(s: &str) -> Result<NaiveDate, AppError> {
+pub(crate) fn parse_day(s: &str) -> Result<NaiveDate, AppError> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d")
         .map_err(|_| AppError::BadRequest("dates are YYYY-MM-DD".into()))
 }

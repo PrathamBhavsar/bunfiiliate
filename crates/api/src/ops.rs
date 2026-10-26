@@ -42,6 +42,7 @@ pub fn routes() -> Router<AppState> {
 // ---- notifications
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct NotificationFilter {
     /// Only unread notifications.
     #[serde(default)]
@@ -150,6 +151,7 @@ pub async fn create_contact(
 }
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct ContactFilter {
     /// `new`, `read` or `closed`.
     status: Option<String>,
@@ -296,6 +298,7 @@ pub async fn put_settings(
 // ---- audit log
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct AuditFilter {
     /// Entity type, e.g. `program`.
     entity: Option<String>,

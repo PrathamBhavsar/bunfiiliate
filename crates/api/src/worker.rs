@@ -20,6 +20,7 @@ use uuid::Uuid;
 
 use crate::analytics;
 use crate::dispatch;
+use crate::error::AppError;
 use crate::mail::Mailer;
 use crate::metrics;
 
@@ -114,7 +115,7 @@ struct Event {
 }
 
 /// A reason the event cannot become a conversion; recorded on the event, not retried.
-enum Fail {
+pub(crate) enum Fail {
     Rejected(String),
     Db(sqlx::Error),
 }
@@ -122,6 +123,15 @@ enum Fail {
 impl From<sqlx::Error> for Fail {
     fn from(e: sqlx::Error) -> Self {
         Fail::Db(e)
+    }
+}
+
+impl From<Fail> for AppError {
+    fn from(f: Fail) -> Self {
+        match f {
+            Fail::Rejected(_) => AppError::Conflict("conversion cannot take this action"),
+            Fail::Db(e) => e.into(),
+        }
     }
 }
 
@@ -540,26 +550,115 @@ fn reversal(source: &str, p: &Value) -> Option<Reversal> {
     Some(Reversal { reason, target })
 }
 
+/// Columns of a conversion `c` about to change status (select it `FOR UPDATE OF c`).
+pub(crate) const LOCKED_COLS: &str = "c.id, c.program_id, c.affiliate_id, c.commission_cents, \
+     c.currency, c.status::text AS status, c.payout_id";
+
 #[derive(sqlx::FromRow)]
-struct Reversible {
+pub(crate) struct Locked {
     id: Uuid,
+    program_id: Uuid,
     affiliate_id: Uuid,
     commission_cents: i64,
     currency: String,
-    status: String,
+    pub(crate) status: String,
     payout_id: Option<Uuid>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Act {
+    Approve,
+    Reject,
+    Reverse,
+}
+
+/// Move a locked conversion through the state machine: status column, balanced ledger txn,
+/// shrink of a payout not yet paid (it was sized with this commission; a paid one nets
+/// against the next batch) and the outbox row. Returns the new status.
+pub(crate) async fn settle(
+    c: &mut PgConnection,
+    conv: &Locked,
+    act: Act,
+    reason: &str,
+) -> Result<&'static str, Fail> {
+    let from = match conv.status.as_str() {
+        "pending" => ConversionStatus::Pending,
+        "approved" => ConversionStatus::Approved,
+        "paid" => ConversionStatus::Paid,
+        "rejected" => ConversionStatus::Rejected,
+        _ => ConversionStatus::Reversed,
+    };
+    let Some(currency) = Currency::new(&conv.currency) else {
+        return reject("invalid conversion currency");
+    };
+    let m = Money::new(conv.commission_cents, currency);
+    let event = match act {
+        Act::Approve => ConversionEvent::Approve(m),
+        Act::Reject => ConversionEvent::Reject(m),
+        Act::Reverse => ConversionEvent::Reverse(m),
+    };
+    let (_, txn) = from
+        .transition(event)
+        .map_err(|e| Fail::Rejected(e.to_string()))?;
+    let (to, stamp) = match act {
+        Act::Approve => ("approved", "approved_at"),
+        Act::Reject => ("rejected", "reversed_at"),
+        Act::Reverse => ("reversed", "reversed_at"),
+    };
+    sqlx::query(&format!(
+        "UPDATE conversions SET status = $2::conversion_status, {stamp} = now() WHERE id = $1"
+    ))
+    .bind(conv.id)
+    .bind(to)
+    .execute(&mut *c)
+    .await?;
+    if let Some(txn) = txn {
+        post(
+            c,
+            &txn,
+            conv.program_id,
+            conv.affiliate_id,
+            (Some(conv.id), None),
+        )
+        .await?;
+    }
+    if let Some(payout) = conv.payout_id {
+        sqlx::query(
+            "UPDATE payouts SET amount_cents = amount_cents - $2 \
+             WHERE id = $1 AND status IN ('draft', 'approved')",
+        )
+        .bind(payout)
+        .bind(conv.commission_cents)
+        .execute(&mut *c)
+        .await?;
+    }
+    let mut payload = json!({
+        "conversion_id": conv.id,
+        "program_id": conv.program_id,
+        "affiliate_id": conv.affiliate_id,
+        "commission_cents": conv.commission_cents,
+        "currency": conv.currency,
+        "status": to,
+    });
+    let topic = if act == Act::Approve {
+        "conversion.approved"
+    } else {
+        payload["reason"] = json!(reason);
+        "conversion.reversed"
+    };
+    outbox(c, topic, payload).await?;
+    Ok(to)
 }
 
 /// Undo a conversion's commission: pending is rejected, approved or paid is reversed. A paid
 /// conversion leaves the affiliate's payable negative, netted against their next payout.
 /// Unknown (organic) and already reversed conversions are a no-op, so replays are safe.
 async fn reverse(c: &mut PgConnection, ev: &Event, r: Reversal) -> Result<(), Fail> {
-    const COLS: &str = "c.id, c.affiliate_id, c.commission_cents, c.currency, c.status::text AS status, c.payout_id";
-    let conv: Option<Reversible> = match &r.target {
+    let conv: Option<Locked> = match &r.target {
         Target::External(id) => {
             sqlx::query_as(&format!(
-                "SELECT {COLS} FROM conversions c WHERE c.program_id = $1 AND c.external_id = $2 \
-                 FOR UPDATE OF c"
+                "SELECT {LOCKED_COLS} FROM conversions c \
+                 WHERE c.program_id = $1 AND c.external_id = $2 FOR UPDATE OF c"
             ))
             .bind(ev.program_id)
             .bind(id)
@@ -568,7 +667,7 @@ async fn reverse(c: &mut PgConnection, ev: &Event, r: Reversal) -> Result<(), Fa
         }
         Target::Refs(refs) => {
             sqlx::query_as(&format!(
-                "SELECT {COLS} FROM inbound_events e \
+                "SELECT {LOCKED_COLS} FROM inbound_events e \
                    JOIN conversions c ON c.program_id = e.program_id AND c.external_id = e.external_id \
                  WHERE e.program_id = $1 AND e.source = $2::event_source AND ( \
                    e.payload #>> '{{data,object,id}}' = ANY($3) \
@@ -587,71 +686,12 @@ async fn reverse(c: &mut PgConnection, ev: &Event, r: Reversal) -> Result<(), Fa
     let Some(conv) = conv else {
         return Ok(());
     };
-    let status = match conv.status.as_str() {
-        "pending" => ConversionStatus::Pending,
-        "approved" => ConversionStatus::Approved,
-        "paid" => ConversionStatus::Paid,
+    let act = match conv.status.as_str() {
+        "pending" => Act::Reject,
+        "approved" | "paid" => Act::Reverse,
         _ => return Ok(()), // already rejected or reversed
     };
-    let Some(currency) = Currency::new(&conv.currency) else {
-        return reject("invalid conversion currency");
-    };
-    let m = Money::new(conv.commission_cents, currency);
-    let event = if status == ConversionStatus::Pending {
-        ConversionEvent::Reject(m)
-    } else {
-        ConversionEvent::Reverse(m)
-    };
-    let (to, txn) = status
-        .transition(event)
-        .map_err(|e| Fail::Rejected(e.to_string()))?;
-    sqlx::query(
-        "UPDATE conversions SET status = $2::conversion_status, reversed_at = now() WHERE id = $1",
-    )
-    .bind(conv.id)
-    .bind(if to == ConversionStatus::Rejected {
-        "rejected"
-    } else {
-        "reversed"
-    })
-    .execute(&mut *c)
-    .await?;
-    if let Some(txn) = txn {
-        post(
-            c,
-            &txn,
-            ev.program_id,
-            conv.affiliate_id,
-            (Some(conv.id), None),
-        )
-        .await?;
-    }
-    // A payout not yet paid was sized with this commission; shrink it. (Paid payouts are
-    // left alone: the negative payable nets against the next batch.)
-    if let Some(payout) = conv.payout_id {
-        sqlx::query(
-            "UPDATE payouts SET amount_cents = amount_cents - $2 \
-             WHERE id = $1 AND status IN ('draft', 'approved')",
-        )
-        .bind(payout)
-        .bind(conv.commission_cents)
-        .execute(&mut *c)
-        .await?;
-    }
-    outbox(
-        c,
-        "conversion.reversed",
-        json!({
-            "conversion_id": conv.id,
-            "program_id": ev.program_id,
-            "affiliate_id": conv.affiliate_id,
-            "commission_cents": conv.commission_cents,
-            "currency": conv.currency,
-            "status": if to == ConversionStatus::Rejected { "rejected" } else { "reversed" },
-            "reason": r.reason,
-        }),
-    )
-    .await?;
+    settle(c, &conv, act, r.reason).await?;
     Ok(())
 }
 
@@ -764,15 +804,6 @@ pub(crate) async fn outbox(
     Ok(())
 }
 
-#[derive(sqlx::FromRow)]
-struct Due {
-    id: Uuid,
-    program_id: Uuid,
-    affiliate_id: Uuid,
-    commission_cents: i64,
-    currency: String,
-}
-
 /// Approve pending conversions past their program's hold period; returns how many.
 pub async fn approve_due(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let mut total = 0;
@@ -794,57 +825,24 @@ async fn approve_batch(pool: &PgPool) -> Result<u64, sqlx::Error> {
     if !locked {
         return Ok(0);
     }
-    let due: Vec<Due> = sqlx::query_as(
-        "SELECT c.id, c.program_id, c.affiliate_id, c.commission_cents, c.currency \
+    let due: Vec<Locked> = sqlx::query_as(&format!(
+        "SELECT {LOCKED_COLS} \
          FROM conversions c JOIN programs p ON p.id = c.program_id \
            JOIN affiliates a ON a.id = c.affiliate_id \
          WHERE c.status = 'pending' AND p.auto_approve \
            AND a.status = 'active' \
            AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = c.program_id) \
            AND c.occurred_at <= now() - make_interval(days => p.hold_days) \
-         ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE OF c SKIP LOCKED",
-    )
+         ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE OF c SKIP LOCKED"
+    ))
     .bind(APPROVE_BATCH)
     .fetch_all(&mut *tx)
     .await?;
     for d in &due {
-        let Some(currency) = Currency::new(&d.currency) else {
-            continue;
-        };
-        let Ok((_, txn)) = ConversionStatus::Pending.transition(ConversionEvent::Approve(
-            Money::new(d.commission_cents, currency),
-        )) else {
-            continue;
-        };
-        sqlx::query(
-            "UPDATE conversions SET status = 'approved', approved_at = now() WHERE id = $1",
-        )
-        .bind(d.id)
-        .execute(&mut *tx)
-        .await?;
-        if let Some(txn) = txn {
-            post(
-                &mut tx,
-                &txn,
-                d.program_id,
-                d.affiliate_id,
-                (Some(d.id), None),
-            )
-            .await?;
+        match settle(&mut tx, d, Act::Approve, "").await {
+            Ok(_) | Err(Fail::Rejected(_)) => {}
+            Err(Fail::Db(e)) => return Err(e),
         }
-        outbox(
-            &mut tx,
-            "conversion.approved",
-            json!({
-                "conversion_id": d.id,
-                "program_id": d.program_id,
-                "affiliate_id": d.affiliate_id,
-                "commission_cents": d.commission_cents,
-                "currency": d.currency,
-                "status": "approved",
-            }),
-        )
-        .await?;
     }
     tx.commit().await?;
     Ok(due.len() as u64)

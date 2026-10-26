@@ -261,6 +261,128 @@ export interface paths {
         patch: operations["update_contact"];
         trace?: never;
     };
+    "/api/v1/conversions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List conversions, newest first. */
+        get: operations["list_conversions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One conversion. */
+        get: operations["get_conversion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversions/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a pending conversion: its commission moves from pending to payable. */
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversions/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a pending conversion: its commission returns to expense. */
+        post: operations["reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/conversions/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse an approved or paid conversion (refund, chargeback). After payout the affiliate's
+         *     payable goes negative and nets against their next batch.
+         */
+        post: operations["reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List customers, newest first. */
+        get: operations["list_customers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One customer. */
+        get: operations["get_customer"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/email-templates": {
         parameters: {
             query?: never;
@@ -301,6 +423,40 @@ export interface paths {
         patch: operations["update_template"];
         trace?: never;
     };
+    "/api/v1/ledger/balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pending and payable commission per affiliate and program, derived from the ledger. */
+        get: operations["list_balances"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/ledger/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ledger legs, newest first. */
+        get: operations["list_entries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/affiliate": {
         parameters: {
             query?: never;
@@ -317,6 +473,40 @@ export interface paths {
         head?: never;
         /** Change the signed-in affiliate's payout email or minimum. */
         patch: operations["me_update"];
+        trace?: never;
+    };
+    "/api/v1/me/earnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in affiliate's conversions, newest first. */
+        get: operations["me_earnings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/payouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in affiliate's approved and paid payouts, newest first. */
+        get: operations["me_payouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/me/referral-codes": {
@@ -400,6 +590,112 @@ export interface paths {
         put?: never;
         /** Mark one of the signed-in user's notifications read. */
         post: operations["mark_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List batches, newest first. */
+        get: operations["list_batches"];
+        put?: never;
+        /**
+         * Draft a batch paying every active affiliate of the program who is owed at least their
+         *     minimum. `409` when nobody is.
+         */
+        post: operations["create_batch_route"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One batch with its payouts. */
+        get: operations["get_batch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** `draft -> approved`. */
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** `draft -> cancelled`: releases the batch's conversions. */
+        post: operations["cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** `email,amount,currency` CSV for the bank or payout tool. */
+        get: operations["export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}/mark-paid": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** `approved -> paid`: posts payable -> cash per payout. */
+        post: operations["mark_paid_route"];
         delete?: never;
         options?: never;
         head?: never;
@@ -766,6 +1062,8 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        Account: "expense" | "aff_pending" | "aff_payable" | "cash";
         Affiliate: {
             email: string;
             /** Format: uuid */
@@ -794,6 +1092,45 @@ export interface components {
             /** Format: uuid */
             id: string;
         };
+        Balance: {
+            /** Format: uuid */
+            affiliate_id: string;
+            currency: string;
+            /**
+             * Format: int64
+             * @description Approved and not yet paid out; negative after a clawback.
+             */
+            payable_cents: number;
+            /**
+             * Format: int64
+             * @description Commission awaiting approval.
+             */
+            pending_cents: number;
+            /** Format: uuid */
+            program_id: string;
+        };
+        BatchDetail: components["schemas"]["BatchView"] & {
+            payouts: components["schemas"]["Payout"][];
+        };
+        BatchView: {
+            /** Format: uuid */
+            approved_by?: string | null;
+            created_at: string;
+            /** Format: uuid */
+            created_by: string;
+            currency: string;
+            /** Format: uuid */
+            id: string;
+            paid_at?: string | null;
+            /** Format: int64 */
+            payout_count: number;
+            /** Format: uuid */
+            program_id: string;
+            /** @description `draft`, `approved`, `paid` or `cancelled`. */
+            status: string;
+            /** Format: int64 */
+            total_cents: number;
+        };
         ContactPatch: {
             /** @description `new`, `read` or `closed`. */
             status: string;
@@ -813,6 +1150,40 @@ export interface components {
             /** Format: uuid */
             workspace_id: string;
         };
+        Conversion: {
+            /** Format: uuid */
+            affiliate_id: string;
+            /**
+             * Format: int64
+             * @description Sale amount in the currency's minor unit.
+             */
+            amount_cents: number;
+            approved_at?: string | null;
+            /** Format: int64 */
+            commission_cents: number;
+            /** Format: uuid */
+            conversion_type_id?: string | null;
+            currency: string;
+            /** Format: uuid */
+            customer_id: string;
+            /** @description The sale's id in the merchant's or payment provider's system. */
+            external_id: string;
+            /** Format: uuid */
+            id: string;
+            occurred_at: string;
+            /**
+             * Format: uuid
+             * @description The payout that claimed it, once batched.
+             */
+            payout_id?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            reversed_at?: string | null;
+            /** @description `pending`, `approved`, `rejected`, `reversed` or `paid`. */
+            status: string;
+        };
+        /** @enum {string} */
+        ConversionStatus: "pending" | "approved" | "rejected" | "reversed" | "paid";
         ConversionType: {
             /** Format: uuid */
             id: string;
@@ -821,8 +1192,37 @@ export interface components {
             /** Format: uuid */
             program_id: string;
         };
+        Customer: {
+            /** Format: uuid */
+            affiliate_id?: string | null;
+            attributed_at?: string | null;
+            /** @description The customer's id in the merchant's system. */
+            external_id: string;
+            /** Format: uuid */
+            first_click_id?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            program_id: string;
+        };
         /** @enum {string} */
         Dim: "total" | "country" | "os" | "browser" | "device" | "referrer";
+        /** @description An affiliate's view of a conversion: no customer, no provider ids. */
+        Earning: {
+            /** Format: int64 */
+            amount_cents: number;
+            approved_at?: string | null;
+            /** Format: int64 */
+            commission_cents: number;
+            currency: string;
+            /** Format: uuid */
+            id: string;
+            occurred_at: string;
+            /** Format: uuid */
+            program_id: string;
+            /** @description `pending`, `approved`, `rejected`, `reversed` or `paid`. */
+            status: string;
+        };
         EmailTemplate: {
             body: string;
             /** Format: uuid */
@@ -845,6 +1245,32 @@ export interface components {
             plan_override_id?: string | null;
             /** Format: uuid */
             program_id: string;
+        };
+        Entry: {
+            /** @description `expense`, `aff_pending`, `aff_payable` or `cash`. */
+            account: string;
+            /** Format: uuid */
+            affiliate_id?: string | null;
+            /**
+             * Format: int64
+             * @description Debit positive, credit negative.
+             */
+            amount_cents: number;
+            /** Format: uuid */
+            conversion_id?: string | null;
+            created_at: string;
+            currency: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            payout_id?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            /**
+             * Format: uuid
+             * @description Legs sharing a `txn_id` sum to zero.
+             */
+            txn_id: string;
         };
         ErrorBody: {
             error: components["schemas"]["ErrorDetail"];
@@ -880,6 +1306,24 @@ export interface components {
              * @description Sum of conversion amounts in the program currency's minor unit.
              */
             revenue_cents: number;
+        };
+        MyPayout: {
+            /** Format: int64 */
+            amount_cents: number;
+            /** Format: uuid */
+            batch_id: string;
+            currency: string;
+            /** Format: uuid */
+            id: string;
+            paid_at?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            /** @description `approved` (owed, not yet sent) or `paid`. */
+            status: string;
+        };
+        NewBatch: {
+            /** Format: uuid */
+            program_id: string;
         };
         NewCode: {
             /** Format: uuid */
@@ -1048,6 +1492,64 @@ export interface components {
              */
             total: number;
         };
+        Paged_Balance: {
+            items: {
+                /** Format: uuid */
+                affiliate_id: string;
+                currency: string;
+                /**
+                 * Format: int64
+                 * @description Approved and not yet paid out; negative after a clawback.
+                 */
+                payable_cents: number;
+                /**
+                 * Format: int64
+                 * @description Commission awaiting approval.
+                 */
+                pending_cents: number;
+                /** Format: uuid */
+                program_id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_BatchView: {
+            items: {
+                /** Format: uuid */
+                approved_by?: string | null;
+                created_at: string;
+                /** Format: uuid */
+                created_by: string;
+                currency: string;
+                /** Format: uuid */
+                id: string;
+                paid_at?: string | null;
+                /** Format: int64 */
+                payout_count: number;
+                /** Format: uuid */
+                program_id: string;
+                /** @description `draft`, `approved`, `paid` or `cancelled`. */
+                status: string;
+                /** Format: int64 */
+                total_cents: number;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_ContactRequest: {
             items: {
                 /** Format: date-time */
@@ -1074,6 +1576,49 @@ export interface components {
              */
             total: number;
         };
+        Paged_Conversion: {
+            items: {
+                /** Format: uuid */
+                affiliate_id: string;
+                /**
+                 * Format: int64
+                 * @description Sale amount in the currency's minor unit.
+                 */
+                amount_cents: number;
+                approved_at?: string | null;
+                /** Format: int64 */
+                commission_cents: number;
+                /** Format: uuid */
+                conversion_type_id?: string | null;
+                currency: string;
+                /** Format: uuid */
+                customer_id: string;
+                /** @description The sale's id in the merchant's or payment provider's system. */
+                external_id: string;
+                /** Format: uuid */
+                id: string;
+                occurred_at: string;
+                /**
+                 * Format: uuid
+                 * @description The payout that claimed it, once batched.
+                 */
+                payout_id?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                reversed_at?: string | null;
+                /** @description `pending`, `approved`, `rejected`, `reversed` or `paid`. */
+                status: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_ConversionType: {
             items: {
                 /** Format: uuid */
@@ -1082,6 +1627,56 @@ export interface components {
                 name: string;
                 /** Format: uuid */
                 program_id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_Customer: {
+            items: {
+                /** Format: uuid */
+                affiliate_id?: string | null;
+                attributed_at?: string | null;
+                /** @description The customer's id in the merchant's system. */
+                external_id: string;
+                /** Format: uuid */
+                first_click_id?: string | null;
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                program_id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_Earning: {
+            items: {
+                /** Format: int64 */
+                amount_cents: number;
+                approved_at?: string | null;
+                /** Format: int64 */
+                commission_cents: number;
+                currency: string;
+                /** Format: uuid */
+                id: string;
+                occurred_at: string;
+                /** Format: uuid */
+                program_id: string;
+                /** @description `pending`, `approved`, `rejected`, `reversed` or `paid`. */
+                status: string;
             }[];
             /** Format: int64 */
             limit: number;
@@ -1132,12 +1727,74 @@ export interface components {
              */
             total: number;
         };
+        Paged_Entry: {
+            items: {
+                /** @description `expense`, `aff_pending`, `aff_payable` or `cash`. */
+                account: string;
+                /** Format: uuid */
+                affiliate_id?: string | null;
+                /**
+                 * Format: int64
+                 * @description Debit positive, credit negative.
+                 */
+                amount_cents: number;
+                /** Format: uuid */
+                conversion_id?: string | null;
+                created_at: string;
+                currency: string;
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                payout_id?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                /**
+                 * Format: uuid
+                 * @description Legs sharing a `txn_id` sum to zero.
+                 */
+                txn_id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_Member: {
             items: {
                 email: string;
                 /** Format: uuid */
                 id: string;
                 role: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_MyPayout: {
+            items: {
+                /** Format: int64 */
+                amount_cents: number;
+                /** Format: uuid */
+                batch_id: string;
+                currency: string;
+                /** Format: uuid */
+                id: string;
+                paid_at?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                /** @description `approved` (owed, not yet sent) or `paid`. */
+                status: string;
             }[];
             /** Format: int64 */
             limit: number;
@@ -1334,6 +1991,23 @@ export interface components {
              */
             total: number;
         };
+        Payout: {
+            /** Format: uuid */
+            affiliate_id: string;
+            /** Format: int64 */
+            amount_cents: number;
+            /** @description Payout email, else the affiliate's account email. */
+            email: string;
+            /** Format: uuid */
+            id: string;
+            /**
+             * Format: uuid
+             * @description The `AffPayable -> Cash` ledger txn, once paid.
+             */
+            ledger_txn_id?: string | null;
+            /** @description `draft`, `approved`, `paid` or `cancelled`. */
+            status: string;
+        };
         PayoutUpdate: {
             payout_email?: string | null;
             /**
@@ -1498,16 +2172,16 @@ export type $defs = Record<string, never>;
 export interface operations {
     list_affiliates: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description `pending`, `active` or `suspended`. */
-                status: string | null;
+                status?: string;
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1767,16 +2441,16 @@ export interface operations {
     };
     summary: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                program_id: string | null;
-                affiliate_id: string | null;
-                from: string | null;
-                to: string | null;
+            query?: {
+                program_id?: string;
+                affiliate_id?: string;
+                from?: string;
+                to?: string;
                 /** @description Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`. */
-                dim: null | components["schemas"]["Dim"];
+                dim?: components["schemas"]["Dim"];
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1810,18 +2484,18 @@ export interface operations {
     };
     timeseries: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description Only this program (must be in the workspace). Default: all programs. */
-                program_id: string | null;
+                program_id?: string;
                 /** @description Admins only: one affiliate. Affiliates always see their own data. */
-                affiliate_id: string | null;
+                affiliate_id?: string;
                 /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
-                from: string | null;
+                from?: string;
                 /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
-                to: string | null;
+                to?: string;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1855,18 +2529,18 @@ export interface operations {
     };
     list_audit: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description Entity type, e.g. `program`. */
-                entity: string | null;
+                entity?: string;
                 /** @description Action, e.g. `program.create`. */
-                action: string | null;
+                action?: string;
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1998,16 +2672,16 @@ export interface operations {
     };
     list_contacts: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description `new`, `read` or `closed`. */
-                status: string | null;
+                status?: string;
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2112,16 +2786,276 @@ export interface operations {
             };
         };
     };
-    list_templates: {
+    list_conversions: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description Admins only: one affiliate. */
+                affiliate_id?: string;
+                status?: components["schemas"]["ConversionStatus"];
+                /** @description First day of `occurred_at`, `YYYY-MM-DD` UTC, inclusive. */
+                from?: string;
+                /** @description Last day of `occurred_at`, `YYYY-MM-DD` UTC, inclusive. */
+                to?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_Conversion"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_conversion: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description 1-based page number (default 1). */
-                page: number | null;
-                /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                /** @description Conversion id */
+                id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversion"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Conversion id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversion"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not pending */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Conversion id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversion"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not pending */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Conversion id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversion"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not approved or paid */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_customers: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description The affiliate the customer is attributed to. */
+                affiliate_id?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_Customer"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_customer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Customer id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Customer"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_templates: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2292,6 +3226,79 @@ export interface operations {
             };
         };
     };
+    list_balances: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description Admins only: one affiliate. Affiliates always get their own balances. */
+                affiliate_id?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_Balance"];
+                };
+            };
+            /** @description Unknown program or other affiliate */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_entries: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                affiliate_id?: string;
+                account?: components["schemas"]["Account"];
+                /** @description All legs of one transaction. */
+                txn_id?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_Entry"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     me_affiliate: {
         parameters: {
             query?: never;
@@ -2358,16 +3365,92 @@ export interface operations {
             };
         };
     };
+    me_earnings: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                status?: components["schemas"]["ConversionStatus"];
+                from?: string;
+                to?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_Earning"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    me_payouts: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_MyPayout"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     me_list_codes: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2460,16 +3543,16 @@ export interface operations {
     };
     list_members: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description Super admins only: act on another workspace. */
-                workspace_id: string | null;
+                workspace_id?: string;
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2494,12 +3577,12 @@ export interface operations {
     };
     invite_member: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description Super admins only: act on another workspace. */
-                workspace_id: string | null;
+                workspace_id?: string;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody: {
@@ -2545,16 +3628,16 @@ export interface operations {
     };
     list_notifications: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description Only unread notifications. */
-                unread: boolean;
+                unread?: boolean;
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2607,16 +3690,270 @@ export interface operations {
             };
         };
     };
-    list_programs: {
+    list_batches: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `draft`, `approved`, `paid` or `cancelled`. */
+                status?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_BatchView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_batch_route: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewBatch"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Unknown program */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Nobody is owed a payout */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_batch: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                /** @description 1-based page number (default 1). */
-                page: number | null;
-                /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                /** @description BatchView id */
+                id: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description BatchView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not a draft */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description BatchView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not a draft */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description BatchView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description text/csv */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    mark_paid_route: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description BatchView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not approved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_programs: {
+        parameters: {
+            query?: {
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -2788,15 +4125,16 @@ export interface operations {
     };
     list_conversion_types: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /** @description Program id */
                 id: string;
-                /** @description 1-based page number (default 1). */
-                page: number | null;
-                /** @description Items per page (default 50, max 200). */
-                limit: number | null;
             };
             cookie?: never;
         };
@@ -2910,15 +4248,16 @@ export interface operations {
     };
     list_enrollments: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /** @description Program id */
                 id: string;
-                /** @description 1-based page number (default 1). */
-                page: number | null;
-                /** @description Items per page (default 50, max 200). */
-                limit: number | null;
             };
             cookie?: never;
         };
@@ -3009,15 +4348,16 @@ export interface operations {
     };
     list_plans: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /** @description Program id */
                 id: string;
-                /** @description 1-based page number (default 1). */
-                page: number | null;
-                /** @description Items per page (default 50, max 200). */
-                limit: number | null;
             };
             cookie?: never;
         };
@@ -3153,15 +4493,16 @@ export interface operations {
     };
     list_sites: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
             header?: never;
             path: {
                 /** @description Program id */
                 id: string;
-                /** @description 1-based page number (default 1). */
-                page: number | null;
-                /** @description Items per page (default 50, max 200). */
-                limit: number | null;
             };
             cookie?: never;
         };
@@ -3267,16 +4608,16 @@ export interface operations {
     };
     list_codes: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                affiliate_id: string | null;
-                program_id: string | null;
+            query?: {
+                affiliate_id?: string;
+                program_id?: string;
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3377,16 +4718,16 @@ export interface operations {
     };
     report_csv: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                program_id: string | null;
-                affiliate_id: string | null;
-                from: string | null;
-                to: string | null;
+            query?: {
+                program_id?: string;
+                affiliate_id?: string;
+                from?: string;
+                to?: string;
                 /** @description Break the range down by this dimension. Summary: none = no breakdown. CSV: default `total`. */
-                dim: null | components["schemas"]["Dim"];
+                dim?: components["schemas"]["Dim"];
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3490,15 +4831,15 @@ export interface operations {
     };
     list_deliveries: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                endpoint_id: string | null;
+            query?: {
+                endpoint_id?: string;
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3562,14 +4903,14 @@ export interface operations {
     };
     list_endpoints: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -3733,14 +5074,14 @@ export interface operations {
     };
     list_workspaces: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
+            query?: {
                 /** @description 1-based page number (default 1). */
-                page: number | null;
+                page?: number;
                 /** @description Items per page (default 50, max 200). */
-                limit: number | null;
+                limit?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
