@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T43 load testing harness & benchmarks
+
+- **Creation**: `bench/run.sh` automated load testing harness (builds release binaries, provisions scratch database `bf_bench` on PostgreSQL 16 via `api bootstrap` and SQL seeds, drives load across `/c`, `/r/:code`, and HMAC-SHA256 signed `/v1/events/:program_key` with `oha` under `BF_FSYNC=always` and `BF_FSYNC=off`, writes JSON metrics to `bench/results/*.json`, and generates `docs/benchmarks.md`), `.gitignore` updates for benchmark results keeping `.gitkeep`.
+- **Update**: [Tasks](/tasks/index.md) T43 done on branch. Acceptance passed: `bench/run.sh` exited 0 with machine-readable results in `bench/results/` and generated `docs/benchmarks.md` with hardware specs (Apple M4 10-core, 16 GB RAM, macOS 26.5.1, PostgreSQL 16.15, oha 1.16.0), RPS, latency percentiles (p50/p95/p99), error counts (0 errors), and single-machine localhost disclosure. `npx markdownlint-cli2 "**/*.md" "#node_modules" "#brain"` passes (0 issues). `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` all pass.
+
 ## [2026-10-26] T41 observability
 
 - **Creation**: `bf_rt::metrics` (hand-rolled Prometheus text registry: static atomics `Counter`/`Gauge`/`Histogram`, `router`, `serve`; no new crates, only `axum` + `tokio/net` on `bf-rt`), `tracker::metrics`, `api::metrics`. Tracker: `bf_ingest_latency_seconds`, `bf_batch_size`, `bf_shed_total`, `bf_spool_bytes`, `bf_spool_lag`. API/worker: `bf_outbox_depth`, `bf_webhook_delivery_failures_total`, `bf_ingest_events_processed_total`, `bf_rollup_tick_seconds`, `bf_approve_tick_seconds`. Details: [Observability](/architecture/observability.md).
