@@ -1,6 +1,7 @@
 //! Postgres access: pool, migrations, repos.
 
 pub mod ledger;
+pub mod tracker;
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
