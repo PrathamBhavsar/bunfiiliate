@@ -1,5 +1,5 @@
 import { type components, createApi } from "@bunfiiliate/sdk";
-import { queryClient } from "./query";
+import { clearUserData, queryClient } from "./query";
 
 export type User = components["schemas"]["UserView"];
 export const meKey = ["me"] as const;
@@ -30,6 +30,7 @@ async function fetchWithRefresh(request: Request) {
     return response;
   }
   if (await refreshSession()) return fetch(replay);
+  clearUserData(meKey);
   queryClient.setQueryData(meKey, null);
   return response;
 }

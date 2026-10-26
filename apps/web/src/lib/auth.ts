@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, errorMessage, meKey, type User } from "./api";
-import { queryClient } from "./query";
+import { clearUserData, queryClient } from "./query";
 
 export type Role = "super_admin" | "admin" | "affiliate";
 
@@ -31,7 +31,10 @@ export function useLogin() {
       if (!data) throw new Error(errorMessage(error));
       return data;
     },
-    onSuccess: (user) => queryClient.setQueryData(meKey, user),
+    onSuccess: (user) => {
+      clearUserData(meKey);
+      queryClient.setQueryData(meKey, user);
+    },
   });
 }
 
@@ -39,8 +42,8 @@ export function useLogout() {
   return useMutation({
     mutationFn: () => api.POST("/api/v1/auth/logout"),
     onSettled: () => {
+      clearUserData(meKey);
       queryClient.setQueryData(meKey, null);
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== meKey[0] });
     },
   });
 }
