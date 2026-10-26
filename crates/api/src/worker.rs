@@ -4,7 +4,7 @@
 //! its ledger txn and the outbox row commit together with the event's `processed_at`.
 //! Ticks (approve, rollup) are guarded by a transaction-scoped advisory lock.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bf_core::{
     Account, AffiliateId, Attribution, Bps, CommissionKind, CommissionPlan, ConversionEvent,
@@ -12,6 +12,7 @@ use bf_core::{
     conversion_created,
 };
 use bf_db::ledger::{self, NewEntry};
+use bf_rt::metrics::Histogram;
 use chrono::{DateTime, Datelike, Months, Utc};
 use serde_json::{Value, json};
 use sqlx::{Acquire, PgConnection, PgPool};
@@ -20,6 +21,7 @@ use uuid::Uuid;
 use crate::analytics;
 use crate::dispatch;
 use crate::mail::Mailer;
+use crate::metrics;
 
 const INGEST_EVERY: Duration = Duration::from_secs(1);
 const APPROVE_EVERY: Duration = Duration::from_secs(60);
@@ -45,22 +47,36 @@ pub async fn run(pool: PgPool, mailer: Mailer) {
         tokio::select! {
             _ = ingest.tick() => match process_events(&pool).await {
                 Ok(0) => {}
-                Ok(n) => tracing::info!(events = n, "ingested"),
+                Ok(n) => {
+                    metrics::EVENTS_PROCESSED.add(n);
+                    tracing::info!(events = n, "ingested");
+                }
                 Err(e) => tracing::error!(error = %e, "ingest tick failed"),
             },
-            _ = approve.tick() => match approve_due(&pool).await {
+            _ = approve.tick() => match timed(&metrics::APPROVE_TICK, approve_due(&pool)).await {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(conversions = n, "auto-approved"),
                 Err(e) => tracing::error!(error = %e, "approve tick failed"),
             },
-            _ = rollup.tick() => if let Err(e) = analytics::rollup(&pool).await {
+            _ = rollup.tick() => if let Err(e) = timed(&metrics::ROLLUP_TICK, analytics::rollup(&pool)).await {
                 tracing::error!(error = %e, "rollup tick failed");
             },
-            _ = dispatch.tick() => match dispatch::dispatch_outbox(&pool, &mailer).await {
-                Ok(0) => {}
-                Ok(n) => tracing::info!(rows = n, "outbox dispatched"),
-                Err(e) => tracing::error!(error = %e, "dispatch tick failed"),
-            },
+            _ = dispatch.tick() => {
+                match dispatch::dispatch_outbox(&pool, &mailer).await {
+                    Ok(0) => {}
+                    Ok(n) => tracing::info!(rows = n, "outbox dispatched"),
+                    Err(e) => tracing::error!(error = %e, "dispatch tick failed"),
+                }
+                match sqlx::query_scalar::<_, i64>(
+                    "SELECT count(*) FROM outbox WHERE done_at IS NULL",
+                )
+                .fetch_one(&pool)
+                .await
+                {
+                    Ok(n) => metrics::OUTBOX_DEPTH.set(n as u64),
+                    Err(e) => tracing::error!(error = %e, "outbox depth failed"),
+                }
+            }
             _ = deliver.tick() => match dispatch::deliver_due(&pool, &http).await {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(deliveries = n, "webhooks attempted"),
@@ -68,6 +84,14 @@ pub async fn run(pool: PgPool, mailer: Mailer) {
             },
         }
     }
+}
+
+/// Await a tick and record its duration.
+async fn timed<const N: usize, T>(h: &Histogram<N>, tick: impl Future<Output = T>) -> T {
+    let start = Instant::now();
+    let out = tick.await;
+    h.observe_since(start);
+    out
 }
 
 /// Process every unprocessed event; returns how many were claimed.

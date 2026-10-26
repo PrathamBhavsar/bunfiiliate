@@ -60,6 +60,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
             bf_db::migrate(&pool).await?;
             let mailer = api::mail::Mailer::from_env()?;
             tracing::info!("worker running");
+            tokio::spawn(bf_rt::metrics::serve(
+                "127.0.0.1:9101",
+                api::metrics::render,
+            ));
             tokio::select! {
                 () = api::worker::run(pool, mailer) => {}
                 _ = tokio::signal::ctrl_c() => {}
@@ -75,6 +79,10 @@ async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
     let pool = bf_db::connect(&cfg.database_url).await?;
     bf_db::migrate(&pool).await?;
     let mailer = api::mail::Mailer::from_env()?;
+    let metrics = tokio::spawn(bf_rt::metrics::serve(
+        "127.0.0.1:9101",
+        api::metrics::render,
+    ));
     let worker = with_worker.then(|| tokio::spawn(api::worker::run(pool.clone(), mailer)));
     let state = AppState {
         pool,
@@ -88,6 +96,7 @@ async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
             let _ = tokio::signal::ctrl_c().await;
         })
         .await?;
+    metrics.abort();
     if let Some(w) = worker {
         w.abort();
     }

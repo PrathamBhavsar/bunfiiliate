@@ -18,6 +18,7 @@ use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 use crate::mail::{Mailer, default_template, render, template_key, vars};
+use crate::metrics;
 
 pub const MAX_ATTEMPTS: i32 = 8;
 const BACKOFF_BASE_SECS: i32 = 30;
@@ -241,6 +242,9 @@ async fn deliver_next(pool: &PgPool, http: &reqwest::Client) -> Result<bool, sql
             (None, false)
         }
     };
+    if !delivered {
+        metrics::WEBHOOK_FAILURES.inc();
+    }
     let attempt = d.attempt + 1;
     let retry_in = (!delivered && attempt < MAX_ATTEMPTS).then(|| backoff_secs(attempt));
     sqlx::query(

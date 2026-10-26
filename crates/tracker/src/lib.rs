@@ -3,13 +3,14 @@
 
 pub mod event;
 pub mod geo;
+pub mod metrics;
 pub mod snapshot;
 pub mod webhook;
 pub mod writer;
 
 use std::net::SocketAddr;
 use std::sync::{Arc, LazyLock};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use arc_swap::ArcSwap;
 use axum::Router;
@@ -77,6 +78,8 @@ pub async fn start(
 ) -> Result<Tracker, Error> {
     let spool = SpoolWriter::open(spool).await?;
     let checkpoint = writer::replay(&pool, &spool).await?;
+    metrics::SPOOL_BYTES.max(checkpoint);
+    metrics::SPOOL_CHECKPOINT.set(checkpoint);
     let (snapshot, watcher) = snapshot::load_and_watch(pool.clone()).await?;
     let (queue, rx) = mpsc::channel(QUEUE_CAPACITY);
     let writer = writer::spawn(pool.clone(), spool.clone(), rx, checkpoint);
@@ -371,19 +374,25 @@ impl AppState {
 /// ack), then hand it to the DB writer. Runs detached so a dropped client connection
 /// cannot strand a spooled record outside the queue and stall the checkpoint.
 async fn ingest(state: AppState, record: Record) -> Result<(), StatusCode> {
+    let started = Instant::now();
     let task = tokio::spawn(async move {
-        let permit = state
-            .queue
-            .try_reserve()
-            .map_err(|_| StatusCode::SERVICE_UNAVAILABLE)?;
+        let permit = state.queue.try_reserve().map_err(|_| {
+            metrics::SHED.inc();
+            StatusCode::SERVICE_UNAVAILABLE
+        })?;
         let payload = serde_json::to_vec(&record).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         let end = state.spool.write(&payload).await.map_err(|e| {
             tracing::error!(error = %e, "spool write failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
         let start = end - HEADER_LEN as u64 - payload.len() as u64;
+        metrics::SPOOL_BYTES.max(end);
         permit.send(Queued { start, end, record });
         Ok(())
     });
-    task.await.unwrap_or(Err(StatusCode::INTERNAL_SERVER_ERROR))
+    let result = task.await.unwrap_or(Err(StatusCode::INTERNAL_SERVER_ERROR));
+    if result.is_ok() {
+        metrics::INGEST.observe_since(started);
+    }
+    result
 }

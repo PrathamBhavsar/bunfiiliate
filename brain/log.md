@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T41 observability
+
+- **Creation**: `bf_rt::metrics` (hand-rolled Prometheus text registry: static atomics `Counter`/`Gauge`/`Histogram`, `router`, `serve`; no new crates, only `axum` + `tokio/net` on `bf-rt`), `tracker::metrics`, `api::metrics`. Tracker: `bf_ingest_latency_seconds`, `bf_batch_size`, `bf_shed_total`, `bf_spool_bytes`, `bf_spool_lag`. API/worker: `bf_outbox_depth`, `bf_webhook_delivery_failures_total`, `bf_ingest_events_processed_total`, `bf_rollup_tick_seconds`, `bf_approve_tick_seconds`. Details: [Observability](/architecture/observability.md).
+- **Update**: [Tasks](/tasks/index.md) T41 done on branch. `cargo test --workspace metrics` (4): histogram cumulative buckets, bearer-token route, api series present, tracker `/metrics` text has `bf_spool_lag` after a click. `crash_before_flush_replays_exactly_once` hit the known shared-PG `_sqlx_test_*` clash in a full run (passes alone): see [Time-Traps](/wisdom/time-traps.md).
+
 ## [2026-10-26] T23 analytics rollups
 
 - **Creation**: `api::analytics`: `rollup` tick (advisory-locked, per-program watermark = last rolled-up day minus 1, delete + upsert, folds clicks and conversions into `daily_rollups` for dims total|country|os|browser|device|referrer) run every 60s by `worker::run`; `GET /analytics/summary`, `/analytics/timeseries`, `/reports/analytics.csv`. `programs::{viewer,require_program}` now `pub(crate)`. Details: [Analytics](/architecture/analytics.md).

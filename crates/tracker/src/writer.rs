@@ -10,6 +10,8 @@ use sqlx::PgPool;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
+use crate::metrics;
+
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 
 const MAX_BATCH: usize = 1000;
@@ -105,6 +107,7 @@ pub fn spawn(
                 flushed.insert(q.start, q.end);
                 batch.push(q.record);
             }
+            metrics::BATCH.observe(batch.len() as u64);
             while let Err(e) = batch.insert(&pool).await {
                 tracing::error!(error = %e, "batch insert failed, retrying");
                 tokio::time::sleep(Duration::from_secs(1)).await;
@@ -113,12 +116,14 @@ pub fn spawn(
             while let Some(end) = flushed.remove(&checkpoint) {
                 checkpoint = end;
             }
-            if checkpoint != before
-                && let Err(e) = spool
+            if checkpoint != before {
+                match spool
                     .checkpoint(checkpoint)
                     .and_then(|_| spool.gc(checkpoint))
-            {
-                tracing::error!(error = %e, "spool checkpoint failed");
+                {
+                    Ok(_) => metrics::SPOOL_CHECKPOINT.set(checkpoint),
+                    Err(e) => tracing::error!(error = %e, "spool checkpoint failed"),
+                }
             }
         }
     })

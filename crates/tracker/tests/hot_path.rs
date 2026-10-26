@@ -474,3 +474,30 @@ async fn static_endpoints(pool: PgPool) {
     }
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn metrics_after_click_has_spool_lag(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .unwrap();
+    let app = router(t.state.clone());
+
+    fire(&app, 1).await;
+    wait_clicks(&pool, 1).await;
+
+    let out = tracker::metrics::render();
+    for name in [
+        "bf_spool_lag",
+        "bf_spool_bytes",
+        "bf_batch_size_count",
+        "bf_shed_total",
+    ] {
+        assert!(out.contains(name), "missing {name}");
+    }
+    // The click went through the spool: latency was observed and bytes were appended.
+    assert!(tracker::metrics::INGEST.count() >= 1);
+    assert!(tracker::metrics::SPOOL_BYTES.get() > 0);
+    std::fs::remove_dir_all(&dir).ok();
+}

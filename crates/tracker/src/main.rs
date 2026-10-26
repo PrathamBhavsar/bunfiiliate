@@ -20,6 +20,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
     let tracker = tracker::start(pool, spool, &cfg.jwt_secret, geo).await?;
 
+    let metrics = tokio::spawn(bf_rt::metrics::serve(
+        "127.0.0.1:9100",
+        tracker::metrics::render,
+    ));
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", cfg.tracker_port)).await?;
     tracing::info!(port = cfg.tracker_port, "tracker started");
     let app = tracker::router(tracker.state).into_make_service_with_connect_info::<SocketAddr>();
@@ -31,5 +35,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // The router is gone, so the queue is closed: let the writer drain it.
     tracker.writer.await?;
     tracker.watcher.abort();
+    metrics.abort();
     Ok(())
 }
