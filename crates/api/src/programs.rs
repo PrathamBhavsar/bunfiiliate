@@ -480,6 +480,9 @@ pub async fn delete_site(
     if !bf_db::programs::delete_site(&mut *tx, ws, id, &domain).await? {
         return Err(AppError::NotFound("site not found"));
     }
+    if bf_db::programs::delete_offsite_codes(&mut *tx, id).await? > 0 {
+        notify_config(&mut *tx).await?;
+    }
     let diff = json!({ "domain": domain });
     audit::record(
         &mut *tx,

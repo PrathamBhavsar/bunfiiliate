@@ -206,6 +206,11 @@ async fn transition(
             AppError::NotFound("affiliate not found")
         });
     }
+    if to == "suspended"
+        && bf_db::affiliates::delete_codes_of_affiliate(&mut *tx, ws, id).await? > 0
+    {
+        notify_config(&mut *tx).await?;
+    }
     let diff = json!({ "status": to });
     audit::record(
         &mut *tx,
