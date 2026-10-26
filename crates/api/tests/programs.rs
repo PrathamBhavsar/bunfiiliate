@@ -26,6 +26,7 @@ impl Api {
             pool: pool.clone(),
             jwt_secret: SECRET.into(),
             secure_cookies: true,
+            limiter: Default::default(),
         };
         Self { app: app(state) }
     }
@@ -1198,4 +1199,43 @@ async fn programs_workspaces_members_and_audit(pool: PgPool) {
         api.post(&enroll_uri, &home.admin, bogus).await.0,
         StatusCode::NOT_FOUND
     );
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn programs_code_landing_url_and_count_are_capped(pool: PgPool) {
+    let api = Api::new(&pool);
+    let a = tenant(&pool, "a").await;
+    let pa = program(&api, &a, "A prog").await;
+    site(&api, &a, &pa, "a.example.com").await;
+    let (aff, _) = affiliate(&pool, a.ws).await;
+    enroll(&api, &a, &pa, aff).await;
+
+    let long = format!("https://a.example.com/{}", "p".repeat(2100));
+    let (st, body) = api
+        .post(
+            "/api/v1/referral-codes",
+            &a.admin,
+            json!({ "affiliate_id": aff, "program_id": pa, "landing_url": long }),
+        )
+        .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "{body}");
+
+    for i in 0..100 {
+        let (st, body) = api
+            .post(
+                "/api/v1/referral-codes",
+                &a.admin,
+                json!({ "affiliate_id": aff, "program_id": pa, "code": format!("code{i:03}") }),
+            )
+            .await;
+        assert_eq!(st, StatusCode::CREATED, "{body}");
+    }
+    let (st, body) = api
+        .post(
+            "/api/v1/referral-codes",
+            &a.admin,
+            json!({ "affiliate_id": aff, "program_id": pa, "code": "one-too-many" }),
+        )
+        .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "{body}");
 }

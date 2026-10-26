@@ -17,9 +17,10 @@ use crate::AppState;
 use crate::audit;
 use crate::auth::{
     ACCESS_COOKIE, ACCESS_TTL_SECS, Any, Auth, Principal, REFRESH_COOKIE, REFRESH_TTL_SECS, cookie,
-    hash_refresh_token, issue_access, new_refresh_token, verify_password,
+    dummy_hash, hash_refresh_token, issue_access, new_refresh_token, verify_password_bounded,
 };
 use crate::error::{AppError, ErrorBody, ErrorDetail};
+use crate::limit;
 use crate::{affiliates, analytics, mail, money, ops, payouts, programs, webhooks, workspaces};
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -191,20 +192,21 @@ fn refresh_expiry() -> chrono::DateTime<Utc> {
 )]
 async fn login(
     State(s): State<AppState>,
+    headers: HeaderMap,
     body: Result<Json<LoginRequest>, JsonRejection>,
 ) -> Result<(HeaderMap, Json<UserView>), AppError> {
     let Json(req) = body?;
-    let bad = AppError::Unauthorized("invalid credentials");
-    let user = bf_db::auth::user_by_email(&s.pool, &req.email)
-        .await?
-        .ok_or(bad)?;
-    let (password, hash) = (req.password, user.password_hash.clone());
-    let ok = tokio::task::spawn_blocking(move || verify_password(&password, &hash))
-        .await
-        .map_err(|_| AppError::Internal)?;
-    if !ok {
-        return Err(AppError::Unauthorized("invalid credentials"));
-    }
+    limit::check(&s.limiter, &limit::LOGIN, &headers, &req.email)?;
+    let user = bf_db::auth::user_by_email(&s.pool, &req.email).await?;
+    // An unknown email verifies against a dummy hash so it costs the same as a wrong password.
+    let hash = user
+        .as_ref()
+        .map_or_else(|| dummy_hash().to_string(), |u| u.password_hash.clone());
+    let ok = verify_password_bounded(req.password, hash).await;
+    let user = match user {
+        Some(u) if ok => u,
+        _ => return Err(AppError::Unauthorized("invalid credentials")),
+    };
     let principal = Principal::from(&user);
     let access = issue_access(&s.jwt_secret, &principal)?;
     let refresh = new_refresh_token();
@@ -243,13 +245,25 @@ async fn refresh(
         refresh_expiry(),
     )
     .await?;
-    let Rotation::Rotated { user_id } = rotation else {
-        let msg = if rotation == Rotation::Reuse {
-            "refresh token reused"
-        } else {
-            "invalid refresh token"
-        };
-        return Err(AppError::Unauthorized(msg));
+    let user_id = match rotation {
+        Rotation::Rotated { user_id } => user_id,
+        Rotation::Reuse { user_id } => {
+            if let Some(user) = bf_db::auth::user_by_id(&s.pool, user_id).await? {
+                audit::record(
+                    &s.pool,
+                    &Principal::from(&user),
+                    "auth.refresh_reuse",
+                    "user",
+                    user_id,
+                    None,
+                )
+                .await?;
+            }
+            return Err(AppError::Unauthorized("refresh token reused"));
+        }
+        Rotation::Grace | Rotation::Invalid => {
+            return Err(AppError::Unauthorized("invalid refresh token"));
+        }
     };
     let user = bf_db::auth::user_by_id(&s.pool, user_id)
         .await?

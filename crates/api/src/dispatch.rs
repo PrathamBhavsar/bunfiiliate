@@ -4,9 +4,9 @@
 //!   transaction, queues a `webhook_deliveries` row per matching active endpoint of the
 //!   program's workspace and writes the affiliate's notification. The row is then done; the
 //!   email goes out right after the commit (best effort: a failure is logged, not retried).
-//! - [`deliver_due`] sends due deliveries, one per transaction. A non-2xx answer or a network
-//!   error schedules the next attempt with exponential backoff; after [`MAX_ATTEMPTS`] the
-//!   delivery is dead (`next_attempt_at` null).
+//! - [`deliver_due`] leases due deliveries, then sends them concurrently. A non-2xx answer or a
+//!   network error schedules the next attempt with exponential backoff; after [`MAX_ATTEMPTS`]
+//!   the delivery is dead (`next_attempt_at` null).
 
 use std::time::Duration;
 
@@ -19,11 +19,13 @@ use uuid::Uuid;
 
 use crate::mail::{Mailer, default_template, render, template_key, vars};
 use crate::metrics;
+use crate::ssrf;
 
 pub const MAX_ATTEMPTS: i32 = 8;
 const BACKOFF_BASE_SECS: i32 = 30;
 const BACKOFF_CAP_SECS: i32 = 3600;
 const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// Delay before the attempt that follows failed attempt number `attempt` (1-based):
 /// 30s, 60s, 120s, ... capped at one hour.
@@ -50,12 +52,20 @@ pub fn signature(secret: &str, ts: i64, body: &str) -> String {
 }
 
 /// HTTP client for deliveries: bounded time, never follows redirects.
+///
+/// Unless `BF_ALLOW_PRIVATE_WEBHOOKS` is set it only connects to public addresses (see [`ssrf`]).
 pub fn http_client() -> reqwest::Client {
-    reqwest::Client::builder()
+    let builder = reqwest::Client::builder()
         .timeout(HTTP_TIMEOUT)
+        .connect_timeout(CONNECT_TIMEOUT)
         .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .expect("static client config")
+        .no_proxy();
+    let builder = if ssrf::allow_private() {
+        builder
+    } else {
+        builder.dns_resolver(ssrf::PublicOnly)
+    };
+    builder.build().expect("static client config")
 }
 
 fn uuid_field(payload: &Value, key: &str) -> Option<Uuid> {
@@ -185,13 +195,39 @@ async fn notify(
     }))
 }
 
-/// Send every due delivery once; returns how many were attempted.
+/// Deliveries leased per tick, and sent at once. The rest wait for the next tick.
+const DELIVER_PER_TICK: i64 = 200;
+const DELIVER_CONCURRENCY: usize = 16;
+/// How long a leased delivery stays invisible to other ticks while its request is in flight.
+/// If the process dies mid-send the delivery is retried after this.
+const LEASE_SECS: i32 = 60;
+
+/// Send due deliveries once each; returns how many were attempted.
+///
+/// Rows are leased (their `next_attempt_at` pushed out and committed) before any HTTP call, so
+/// no transaction or row lock is held while a slow endpoint answers, and a slow endpoint only
+/// holds up its own request, not the worker's other ticks.
 pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, sqlx::Error> {
-    let mut n = 0;
-    while deliver_next(pool, http).await? {
-        n += 1;
+    let due = lease_due(pool).await?;
+    let attempted = due.len() as u64;
+    let mut due = due.into_iter();
+    loop {
+        let mut sends = tokio::task::JoinSet::new();
+        for d in due.by_ref().take(DELIVER_CONCURRENCY) {
+            let (pool, http) = (pool.clone(), http.clone());
+            sends.spawn(async move { send_one(&pool, &http, d).await });
+        }
+        if sends.is_empty() {
+            return Ok(attempted);
+        }
+        while let Some(res) = sends.join_next().await {
+            match res {
+                Ok(Ok(())) => {}
+                Ok(Err(e)) => tracing::error!(error = %e, "recording delivery failed"),
+                Err(e) => tracing::error!(error = %e, "delivery task failed"),
+            }
+        }
     }
-    Ok(n)
 }
 
 #[derive(sqlx::FromRow)]
@@ -205,33 +241,45 @@ struct Due {
     payload: Value,
 }
 
-async fn deliver_next(pool: &PgPool, http: &reqwest::Client) -> Result<bool, sqlx::Error> {
-    let mut tx = pool.begin().await?;
-    let Some(d) = sqlx::query_as::<_, Due>(
-        "SELECT d.id, d.attempt, e.url, e.secret, o.id AS outbox_id, o.topic, o.payload \
-         FROM webhook_deliveries d \
-         JOIN webhook_endpoints e ON e.id = d.endpoint_id AND e.active \
-         JOIN outbox o ON o.id = d.outbox_id \
-         WHERE d.next_attempt_at <= now() \
-         ORDER BY d.next_attempt_at, d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED",
+/// Claim up to [`DELIVER_PER_TICK`] due deliveries by pushing their next attempt [`LEASE_SECS`]
+/// out.
+async fn lease_due(pool: &PgPool) -> Result<Vec<Due>, sqlx::Error> {
+    sqlx::query_as::<_, Due>(
+        "WITH due AS ( \
+             SELECT d.id FROM webhook_deliveries d \
+             JOIN webhook_endpoints e ON e.id = d.endpoint_id AND e.active \
+             WHERE d.next_attempt_at <= now() \
+             ORDER BY d.next_attempt_at, d.id LIMIT $1 FOR UPDATE OF d SKIP LOCKED), \
+         leased AS ( \
+             UPDATE webhook_deliveries d SET next_attempt_at = now() + $2 * interval '1 second' \
+             FROM due WHERE d.id = due.id RETURNING d.id, d.attempt, d.endpoint_id, d.outbox_id) \
+         SELECT l.id, l.attempt, e.url, e.secret, o.id AS outbox_id, o.topic, o.payload \
+         FROM leased l JOIN webhook_endpoints e ON e.id = l.endpoint_id \
+         JOIN outbox o ON o.id = l.outbox_id",
     )
-    .fetch_optional(&mut *tx)
-    .await?
-    else {
-        return Ok(false);
-    };
+    .bind(DELIVER_PER_TICK)
+    .bind(LEASE_SECS)
+    .fetch_all(pool)
+    .await
+}
 
+/// POST one leased delivery and record the outcome.
+async fn send_one(pool: &PgPool, http: &reqwest::Client, d: Due) -> Result<(), sqlx::Error> {
     let body = json!({ "id": d.outbox_id, "topic": d.topic, "data": d.payload }).to_string();
     let ts = Utc::now().timestamp();
-    let sent = http
-        .post(&d.url)
-        .header("content-type", "application/json")
-        .header("x-bf-event", &d.topic)
-        .header("x-bf-delivery", d.id.to_string())
-        .header("x-bf-signature", signature(&d.secret, ts, &body))
-        .body(body)
-        .send()
-        .await;
+    let sent = match ssrf::check_literal_host(&d.url) {
+        Err(_) => Err("url points at a private address".to_string()),
+        Ok(()) => http
+            .post(&d.url)
+            .header("content-type", "application/json")
+            .header("x-bf-event", &d.topic)
+            .header("x-bf-delivery", d.id.to_string())
+            .header("x-bf-signature", signature(&d.secret, ts, &body))
+            .body(body)
+            .send()
+            .await
+            .map_err(|e| e.to_string()),
+    };
     let (status, delivered) = match &sent {
         Ok(r) => (
             Some(i32::from(r.status().as_u16())),
@@ -255,10 +303,9 @@ async fn deliver_next(pool: &PgPool, http: &reqwest::Client) -> Result<bool, sql
     .bind(attempt)
     .bind(status)
     .bind(retry_in)
-    .execute(&mut *tx)
+    .execute(pool)
     .await?;
-    tx.commit().await?;
-    Ok(true)
+    Ok(())
 }
 
 #[cfg(test)]

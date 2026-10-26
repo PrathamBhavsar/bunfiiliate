@@ -184,6 +184,7 @@ impl Api {
             pool: pool.clone(),
             jwt_secret: SECRET.into(),
             secure_cookies: true,
+            limiter: Default::default(),
         }))
     }
 

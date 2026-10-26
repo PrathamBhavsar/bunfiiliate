@@ -1,4 +1,7 @@
 # #[sqlx::test] on a shared Postgres times out in the pool when many test threads
 # run at once (hot_path failed 5 of 6 runs at ~10 threads, 0 of 4 at 4).
+# BF_ALLOW_PRIVATE_WEBHOOKS: the webhook tests deliver to a receiver on 127.0.0.1, which the
+# SSRF guard otherwise refuses. Tests only; never set it in a deployment.
 [env]
 RUST_TEST_THREADS = "4"
+BF_ALLOW_PRIVATE_WEBHOOKS = "1"

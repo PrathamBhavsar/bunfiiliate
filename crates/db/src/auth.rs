@@ -130,13 +130,29 @@ pub enum Rotation {
     /// Old token revoked, new one stored in the same family.
     Rotated { user_id: Uuid },
     /// An already-rotated or revoked token came back: the whole family is now revoked.
-    Reuse,
+    Reuse { user_id: Uuid },
+    /// A just-rotated token came back inside the grace window: refused, family untouched.
+    Grace,
     /// Unknown or expired token.
     Invalid,
 }
 
-/// Swap `old_hash` for `new_hash`. Presenting a token that was already used
-/// revokes every token of its family.
+/// A token rotated this recently and presented again is a lost response or a second tab racing
+/// the first, not a theft: it gets a plain 401 and the family stays alive.
+const REUSE_GRACE_SECS: i64 = 10;
+
+/// A family (one login) stops refreshing this long after it began, however often it rotates.
+pub const FAMILY_MAX_AGE_DAYS: i64 = 90;
+
+/// When the family began: its id is a UUIDv7 minted at login.
+fn family_started(family_id: Uuid) -> Option<DateTime<Utc>> {
+    let (secs, nanos) = family_id.get_timestamp()?.to_unix();
+    DateTime::from_timestamp(i64::try_from(secs).ok()?, nanos)
+}
+
+/// Swap `old_hash` for `new_hash`. Presenting a token that was rotated more than
+/// [`REUSE_GRACE_SECS`] ago revokes every token of its family. The new token never outlives
+/// the family's [`FAMILY_MAX_AGE_DAYS`].
 pub async fn rotate_refresh(
     pool: &PgPool,
     old_hash: &[u8],
@@ -144,24 +160,35 @@ pub async fn rotate_refresh(
     new_expires_at: DateTime<Utc>,
 ) -> Result<Rotation, sqlx::Error> {
     let mut tx = pool.begin().await?;
-    let row: Option<(Uuid, Uuid, Uuid, bool, bool)> = sqlx::query_as(
-        "SELECT id, user_id, family_id, revoked_at IS NOT NULL, expires_at <= now() \
+    let row: Option<(Uuid, Uuid, Uuid, bool, bool, bool)> = sqlx::query_as(
+        "SELECT id, user_id, family_id, revoked_at IS NOT NULL, expires_at <= now(), \
+                COALESCE(revoked_at > now() - make_interval(secs => $2) AND replaced_by IS NOT NULL, false) \
          FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE",
     )
     .bind(old_hash)
+    .bind(REUSE_GRACE_SECS as f64)
     .fetch_optional(&mut *tx)
     .await?;
-    let Some((id, user_id, family_id, revoked, expired)) = row else {
+    let Some((id, user_id, family_id, revoked, expired, in_grace)) = row else {
         return Ok(Rotation::Invalid);
     };
     if revoked {
+        if in_grace {
+            return Ok(Rotation::Grace);
+        }
         revoke_family(&mut tx, family_id).await?;
         tx.commit().await?;
-        return Ok(Rotation::Reuse);
+        return Ok(Rotation::Reuse { user_id });
     }
     if expired {
         return Ok(Rotation::Invalid);
     }
+    let family_ends =
+        family_started(family_id).map(|t| t + chrono::Duration::days(FAMILY_MAX_AGE_DAYS));
+    if family_ends.is_some_and(|end| end <= Utc::now()) {
+        return Ok(Rotation::Invalid);
+    }
+    let new_expires_at = family_ends.map_or(new_expires_at, |end| end.min(new_expires_at));
     let new_id = Uuid::now_v7();
     insert_refresh(
         &mut *tx,

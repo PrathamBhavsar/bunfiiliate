@@ -1,6 +1,7 @@
 //! Passwords, access JWTs, refresh tokens, the `Auth<R>` extractor and the Origin check.
 
 use std::marker::PhantomData;
+use std::sync::LazyLock;
 
 use argon2::Argon2;
 use argon2::password_hash::rand_core::{OsRng, RngCore};
@@ -17,6 +18,7 @@ use bf_db::auth::{User, UserRole};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tokio::sync::Semaphore;
 use uuid::Uuid;
 
 use crate::AppState;
@@ -44,6 +46,36 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
             .verify_password(password.as_bytes(), &h)
             .is_ok()
     })
+}
+
+/// Argon2 uses ~19 MiB per run, so only this many hash/verify jobs run at once; the rest wait.
+const MAX_CONCURRENT_HASHES: usize = 4;
+static HASHING: Semaphore = Semaphore::const_new(MAX_CONCURRENT_HASHES);
+
+/// [`hash_password`] on the blocking pool, bounded by [`HASHING`].
+pub async fn hash_password_bounded(password: String) -> Result<String, AppError> {
+    let _permit = HASHING.acquire().await.map_err(|_| AppError::Internal)?;
+    tokio::task::spawn_blocking(move || hash_password(&password))
+        .await
+        .map_err(|_| AppError::Internal)?
+}
+
+/// [`verify_password`] on the blocking pool, bounded by [`HASHING`].
+pub async fn verify_password_bounded(password: String, hash: String) -> bool {
+    let Ok(_permit) = HASHING.acquire().await else {
+        return false;
+    };
+    tokio::task::spawn_blocking(move || verify_password(&password, &hash))
+        .await
+        .unwrap_or(false)
+}
+
+/// A valid hash nobody knows the password of: login verifies against it when the email is
+/// unknown, so unknown and wrong-password cost the same.
+pub fn dummy_hash() -> &'static str {
+    static HASH: LazyLock<String> =
+        LazyLock::new(|| hash_password(&random_hex(16)).expect("argon2 hashes"));
+    &HASH
 }
 
 /// `n` random bytes, hex encoded.

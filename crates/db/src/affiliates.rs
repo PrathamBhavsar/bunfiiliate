@@ -262,6 +262,14 @@ pub async fn insert_code(
     Ok(res.rows_affected() > 0)
 }
 
+/// How many codes this affiliate holds, across programs.
+pub async fn count_codes(db: impl PgExecutor<'_>, affiliate_id: Uuid) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar("SELECT count(*) FROM referral_codes WHERE affiliate_id = $1")
+        .bind(affiliate_id)
+        .fetch_one(db)
+        .await
+}
+
 pub async fn list_codes(
     pool: &PgPool,
     workspace_id: Uuid,

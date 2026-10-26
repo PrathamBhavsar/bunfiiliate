@@ -25,6 +25,7 @@ fn app(pool: PgPool) -> Router {
         pool,
         jwt_secret: "test-secret".into(),
         secure_cookies: true,
+        limiter: Default::default(),
     };
     build(
         routes::routes().route("/admin-only", get(admin_only)),
@@ -241,6 +242,7 @@ async fn auth_refresh_reuse_revokes_family(pool: PgPool) {
     let app = app(pool.clone());
     let rt1 = cookie_pair(&login(&app, "a@x.io").await, "bf_rt");
     let rt2 = cookie_pair(&send(&app, refresh_with(&rt1)).await, "bf_rt");
+    age_rotations(&pool).await;
 
     let reuse = send(&app, refresh_with(&rt1)).await;
     assert_eq!(reuse.status(), StatusCode::UNAUTHORIZED);
@@ -385,4 +387,156 @@ async fn auth_bootstrap_concurrent_creates_one(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 1);
+}
+
+/// Pretend the rotations happened a minute ago, past the reuse grace window.
+async fn age_rotations(pool: &PgPool) {
+    sqlx::query("UPDATE refresh_tokens SET revoked_at = now() - interval '1 minute' WHERE revoked_at IS NOT NULL")
+        .execute(pool)
+        .await
+        .unwrap();
+}
+
+async fn audit_count(pool: &PgPool, action: &str) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM audit_log WHERE action = $1")
+        .bind(action)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn auth_refresh_reuse_inside_grace_does_not_revoke_family(pool: PgPool) {
+    add_user(&pool, "a@x.io", UserRole::Admin).await;
+    let app = app(pool.clone());
+    let rt1 = cookie_pair(&login(&app, "a@x.io").await, "bf_rt");
+    let rt2 = cookie_pair(&send(&app, refresh_with(&rt1)).await, "bf_rt");
+
+    // A second tab (or a lost response) replays rt1 right after the rotation.
+    let again = send(&app, refresh_with(&rt1)).await;
+    assert_eq!(again.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        json_body(again).await["error"]["message"],
+        "invalid refresh token"
+    );
+
+    // The family survives and its live token still rotates.
+    assert_eq!(
+        send(&app, refresh_with(&rt2)).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(audit_count(&pool, "auth.refresh_reuse").await, 0);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn auth_refresh_reuse_after_grace_is_audited(pool: PgPool) {
+    add_user(&pool, "a@x.io", UserRole::Admin).await;
+    let app = app(pool.clone());
+    let rt1 = cookie_pair(&login(&app, "a@x.io").await, "bf_rt");
+    send(&app, refresh_with(&rt1)).await;
+    age_rotations(&pool).await;
+    assert_eq!(
+        send(&app, refresh_with(&rt1)).await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(audit_count(&pool, "auth.refresh_reuse").await, 1);
+}
+
+/// A UUIDv7 minted `days` ago, the id a family would have had then.
+fn family_id_aged(days: u64) -> Uuid {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        - days * 86_400;
+    Uuid::new_v7(uuid::Timestamp::from_unix(uuid::NoContext, secs, 0))
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn auth_refresh_family_has_an_absolute_lifetime(pool: PgPool) {
+    add_user(&pool, "a@x.io", UserRole::Admin).await;
+    let app = app(pool.clone());
+
+    // 89 days in: still refreshes, but the new token stops at day 90, not day 119.
+    let rt = cookie_pair(&login(&app, "a@x.io").await, "bf_rt");
+    sqlx::query("UPDATE refresh_tokens SET family_id = $1")
+        .bind(family_id_aged(89))
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(send(&app, refresh_with(&rt)).await.status(), StatusCode::OK);
+    let days_left: i64 = sqlx::query_scalar(
+        "SELECT extract(epoch FROM max(expires_at) - now())::bigint / 86400 FROM refresh_tokens WHERE revoked_at IS NULL",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(
+        days_left <= 1,
+        "capped at the family end, got {days_left} days"
+    );
+
+    // 91 days in: refused although the token itself has not expired.
+    let rt = cookie_pair(&login(&app, "a@x.io").await, "bf_rt");
+    sqlx::query("UPDATE refresh_tokens SET family_id = $1 WHERE revoked_at IS NULL AND expires_at > now() + interval '10 days'")
+        .bind(family_id_aged(91))
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        send(&app, refresh_with(&rt)).await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn auth_login_is_rate_limited_per_email(pool: PgPool) {
+    add_user(&pool, "rl-login@x.io", UserRole::Admin).await;
+    let app = app(pool);
+    let mut last = StatusCode::OK;
+    for _ in 0..12 {
+        last = login(&app, "rl-login@x.io").await.status();
+    }
+    assert_eq!(last, StatusCode::TOO_MANY_REQUESTS);
+    // Another address is unaffected.
+    assert_eq!(
+        send(
+            &app,
+            post("/api/v1/auth/login").json(json!({ "email": "nobody@x.io", "password": "x" }))
+        )
+        .await
+        .status(),
+        StatusCode::UNAUTHORIZED
+    );
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn auth_unknown_email_is_the_same_401_as_wrong_password(pool: PgPool) {
+    add_user(&pool, "known@x.io", UserRole::Admin).await;
+    let app = app(pool);
+    let wrong = send(
+        &app,
+        post("/api/v1/auth/login").json(json!({ "email": "known@x.io", "password": "nope" })),
+    )
+    .await;
+    let unknown = send(
+        &app,
+        post("/api/v1/auth/login").json(json!({ "email": "ghost@x.io", "password": "nope" })),
+    )
+    .await;
+    assert_eq!(wrong.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(unknown.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(json_body(wrong).await, json_body(unknown).await);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn auth_oversized_body_is_refused(pool: PgPool) {
+    let app = app(pool);
+    let big = "x".repeat(70 * 1024);
+    let res = send(
+        &app,
+        post("/api/v1/auth/login").json(json!({ "email": "a@x.io", "password": big })),
+    )
+    .await;
+    assert_eq!(res.status(), StatusCode::PAYLOAD_TOO_LARGE);
 }
