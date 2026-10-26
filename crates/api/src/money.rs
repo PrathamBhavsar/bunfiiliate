@@ -489,8 +489,9 @@ pub async fn me_earnings(
     Query(page): Query<PageQuery>,
 ) -> Result<Json<Paged<Earning>>, AppError> {
     let (ws, own) = viewer(&s, &auth.principal).await?;
+    let own = own.ok_or(AppError::Forbidden("no affiliate profile"))?;
     let sc = ConversionScope::new(
-        (ws, own),
+        (ws, Some(own)),
         (f.program_id, f.status),
         (f.from.as_deref(), f.to.as_deref()),
     )?;
