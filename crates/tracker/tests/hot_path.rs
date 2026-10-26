@@ -267,6 +267,40 @@ async fn crash_before_flush_replays_exactly_once(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
+async fn nul_bytes_and_null_landing_do_not_wedge_pipeline(pool: PgPool) {
+    seed(&pool, "abc").await;
+    sqlx::query(
+        "INSERT INTO referral_codes (code, affiliate_id, program_id) \
+         SELECT 'nolanding', a.id, p.id FROM affiliates a, programs p",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+        .await
+        .unwrap();
+    let app = router(t.state.clone());
+
+    let body = r#"{"code":"abc","vid":"v\u0000x","url":"https://a.com/p\u0000q","ref":"https://h\u0000.io"}"#;
+    assert_eq!(
+        app.clone().oneshot(beacon(body)).await.unwrap().status(),
+        StatusCode::NO_CONTENT
+    );
+    assert_eq!(
+        app.clone().oneshot(click_req(0)).await.unwrap().status(),
+        StatusCode::FOUND
+    );
+    wait_clicks(&pool, 2).await;
+    let nolanding = Request::get("/r/nolanding").body(Body::empty()).unwrap();
+    assert_eq!(
+        app.oneshot(nolanding).await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
 async fn unknown_code_is_404(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();

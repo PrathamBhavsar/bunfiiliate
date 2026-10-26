@@ -25,9 +25,13 @@ pub struct ProgramKeyRow {
 }
 
 pub async fn load_codes(pool: &PgPool) -> Result<Vec<CodeRow>, sqlx::Error> {
-    sqlx::query_as("SELECT code, program_id, affiliate_id, landing_url FROM referral_codes")
-        .fetch_all(pool)
-        .await
+    // `landing_url` is nullable in the schema; a code without one cannot redirect.
+    sqlx::query_as(
+        "SELECT code, program_id, affiliate_id, landing_url FROM referral_codes \
+         WHERE landing_url IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await
 }
 
 pub async fn load_program_keys(pool: &PgPool) -> Result<Vec<ProgramKeyRow>, sqlx::Error> {

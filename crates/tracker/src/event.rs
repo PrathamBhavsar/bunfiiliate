@@ -65,8 +65,13 @@ pub fn ip_hash(salt: &str, ip: &str) -> Vec<u8> {
         .to_vec()
 }
 
+/// Client text for storage: control chars dropped (Postgres `text` rejects NUL, which
+/// would fail a whole batch), at most `max_chars` kept.
 pub fn clip(s: &str, max_chars: usize) -> String {
-    s.chars().take(max_chars).collect()
+    s.chars()
+        .filter(|c| !c.is_control())
+        .take(max_chars)
+        .collect()
 }
 
 /// Append `bf_click=<id>` to a landing url, before any fragment.
@@ -115,6 +120,12 @@ mod tests {
         assert_eq!(country("XX"), None);
         assert_eq!(country("T1"), None);
         assert_eq!(country("USA"), None);
+    }
+
+    #[test]
+    fn clip_drops_control_chars() {
+        assert_eq!(clip("a\u{0}b\nc", 10), "abc");
+        assert_eq!(clip("abcdef", 3), "abc");
     }
 
     #[test]

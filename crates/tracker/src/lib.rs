@@ -253,7 +253,7 @@ impl AppState {
             device: ua.device,
             os: ua.os,
             browser: ua.browser,
-            referrer_host: referrer.and_then(referrer_host),
+            referrer_host: referrer.and_then(referrer_host).map(|h| clip(&h, 255)),
             landing_path: Some(clip(&url_path(landing), 512)),
         }
     }
