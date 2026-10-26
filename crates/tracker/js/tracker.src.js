@@ -35,8 +35,8 @@
     var body = JSON.stringify({
       code: code,
       vid: vid,
-      url: w.location.href,
-      ref: d.referrer
+      url: w.location.origin + w.location.pathname,
+      ref: d.referrer && new URL(d.referrer).origin
     });
     var n = w.navigator;
     if (n.sendBeacon && n.sendBeacon(endpoint, new Blob([body], { type: "application/json" }))) return;

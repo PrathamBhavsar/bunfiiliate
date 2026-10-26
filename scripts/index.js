@@ -10,7 +10,7 @@ function load(file, { search = "", src = "https://t.example.com/t.js", days, bea
   const jar = new Map();
   const sent = [];
   const document = {
-    referrer: "https://news.example/",
+    referrer: "https://news.example/story?id=1#x",
     currentScript: {
       src,
       getAttribute: (k) => (k === "data-days" ? days ?? null : null),
@@ -28,7 +28,8 @@ function load(file, { search = "", src = "https://t.example.com/t.js", days, bea
   const window = {
     location: {
       search,
-      href: `${https ? "https" : "http"}://shop.example/p${search}`,
+      origin: `${https ? "https" : "http"}://shop.example`,
+      pathname: "/p",
       protocol: https ? "https:" : "http:",
     },
     navigator: {
@@ -59,7 +60,7 @@ for (const file of ["tracker.src.js", "tracker.min.js"]) {
     assert.equal(jar.get("bf_ref").attrs["max-age"], String(7 * 86400));
   });
 
-  test(`${file}: beacon posts {code,vid,url,ref} to script origin + /c`, async () => {
+  test(`${file}: beacon posts {code,vid,url,ref} (query/hash stripped) to script origin + /c`, async () => {
     const { jar, sent } = load(file, { search: "?bf_click=abc123" });
     assert.equal(sent.length, 1);
     assert.equal(sent[0].via, "beacon");
@@ -68,8 +69,8 @@ for (const file of ["tracker.src.js", "tracker.min.js"]) {
     assert.deepEqual(body, {
       code: "abc123",
       vid: jar.get("bf_vid").value,
-      url: "https://shop.example/p?bf_click=abc123",
-      ref: "https://news.example/",
+      url: "https://shop.example/p",
+      ref: "https://news.example",
     });
   });
 
