@@ -5,13 +5,13 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | id | branch | status |
 | :--- | :--- | :--- |
 | T00 | feat/workspace-scaffold | done, merged to staging (Sonnet; cargo-deny ok) |
-| T01 | feat/ci | todo |
-| T10 | feat/core-money-ledger | done on branch, not yet merged (cargo test -p bf-core ok) |
+| T01 | feat/ci | done, merged (agy/antigravity) |
+| T10 | feat/core-money-ledger | done, merged (Sonnet) |
 | T11 | feat/core-state-machines | todo |
-| T12 | feat/db-schema | done |
-| T13 | feat/spool | todo |
+| T12 | feat/db-schema | done, merged (Sonnet) |
+| T13 | feat/spool | done, merged (agy/antigravity) |
 | T14 | feat/tracker-hot-path | todo |
-| T15 | feat/tracker-js | done (Sonnet; min 1133B < 2048, 14 node tests) |
+| T15 | feat/tracker-js | done, merged (Sonnet) |
 | T16 | feat/ingest-webhooks | todo |
 | T17 | feat/worker-ingest | todo |
 | T18 | feat/payouts-reversals | todo |

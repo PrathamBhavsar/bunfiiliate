@@ -15,3 +15,7 @@ timestamp: 2026-10-26
 - **`.mmdb` files**: GeoLite2 is not redistributable. Never commit it.
 - **Static export** has no dynamic routes: use `?id=` query routes.
 - **`node --test scripts/`** on Node 22 treats the dir as a module, not a glob: it needs `scripts/index.js` (tests live there).
+- **Orca agent ids**: agy is `antigravity`, not `agy`. Always `worker-stop` stray test workers.
+- **Orca check loop**: ack each delivery (`check --ack <id> --wait`) or old messages replay.
+- **`brew services start postgresql@16` can fail silently** when PG18 holds 5432. Verify with `select version()`.
+- **Parallel branches** all edit root `Cargo.toml` + `brain/log.md`: expect trivial merge conflicts, keep both sides.
