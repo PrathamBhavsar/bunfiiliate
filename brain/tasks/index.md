@@ -32,7 +32,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T44 | feat/deploy | done, merged (agy/antigravity); Dockerfile, compose, Caddyfile, systemd, self-hosting.md |
 | T42 | feat/geoip | done, merged (Sonnet); `cargo test -p tracker geo` 6 tests |
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
-| T51 | feat/release-page | done on branch (agy/antigravity); site/index.html datasheet, scripts/check-bench-numbers.sh, browser-verified |
+| T51 | feat/release-page | done, merged (agy/antigravity); site/index.html datasheet, scripts/check-bench-numbers.sh, browser-verified |
 | T60 | final gate (make ci, ocr, e2e) | todo |
 
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).
