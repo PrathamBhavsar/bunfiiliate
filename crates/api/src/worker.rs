@@ -125,11 +125,14 @@ struct Event {
     external_id: String,
     payload: String,
     received_at: DateTime<Utc>,
+    attempts: i32,
 }
 
 /// A reason the event cannot become a conversion; recorded on the event, not retried.
 pub(crate) enum Fail {
     Rejected(String),
+    /// Not resolvable yet (a refund whose sale has not been ingested): try again later.
+    Retry(&'static str),
     Db(sqlx::Error),
 }
 
@@ -142,7 +145,9 @@ impl From<sqlx::Error> for Fail {
 impl From<Fail> for AppError {
     fn from(f: Fail) -> Self {
         match f {
-            Fail::Rejected(_) => AppError::Conflict("conversion cannot take this action"),
+            Fail::Rejected(_) | Fail::Retry(_) => {
+                AppError::Conflict("conversion cannot take this action")
+            }
             Fail::Db(e) => e.into(),
         }
     }
@@ -164,8 +169,8 @@ async fn process_next(pool: &PgPool) -> Result<bool, sqlx::Error> {
     let mut tx = pool.begin().await?;
     let Some(ev) = sqlx::query_as::<_, Event>(
         "SELECT id, program_id, source::text AS source, external_id, payload::text AS payload, \
-                received_at \
-         FROM inbound_events WHERE processed_at IS NULL \
+                received_at, attempts \
+         FROM inbound_events WHERE processed_at IS NULL AND (retry_at IS NULL OR retry_at <= now()) \
          ORDER BY received_at, id LIMIT 1 FOR UPDATE SKIP LOCKED",
     )
     .fetch_optional(&mut *tx)
@@ -185,6 +190,25 @@ async fn process_next(pool: &PgPool) -> Result<bool, sqlx::Error> {
             sp.rollback().await?;
             Some(why)
         }
+        Err(Fail::Retry(why)) => {
+            sp.rollback().await?;
+            if ev.attempts < MAX_RETRIES {
+                // Back off 30s, 1m, 2m, ... and look again; the event stays unprocessed.
+                sqlx::query(
+                    "UPDATE inbound_events SET attempts = attempts + 1, \
+                            retry_at = now() + $2 * interval '1 second' WHERE id = $1",
+                )
+                .bind(ev.id)
+                .bind(RETRY_BASE_SECS << ev.attempts)
+                .execute(&mut *tx)
+                .await?;
+                tx.commit().await?;
+                return Ok(true);
+            }
+            // Out of attempts: most likely a refund of a sale we never credited (organic).
+            tracing::info!(event = %ev.id, reason = why, "giving up on unresolved event");
+            None
+        }
         Err(Fail::Db(e)) if is_data_error(&e) => {
             sp.rollback().await?;
             Some(e.to_string())
@@ -203,8 +227,15 @@ async fn process_next(pool: &PgPool) -> Result<bool, sqlx::Error> {
     Ok(true)
 }
 
+/// How often an unresolved reversal is retried before it is dropped as unmatched.
+const MAX_RETRIES: i32 = 5;
+const RETRY_BASE_SECS: i32 = 30;
+
 /// The conversion facts an event carries, whatever its source.
 struct Fields {
+    /// The provider's business object (invoice, payment intent) the money was taken for. Two
+    /// events with the same one are the same payment.
+    provider_ref: Option<String>,
     customer: String,
     amount_cents: i64,
     currency: Option<String>,
@@ -243,7 +274,14 @@ fn parse(source: &str, p: &Value, received_at: DateTime<Utc>) -> Result<Option<F
         "stripe" => {
             let amount = match kind("/type") {
                 Some("invoice.paid") => "/data/object/amount_paid",
-                Some("checkout.session.completed") => "/data/object/amount_total",
+                Some("checkout.session.completed" | "checkout.session.async_payment_succeeded") => {
+                    // Delayed methods complete the session before the money arrives; the
+                    // async_payment_succeeded event announces it.
+                    if kind("/data/object/payment_status") == Some("unpaid") {
+                        return Ok(None);
+                    }
+                    "/data/object/amount_total"
+                }
                 _ => return Ok(None),
             };
             (
@@ -283,6 +321,7 @@ fn parse(source: &str, p: &Value, received_at: DateTime<Utc>) -> Result<Option<F
         ),
     };
     Ok(Some(Fields {
+        provider_ref: provider_ref(source, p),
         customer: customer.ok_or("missing customer")?,
         amount_cents: amount.ok_or("missing amount")?,
         currency: currency.map(|c| c.to_uppercase()),
@@ -291,6 +330,25 @@ fn parse(source: &str, p: &Value, received_at: DateTime<Utc>) -> Result<Option<F
         code,
         occurred_at: at.unwrap_or(received_at),
     }))
+}
+
+/// The provider's business object a Stripe payment belongs to. A subscription payment sends
+/// `invoice.paid` (object id = the invoice) and `checkout.session.completed` (its `invoice`
+/// field = the same invoice); a one-off checkout has only a payment intent.
+fn provider_ref(source: &str, p: &Value) -> Option<String> {
+    if source != "stripe" {
+        return None;
+    }
+    let kind = p.pointer("/type").and_then(Value::as_str)?;
+    let obj = |k: &str| text(p, &format!("/data/object/{k}"));
+    let found = if kind == "invoice.paid" {
+        obj("id")
+    } else {
+        obj("invoice")
+            .or_else(|| obj("payment_intent"))
+            .or_else(|| obj("id"))
+    };
+    found.map(|r| format!("stripe:{r}"))
 }
 
 /// Whole months from `from` to `to` (0 = the first month).
@@ -358,6 +416,14 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
     .await?;
     if f.currency.as_deref().is_some_and(|x| x != program.currency) {
         return reject("currency does not match program");
+    }
+    if f.amount_cents < 0 {
+        return reject("negative amount");
+    }
+    if f.amount_cents == 0 {
+        // A trial-start invoice or a 100%-off checkout: no money moved, so no commission
+        // (a flat plan would otherwise pay out on every $0 invoice).
+        return Ok(());
     }
     let Some(currency) = Currency::new(&program.currency) else {
         return reject("invalid program currency");
@@ -482,9 +548,9 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
     let conversion = Uuid::now_v7();
     let created = sqlx::query(
         "INSERT INTO conversions (id, program_id, customer_id, affiliate_id, conversion_type_id, \
-           external_id, amount_cents, commission_cents, currency, occurred_at, hold_reason) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
-         ON CONFLICT (program_id, external_id) DO NOTHING",
+           external_id, amount_cents, commission_cents, currency, occurred_at, hold_reason, provider_ref) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) \
+         ON CONFLICT DO NOTHING",
     )
     .bind(conversion)
     .bind(ev.program_id)
@@ -497,11 +563,14 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
     .bind(&program.currency)
     .bind(f.occurred_at)
     .bind(&hold)
+    .bind(&f.provider_ref)
     .execute(&mut *c)
     .await?
     .rows_affected();
     if created == 0 {
-        return Ok(()); // already converted: replay or redelivery under another source
+        // Already converted: a replay, or the same payment announced by a second event
+        // (same external id or same provider_ref).
+        return Ok(());
     }
 
     let txn = conversion_created(commission).map_err(|e| Fail::Rejected(e.to_string()))?;
@@ -541,6 +610,14 @@ fn reversal(source: &str, p: &Value) -> Option<Reversal> {
     let kind = |ptr: &str| p.pointer(ptr).and_then(Value::as_str);
     let refs = |ptrs: &[&str]| Target::Refs(ptrs.iter().filter_map(|x| text(p, x)).collect());
     let (reason, target) = match (source, kind("/type"), kind("/event_type")) {
+        // The ledger reverses a whole commission or none of it, so a partial refund is left
+        // alone (documented limitation) rather than clawing back all of it. Stripe's
+        // `refunded` is false until the charge is fully refunded.
+        ("stripe", Some("charge.refunded"), _)
+            if p.pointer("/data/object/refunded").and_then(Value::as_bool) == Some(false) =>
+        {
+            return None;
+        }
         ("stripe", Some("charge.refunded"), _) => (
             "refund",
             refs(&[
@@ -553,6 +630,9 @@ fn reversal(source: &str, p: &Value) -> Option<Reversal> {
             "chargeback",
             refs(&["/data/object/charge", "/data/object/payment_intent"]),
         ),
+        ("paddle", _, Some("adjustment.created")) if kind("/data/type") == Some("partial") => {
+            return None;
+        }
         ("paddle", _, Some("adjustment.created")) => (
             match kind("/data/action")? {
                 "refund" => "refund",
@@ -648,7 +728,10 @@ pub(crate) async fn settle(
     }
     if let Some(payout) = conv.payout_id {
         sqlx::query(
-            "UPDATE payouts SET amount_cents = amount_cents - $2 \
+            // Clamped: a payout can be smaller than its claimed conversions (a clawback was
+            // netted into it), and a negative one would make the whole batch unpayable. The
+            // shortfall stays in the affiliate's payable and nets against the next batch.
+            "UPDATE payouts SET amount_cents = GREATEST(amount_cents - $2, 0) \
              WHERE id = $1 AND status IN ('draft', 'approved')",
         )
         .bind(payout)
@@ -676,46 +759,53 @@ pub(crate) async fn settle(
 
 /// Undo a conversion's commission: pending is rejected, approved or paid is reversed. A paid
 /// conversion leaves the affiliate's payable negative, netted against their next payout.
-/// Unknown (organic) and already reversed conversions are a no-op, so replays are safe.
+/// Already reversed conversions are a no-op, so replays are safe. A reversal that matches no
+/// conversion may have overtaken its sale, so it is retried a few times before it is dropped
+/// as unmatched (a refund of an organic sale).
 async fn reverse(c: &mut PgConnection, ev: &Event, r: Reversal) -> Result<(), Fail> {
-    let conv: Option<Locked> = match &r.target {
+    let found: Vec<Locked> = match &r.target {
         Target::External(id) => {
             sqlx::query_as(&format!(
                 "SELECT {LOCKED_COLS} FROM conversions c \
-                 WHERE c.program_id = $1 AND c.external_id = $2 FOR UPDATE OF c"
+                 WHERE c.program_id = $1 AND c.external_id = $2 ORDER BY c.id FOR UPDATE OF c"
             ))
             .bind(ev.program_id)
             .bind(id)
-            .fetch_optional(&mut *c)
+            .fetch_all(&mut *c)
             .await?
         }
+        // Every conversion made from an event that names one of the refs, not just the first.
         Target::Refs(refs) => {
             sqlx::query_as(&format!(
-                "SELECT {LOCKED_COLS} FROM inbound_events e \
-                   JOIN conversions c ON c.program_id = e.program_id AND c.external_id = e.external_id \
-                 WHERE e.program_id = $1 AND e.source = $2::event_source AND ( \
-                   e.payload #>> '{{data,object,id}}' = ANY($3) \
-                   OR e.payload #>> '{{data,object,charge}}' = ANY($3) \
-                   OR e.payload #>> '{{data,object,payment_intent}}' = ANY($3) \
-                   OR e.payload #>> '{{data,id}}' = ANY($3)) \
-                 ORDER BY e.received_at, e.id LIMIT 1 FOR UPDATE OF c"
+                "SELECT {LOCKED_COLS} FROM conversions c \
+                 WHERE c.program_id = $1 AND (c.program_id, c.external_id) IN ( \
+                   SELECT e.program_id, e.external_id FROM inbound_events e \
+                   WHERE e.program_id = $1 AND e.source = $2::event_source AND ( \
+                     e.payload #>> '{{data,object,id}}' = ANY($3) \
+                     OR e.payload #>> '{{data,object,charge}}' = ANY($3) \
+                     OR e.payload #>> '{{data,object,invoice}}' = ANY($3) \
+                     OR e.payload #>> '{{data,object,payment_intent}}' = ANY($3) \
+                     OR e.payload #>> '{{data,id}}' = ANY($3))) \
+                 ORDER BY c.id FOR UPDATE OF c"
             ))
             .bind(ev.program_id)
             .bind(&ev.source)
             .bind(refs)
-            .fetch_optional(&mut *c)
+            .fetch_all(&mut *c)
             .await?
         }
     };
-    let Some(conv) = conv else {
-        return Ok(());
-    };
-    let act = match conv.status.as_str() {
-        "pending" => Act::Reject,
-        "approved" | "paid" => Act::Reverse,
-        _ => return Ok(()), // already rejected or reversed
-    };
-    settle(c, &conv, act, r.reason).await?;
+    if found.is_empty() {
+        return Err(Fail::Retry("no conversion matches the reversal"));
+    }
+    for conv in &found {
+        let act = match conv.status.as_str() {
+            "pending" => Act::Reject,
+            "approved" | "paid" => Act::Reverse,
+            _ => continue, // already rejected or reversed
+        };
+        settle(c, conv, act, r.reason).await?;
+    }
     Ok(())
 }
 
@@ -869,7 +959,7 @@ async fn approve_batch(pool: &PgPool) -> Result<u64, sqlx::Error> {
          WHERE c.status = 'pending' AND c.hold_reason IS NULL AND p.auto_approve \
            AND a.status = 'active' \
            AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = c.program_id) \
-           AND c.occurred_at <= now() - make_interval(days => p.hold_days) \
+           AND c.occurred_at <= now() - make_interval(days => LEAST(p.hold_days, 3650)) \
          ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE OF c SKIP LOCKED"
     ))
     .bind(APPROVE_BATCH)
@@ -877,7 +967,7 @@ async fn approve_batch(pool: &PgPool) -> Result<u64, sqlx::Error> {
     .await?;
     for d in &due {
         match settle(&mut tx, d, Act::Approve, "").await {
-            Ok(_) | Err(Fail::Rejected(_)) => {}
+            Ok(_) | Err(Fail::Rejected(_) | Fail::Retry(_)) => {}
             Err(Fail::Db(e)) => return Err(e),
         }
     }

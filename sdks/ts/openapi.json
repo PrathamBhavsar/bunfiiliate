@@ -7648,7 +7648,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Absent: unchanged. `null`: cleared (payouts go to the account email). A string: set."
           },
           "payout_min_cents": {
             "type": [

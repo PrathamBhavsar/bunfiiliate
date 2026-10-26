@@ -475,3 +475,51 @@ async fn analytics_csv_exact(pool: PgPool) {
         StatusCode::BAD_REQUEST
     );
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn analytics_rollup_picks_up_a_late_reversal_and_a_back_dated_sale(pool: PgPool) {
+    let t = tenant(&pool, "a").await;
+    seed(&pool, &t).await;
+    rollup(&pool).await.unwrap();
+    let api = Api::new(&pool);
+    let uri = "/api/v1/analytics/summary?from=2026-10-01&to=2026-10-21";
+    let (_, before) = api.get(uri, &t.admin).await;
+    assert_eq!(before["conversions"], 3);
+
+    // A chargeback weeks after the sale: far outside the one-day lookback.
+    sqlx::query(
+        "UPDATE conversions SET occurred_at = '2026-10-05T12:00:00Z' WHERE amount_cents = 2000",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    rollup(&pool).await.unwrap();
+    let (_, moved) = api.get(uri, &t.admin).await;
+    assert_eq!(
+        moved["conversions"], 3,
+        "back-dating moves it, still counted"
+    );
+
+    sqlx::query(
+        "UPDATE conversions SET status = 'reversed', reversed_at = now() WHERE amount_cents = 2000",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    rollup(&pool).await.unwrap();
+    let (_, after) = api.get(uri, &t.admin).await;
+    assert_eq!(after["conversions"], 2);
+    assert_eq!(after["revenue_cents"], 15_000);
+
+    // A back-dated sale arriving now is folded in as well.
+    let c = conversion(&pool, &t, t.b.0, None, "approved", (700, 70)).await;
+    sqlx::query("UPDATE conversions SET occurred_at = '2026-10-03T12:00:00Z' WHERE id = $1")
+        .bind(c)
+        .execute(&pool)
+        .await
+        .unwrap();
+    rollup(&pool).await.unwrap();
+    let (_, late) = api.get(uri, &t.admin).await;
+    assert_eq!(late["conversions"], 3);
+    assert_eq!(late["revenue_cents"], 15_700);
+}

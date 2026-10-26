@@ -88,8 +88,11 @@ pub async fn create_batch(
         .await?;
     for o in owed {
         let payout = Uuid::now_v7();
+        // The payout email is copied now: changing it later cannot redirect an approved batch.
         sqlx::query(
-            "INSERT INTO payouts (id, batch_id, affiliate_id, amount_cents) VALUES ($1, $2, $3, $4)",
+            "INSERT INTO payouts (id, batch_id, affiliate_id, amount_cents, payout_email) \
+             SELECT $1, $2, a.id, $4, COALESCE(a.payout_email, u.email)::text \
+             FROM affiliates a JOIN users u ON u.id = a.user_id WHERE a.id = $3",
         )
         .bind(payout)
         .bind(batch)
@@ -173,11 +176,14 @@ pub async fn mark_paid(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
     for (payout, affiliate, cents, st) in rows {
         let st = status(&st).ok_or(AppError::Internal)?;
         let (_, txn) = st
-            .transition(PayoutEvent::MarkPaid(Money::new(cents, b.currency)))
+            .transition(PayoutEvent::MarkPaid(Money::new(cents.max(0), b.currency)))
             .map_err(invalid)?;
+        // A payout shrunk to nothing by reversals moves no money but is still closed out.
         let txn_id = match txn {
-            Some(t) => post(&mut tx, &t, program, affiliate, (None, Some(payout))).await?,
-            None => None,
+            Some(t) if cents > 0 => {
+                post(&mut tx, &t, program, affiliate, (None, Some(payout))).await?
+            }
+            _ => None,
         };
         sqlx::query("UPDATE payouts SET status = 'paid', ledger_txn_id = $2 WHERE id = $1")
             .bind(payout)
@@ -341,7 +347,7 @@ async fn detail(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<BatchDetail, AppErr
         .await?
         .ok_or(AppError::NotFound("payout batch not found"))?;
     let payouts = sqlx::query_as(
-        "SELECT p.id, p.affiliate_id, COALESCE(a.payout_email, u.email)::text AS email, \
+        "SELECT p.id, p.affiliate_id, COALESCE(p.payout_email, a.payout_email, u.email)::text AS email, \
                 p.amount_cents, p.status::text AS status, p.ledger_txn_id \
          FROM payouts p JOIN affiliates a ON a.id = p.affiliate_id JOIN users u ON u.id = a.user_id \
          WHERE p.batch_id = $1 ORDER BY 3, p.id",

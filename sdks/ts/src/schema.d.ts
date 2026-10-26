@@ -2009,6 +2009,7 @@ export interface components {
             status: string;
         };
         PayoutUpdate: {
+            /** @description Absent: unchanged. `null`: cleared (payouts go to the account email). A string: set. */
             payout_email?: string | null;
             /**
              * Format: int64

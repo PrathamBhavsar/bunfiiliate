@@ -287,9 +287,21 @@ pub async fn reactivate(
 
 #[derive(Deserialize, Serialize, ToSchema)]
 pub struct PayoutUpdate {
-    payout_email: Option<String>,
+    /// Absent: unchanged. `null`: cleared (payouts go to the account email). A string: set.
+    #[serde(
+        default,
+        deserialize_with = "present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<String>, nullable)]
+    payout_email: Option<Option<String>>,
     /// Minimum balance in cents before a payout is created.
     payout_min_cents: Option<i64>,
+}
+
+/// Keeps `null` apart from an absent field: `Some(None)` is an explicit null.
+fn present<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(d).map(Some)
 }
 
 async fn update_payout(
@@ -299,7 +311,11 @@ async fn update_payout(
     req: PayoutUpdate,
 ) -> Result<Json<Affiliate>, AppError> {
     let ws = p.workspace_scope(None)?;
-    if req.payout_email.as_deref().is_some_and(|e| !email_ok(e)) {
+    let new_email = req
+        .payout_email
+        .as_ref()
+        .map(|e| e.as_deref().map(str::trim));
+    if new_email.flatten().is_some_and(|e| !email_ok(e)) {
         return Err(AppError::BadRequest("invalid payout_email".into()));
     }
     if req.payout_min_cents.is_some_and(|c| c < 0) {
@@ -308,17 +324,18 @@ async fn update_payout(
         ));
     }
     let mut tx = s.pool.begin().await?;
-    let found = bf_db::affiliates::update_payout(
-        &mut *tx,
-        ws,
-        id,
-        req.payout_email.as_deref(),
-        req.payout_min_cents,
-    )
-    .await?;
-    if !found {
-        return Err(AppError::NotFound("affiliate not found"));
+    let current = bf_db::affiliates::get_affiliate(&mut *tx, ws, id)
+        .await?
+        .ok_or(AppError::NotFound("affiliate not found"))?;
+    // Money follows this address, so only an active affiliate's can change: a suspended one
+    // must not be able to redirect what they are still owed.
+    if new_email.is_some_and(|e| e != current.payout_email.as_deref()) && current.status != "active"
+    {
+        return Err(AppError::Conflict(
+            "payout email can only change while the affiliate is active",
+        ));
     }
+    bf_db::affiliates::update_payout(&mut *tx, ws, id, new_email, req.payout_min_cents).await?;
     audit::record(
         &mut *tx,
         p,
