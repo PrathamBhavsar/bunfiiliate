@@ -1,4 +1,4 @@
-use api::worker::{approve_due, process_events};
+use api::worker::{approve_due, process_events, release_hold};
 use bf_db::ledger::balance_for_affiliate;
 use bf_db::tracker::{InboundEvent, insert_events};
 use chrono::{DateTime, Duration, Utc};
@@ -656,4 +656,90 @@ async fn suspended_or_unenrolled_affiliates_earn_nothing(pool: PgPool) {
         conversions(&pool, &s).await,
         [(s.a, 1_000, "pending".into())]
     );
+}
+
+/// `(external_id, status, hold_reason)` of every conversion, by external id.
+async fn holds(pool: &PgPool, s: &Seed) -> Vec<(String, String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT external_id, status::text, hold_reason FROM conversions \
+         WHERE program_id = $1 ORDER BY external_id",
+    )
+    .bind(s.program)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn fraud_flagged_click_holds_conversion_until_released(pool: PgPool) {
+    let s = seed(&pool, Opts::default()).await;
+    let now = Utc::now();
+    let bad = click(&pool, &s, s.a, "bad", now - Duration::days(12)).await;
+    let good = click(&pool, &s, s.b, "good", now - Duration::days(12)).await;
+    sqlx::query("UPDATE clicks SET fraud_reason = 'bot_ua' WHERE id = $1")
+        .bind(bad)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let at = now - Duration::days(10);
+    send(
+        &pool,
+        &s,
+        "generic",
+        "e1",
+        sale("bad-cus", 10_000, Some(bad), at),
+    )
+    .await;
+    send(
+        &pool,
+        &s,
+        "generic",
+        "e2",
+        sale("good-cus", 10_000, Some(good), at),
+    )
+    .await;
+    // Recurring sale of the flagged customer has no click of its own: still held.
+    send(&pool, &s, "generic", "e3", sale("bad-cus", 5_000, None, at)).await;
+    assert_eq!(process_events(&pool).await.unwrap(), 3);
+
+    // The flagged conversions are recorded and posted like any other, only held.
+    let held = || Some("click_flagged:bot_ua".to_owned());
+    let row = |e: &str, status: &str, hold| (e.to_owned(), status.to_owned(), hold);
+    assert_eq!(
+        holds(&pool, &s).await,
+        [
+            row("e1", "pending", held()),
+            row("e2", "pending", None),
+            row("e3", "pending", held())
+        ]
+    );
+    assert_eq!(outbox_topics(&pool).await.len(), 3);
+    assert_eq!(unbalanced_txns(&pool).await, 0);
+    // Affiliate A earned 10% of 10_000 + 5_000, all still pending.
+    let bal = balance_for_affiliate(&pool, s.program, s.a).await.unwrap();
+    assert_eq!((bal.pending_cents, bal.payable_cents), (1_500, 0));
+
+    // Auto-approve skips the held ones.
+    assert_eq!(approve_due(&pool).await.unwrap(), 1);
+    let statuses = || async {
+        holds(&pool, &s)
+            .await
+            .into_iter()
+            .map(|(_, st, _)| st)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(statuses().await, ["pending", "approved", "pending"]);
+    assert_eq!(approve_due(&pool).await.unwrap(), 0);
+
+    // Release returns one to the normal path; the other stays held.
+    let id: Uuid = sqlx::query_scalar("SELECT id FROM conversions WHERE external_id = 'e1'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(release_hold(&pool, id).await.unwrap());
+    assert!(!release_hold(&pool, id).await.unwrap(), "not held any more");
+    assert!(!release_hold(&pool, Uuid::now_v7()).await.unwrap());
+    assert_eq!(approve_due(&pool).await.unwrap(), 1);
+    assert_eq!(statuses().await, ["approved", "approved", "pending"]);
+    assert_eq!(unbalanced_txns(&pool).await, 0);
 }

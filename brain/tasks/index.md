@@ -24,7 +24,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T30 | feat/web-shell | done, merged (Sonnet); SDK pipeline + apps/web shell. CI uses pnpm 9: bump to 12 for the workspace lockfile |
 | T31 | feat/web-admin-core | done, merged (Sonnet); programs, sites, plans, affiliates, codes. Browser-verified |
 | T32-T34 | web pages | todo |
-| T40 | feat/fraud-rules | in progress (Sonnet) |
+| T40 | feat/fraud-rules | done, merged (Sonnet); `cargo test fraud` 10 tests |
 | T41 | feat/observability | done, merged (Sonnet); `cargo test --workspace metrics` 4 tests |
 | T43 | feat/load-test | todo |
 | T44 | feat/deploy | done, merged (agy/antigravity); Dockerfile, compose, Caddyfile, systemd, self-hosting.md |

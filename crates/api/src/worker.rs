@@ -456,11 +456,21 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
         .commission_for(amount, months_between(attributed_at, f.occurred_at))
         .map_err(|e| Fail::Rejected(e.to_string()))?;
 
+    // A conversion credited through a flagged click stays pending until an admin releases it.
+    let hold: Option<String> = sqlx::query_scalar(
+        "SELECT 'click_flagged:' || k.fraud_reason FROM customers cu \
+           JOIN clicks k ON k.id = cu.first_click_id \
+         WHERE cu.id = $1 AND k.fraud_reason IS NOT NULL",
+    )
+    .bind(customer_id)
+    .fetch_optional(&mut *c)
+    .await?;
+
     let conversion = Uuid::now_v7();
     let created = sqlx::query(
         "INSERT INTO conversions (id, program_id, customer_id, affiliate_id, conversion_type_id, \
-           external_id, amount_cents, commission_cents, currency, occurred_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) \
+           external_id, amount_cents, commission_cents, currency, occurred_at, hold_reason) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) \
          ON CONFLICT (program_id, external_id) DO NOTHING",
     )
     .bind(conversion)
@@ -473,6 +483,7 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
     .bind(commission.cents)
     .bind(&program.currency)
     .bind(f.occurred_at)
+    .bind(&hold)
     .execute(&mut *c)
     .await?
     .rows_affected();
@@ -816,6 +827,19 @@ pub async fn approve_due(pool: &PgPool) -> Result<u64, sqlx::Error> {
     }
 }
 
+/// Admin release of a fraud hold: the conversion goes back to the normal auto-approve path.
+/// False when it is unknown, not pending or not held.
+pub async fn release_hold(pool: &PgPool, conversion: Uuid) -> Result<bool, sqlx::Error> {
+    let res = sqlx::query(
+        "UPDATE conversions SET hold_reason = NULL \
+         WHERE id = $1 AND status = 'pending' AND hold_reason IS NOT NULL",
+    )
+    .bind(conversion)
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected() == 1)
+}
+
 async fn approve_batch(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let mut tx = pool.begin().await?;
     let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_xact_lock($1)")
@@ -829,7 +853,7 @@ async fn approve_batch(pool: &PgPool) -> Result<u64, sqlx::Error> {
         "SELECT {LOCKED_COLS} \
          FROM conversions c JOIN programs p ON p.id = c.program_id \
            JOIN affiliates a ON a.id = c.affiliate_id \
-         WHERE c.status = 'pending' AND p.auto_approve \
+         WHERE c.status = 'pending' AND c.hold_reason IS NULL AND p.auto_approve \
            AND a.status = 'active' \
            AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = c.program_id) \
            AND c.occurred_at <= now() - make_interval(days => p.hold_days) \

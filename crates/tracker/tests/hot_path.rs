@@ -154,6 +154,7 @@ async fn undrained(pool: &PgPool, dir: &Path, cap: usize) -> (AppState, mpsc::Re
         queue,
         ip_salt: SALT.into(),
         geo: Arc::new(Geo::disabled()),
+        fraud: bf_core::default_rules().into(),
     };
     (state, rx)
 }
@@ -499,5 +500,57 @@ async fn metrics_after_click_has_spool_lag(pool: PgPool) {
     // The click went through the spool: latency was observed and bytes were appended.
     assert!(tracker::metrics::INGEST.count() >= 1);
     assert!(tracker::metrics::SPOOL_BYTES.get() > 0);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+fn click_from(ip: &str, ua: &str) -> Request<Body> {
+    Request::get("/r/abc")
+        .header("user-agent", ua)
+        .header("x-forwarded-for", ip)
+        .body(Body::empty())
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn fraud_flagged_clicks_are_stored_with_reason(pool: PgPool) {
+    const BOT: &str = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .unwrap();
+    let app = router(t.state.clone());
+
+    // Flagged clicks redirect like any other: nothing is dropped.
+    for (ip, ua) in [
+        ("198.51.100.1", BOT),
+        ("198.51.100.2", CHROME),
+        ("198.51.100.2", CHROME),
+        ("198.51.100.3", CHROME),
+    ] {
+        let res = app.clone().oneshot(click_from(ip, ua)).await.unwrap();
+        assert_eq!(res.status(), StatusCode::FOUND, "{ip}");
+    }
+    wait_clicks(&pool, 4).await;
+
+    let reason = |ip: &'static str| {
+        let pool = pool.clone();
+        async move {
+            let rows: Vec<Option<String>> = sqlx::query_scalar(
+                "SELECT fraud_reason FROM clicks WHERE ip_hash = $1 ORDER BY id",
+            )
+            .bind(tracker::event::ip_hash(SALT, ip))
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+            rows
+        }
+    };
+    assert_eq!(reason("198.51.100.1").await, [Some("bot_ua".to_owned())]);
+    assert_eq!(
+        reason("198.51.100.2").await,
+        [None, Some("duplicate".to_owned())]
+    );
+    assert_eq!(reason("198.51.100.3").await, [None]);
     std::fs::remove_dir_all(&dir).ok();
 }

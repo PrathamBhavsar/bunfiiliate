@@ -59,6 +59,9 @@ pub struct Click {
     pub browser: Option<String>,
     pub referrer_host: Option<String>,
     pub landing_path: Option<String>,
+    /// Why a fraud rule flagged the click; the click is kept either way.
+    #[serde(default)]
+    pub fraud_reason: Option<String>,
 }
 
 /// Batch insert; replays and retries are no-ops on the primary key.
@@ -70,15 +73,16 @@ pub async fn insert_clicks(pool: &PgPool, clicks: &[Click]) -> Result<u64, sqlx:
     }
     let res = sqlx::query(
         "INSERT INTO clicks (id, program_id, affiliate_id, code, visitor_id, ts, ip_hash, \
-                             country, device, os, browser, referrer_host, landing_path) \
+                             country, device, os, browser, referrer_host, landing_path, \
+                             fraud_reason) \
          SELECT id, program_id, affiliate_id, code, visitor_id, \
                 TIMESTAMPTZ 'epoch' + ts_ms * INTERVAL '1 millisecond', \
-                ip_hash, country, device, os, browser, referrer_host, landing_path \
+                ip_hash, country, device, os, browser, referrer_host, landing_path, fraud_reason \
          FROM UNNEST($1::uuid[], $2::uuid[], $3::uuid[], $4::text[], $5::text[], $6::bigint[], \
                      $7::bytea[], $8::text[], $9::text[], $10::text[], $11::text[], \
-                     $12::text[], $13::text[]) \
+                     $12::text[], $13::text[], $14::text[]) \
               AS t(id, program_id, affiliate_id, code, visitor_id, ts_ms, ip_hash, country, \
-                   device, os, browser, referrer_host, landing_path) \
+                   device, os, browser, referrer_host, landing_path, fraud_reason) \
          ON CONFLICT DO NOTHING",
     )
     .bind(col!(id))
@@ -94,6 +98,7 @@ pub async fn insert_clicks(pool: &PgPool, clicks: &[Click]) -> Result<u64, sqlx:
     .bind(col!(browser))
     .bind(col!(referrer_host))
     .bind(col!(landing_path))
+    .bind(col!(fraud_reason))
     .execute(pool)
     .await?;
     Ok(res.rows_affected())

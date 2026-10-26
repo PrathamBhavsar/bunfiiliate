@@ -35,5 +35,9 @@ Refund/chargeback events are handled before conversion parsing in `handle` (`wor
 
 Not here yet: fraud holds (T40), outbox dispatch (T24).
 Outbox dispatch (webhooks, email, notifications) is [Ops Routes](/architecture/ops.md); the worker also runs its two 1s ticks. Not here yet: fraud holds (T40), reversals/payouts (T18).
+## Fraud holds (T40)
+Ingest looks up the customer's `first_click_id`; if that click has `clicks.fraud_reason` the conversion is inserted with `hold_reason = 'click_flagged:<reason>'`. It is posted to the ledger like any pending conversion (so reversals and balances work) but `approve_batch` requires `hold_reason IS NULL`. `worker::release_hold(pool, id) -> bool` clears the hold (pending + held only); the conversion then follows the normal hold-days auto-approve. Manual approve routes (T22) must also refuse held conversions until released.
+
+Not here yet: outbox dispatch (T24).
 
 See [Ledger](/architecture/ledger.md).
