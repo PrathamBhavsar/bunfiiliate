@@ -26,14 +26,17 @@
       .join("");
   }
 
-  function track(code) {
+  function track(code, click) {
     var vid = get("bf_vid");
     if (!vid) set("bf_vid", (vid = uid()), 365);
     code = code || get("bf_ref");
-    if (!code || !endpoint) return;
-    set("bf_ref", code, days);
+    click = click || get("bf_click");
+    if (!(code || click) || !endpoint) return;
+    if (code) set("bf_ref", code, days);
+    if (click) set("bf_click", click, days);
     var body = JSON.stringify({
-      code: code,
+      code: code || null,
+      click: click || null,
       vid: vid,
       url: w.location.origin + w.location.pathname,
       ref: d.referrer && new URL(d.referrer).origin
@@ -49,7 +52,7 @@
   }
 
   w.bunfiiliate = { track: track };
-  var landed = q.get("ref") || q.get("bf_click");
-  if (landed) track(landed);
+  var ref = q.get("ref"), click = q.get("bf_click");
+  if (ref || click) track(ref, click);
   else if (!get("bf_vid")) set("bf_vid", uid(), 365);
 })(window, document);

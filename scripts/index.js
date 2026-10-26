@@ -44,30 +44,37 @@ function load(file, { search = "", src = "https://t.example.com/t.js", days, bea
 }
 
 for (const file of ["tracker.src.js", "tracker.min.js"]) {
-  test(`${file}: bf_click sets bf_vid (1y) and bf_ref (default 30d)`, () => {
+  test(`${file}: bf_click sets bf_vid (1y) and bf_click (default 30d), not bf_ref`, () => {
     const { jar } = load(file, { search: "?bf_click=abc123" });
-    assert.equal(jar.get("bf_ref").value, "abc123");
-    assert.equal(jar.get("bf_ref").attrs["max-age"], String(30 * 86400));
+    assert.equal(jar.get("bf_click").value, "abc123");
+    assert.ok(!jar.has("bf_ref"));
+    assert.equal(jar.get("bf_click").attrs["max-age"], String(30 * 86400));
     assert.equal(jar.get("bf_vid").attrs["max-age"], String(365 * 86400));
     assert.match(jar.get("bf_vid").value, /^[0-9a-f-]{32,36}$/);
-    assert.equal(jar.get("bf_ref").attrs.path, "/");
-    assert.ok("Secure" in jar.get("bf_ref").attrs);
+    assert.equal(jar.get("bf_click").attrs.path, "/");
+    assert.ok("Secure" in jar.get("bf_click").attrs);
   });
 
-  test(`${file}: ?ref= wins over bf_click, data-days configures bf_ref`, () => {
-    const { jar } = load(file, { search: "?ref=fromref&bf_click=other", days: "7" });
+  test(`${file}: ?ref= is the code, bf_click the click; data-days configures both cookies`, async () => {
+    const { jar, sent } = load(file, { search: "?ref=fromref&bf_click=other", days: "7" });
     assert.equal(jar.get("bf_ref").value, "fromref");
+    assert.equal(jar.get("bf_click").value, "other");
     assert.equal(jar.get("bf_ref").attrs["max-age"], String(7 * 86400));
+    assert.equal(jar.get("bf_click").attrs["max-age"], String(7 * 86400));
+    const body = JSON.parse(await sent[0].blob.text());
+    assert.equal(body.code, "fromref");
+    assert.equal(body.click, "other");
   });
 
-  test(`${file}: beacon posts {code,vid,url,ref} (query/hash stripped) to script origin + /c`, async () => {
+  test(`${file}: beacon posts {code,click,vid,url,ref} (query/hash stripped) to script origin + /c`, async () => {
     const { jar, sent } = load(file, { search: "?bf_click=abc123" });
     assert.equal(sent.length, 1);
     assert.equal(sent[0].via, "beacon");
     assert.equal(sent[0].url, "https://t.example.com/c");
     const body = JSON.parse(await sent[0].blob.text());
     assert.deepEqual(body, {
-      code: "abc123",
+      code: null,
+      click: "abc123",
       vid: jar.get("bf_vid").value,
       url: "https://shop.example/p",
       ref: "https://news.example",
@@ -82,14 +89,28 @@ for (const file of ["tracker.src.js", "tracker.min.js"]) {
     assert.equal(sent[0].init.keepalive, true);
   });
 
-  test(`${file}: no code -> vid cookie only, no beacon, no bf_ref`, () => {
+  test(`${file}: ?ref= alone posts the code with a null click`, async () => {
+    const { jar, sent } = load(file, { search: "?ref=promo" });
+    const body = JSON.parse(await sent[0].blob.text());
+    assert.deepEqual(body, {
+      code: "promo",
+      click: null,
+      vid: jar.get("bf_vid").value,
+      url: "https://shop.example/p",
+      ref: "https://news.example",
+    });
+    assert.ok(!jar.has("bf_click"));
+  });
+
+  test(`${file}: no code or click -> vid cookie only, no beacon, no bf_ref/bf_click`, () => {
     const { jar, sent } = load(file);
     assert.ok(jar.has("bf_vid"));
     assert.ok(!jar.has("bf_ref"));
+    assert.ok(!jar.has("bf_click"));
     assert.equal(sent.length, 0);
   });
 
-  test(`${file}: track() reuses stored bf_ref and vid; explicit code overrides`, () => {
+  test(`${file}: track() reuses stored click and vid; explicit code overrides`, async () => {
     const { jar, sent, window } = load(file, { search: "?bf_click=first" });
     const vid = jar.get("bf_vid").value;
     window.bunfiiliate.track();
@@ -97,6 +118,10 @@ for (const file of ["tracker.src.js", "tracker.min.js"]) {
     assert.equal(sent.length, 3);
     assert.equal(jar.get("bf_vid").value, vid);
     assert.equal(jar.get("bf_ref").value, "second");
+    assert.equal(jar.get("bf_click").value, "first");
+    const last = JSON.parse(await sent[2].blob.text());
+    assert.equal(last.code, "second");
+    assert.equal(last.click, "first");
   });
 
   test(`${file}: http page omits Secure`, () => {

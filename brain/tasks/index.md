@@ -10,9 +10,9 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T11 | feat/core-state-machines | done, merged (Sonnet) |
 | T12 | feat/db-schema | done, merged (Sonnet) |
 | T13 | feat/spool | done, merged (agy/antigravity) |
-| T14 | feat/tracker-hot-path | done, merged (Sonnet); follow-up: tracker.js sends bf_click as code to /c |
+| T14 | feat/tracker-hot-path | done, merged (Sonnet); tracker.js bf_click-as-code follow-up fixed in T16 |
 | T15 | feat/tracker-js | done, merged (Sonnet) |
-| T16 | feat/ingest-webhooks | todo |
+| T16 | feat/ingest-webhooks | done on branch (Sonnet) |
 | T17 | feat/worker-ingest | todo |
 | T18 | feat/payouts-reversals | todo |
 | T20 | feat/api-auth | done, merged (Sonnet); JWT hand-rolled HS256 (rsa advisory), review in T60 |

@@ -219,6 +219,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "serde",
+ "serde_json",
  "sqlx",
  "tokio",
  "uuid",
@@ -2220,6 +2221,7 @@ dependencies = [
  "bf-db",
  "bf-rt",
  "bf-spool",
+ "hmac",
  "serde",
  "serde_json",
  "sha2",

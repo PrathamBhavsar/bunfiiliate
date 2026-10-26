@@ -15,7 +15,7 @@ timestamp: 2026-10-26
 5. Crash: replay from checkpoint. At-least-once + unique keys = effectively-once.
 6. Channel full: 503 load shedding. Never unbounded memory.
 
-Webhooks (generic/Stripe/Paddle): tracker only verifies signature + spools to `inbound_events`. Business logic lives in worker.
+Webhooks (generic/Stripe/Paddle): tracker only verifies signature (`tracker::webhook::Source::verify`, 5-minute tolerance for Stripe/Paddle) + spools to `inbound_events` through the same spool/queue/writer path as clicks (`Record::Event`). Dedup via `ON CONFLICT (program_id, source, external_id) DO NOTHING`, external_id = Idempotency-Key / Stripe `id` / Paddle `event_id`. Business logic lives in worker.
 
 fsync mode `always|off`, both benchmarked.
 

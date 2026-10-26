@@ -328,6 +328,39 @@ async fn unknown_code_is_404(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
+async fn beacon_click_field_is_accepted(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT)
+        .await
+        .unwrap();
+    let app = router(t.state.clone());
+    let send = |body: &'static str| {
+        let app = app.clone();
+        async move { app.oneshot(beacon(body)).await.unwrap().status() }
+    };
+
+    // `/r` already recorded a click-only visit: acknowledged, not recorded again.
+    let click = r#"{"code":null,"click":"0190c1d2-0000-7000-8000-000000000000","vid":"v"}"#;
+    assert_eq!(send(click).await, StatusCode::NO_CONTENT);
+    // A referral code records a click, with or without a click id beside it.
+    let both = r#"{"code":"abc","click":"c1","vid":"v","url":"https://example.com/","ref":null}"#;
+    assert_eq!(send(both).await, StatusCode::NO_CONTENT);
+    let code = r#"{"code":"abc","click":null,"vid":"v"}"#;
+    assert_eq!(send(code).await, StatusCode::NO_CONTENT);
+    wait_clicks(&pool, 2).await;
+    // Neither code nor click, or an unknown code, is rejected.
+    assert_eq!(send(r#"{"vid":"v"}"#).await, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        send(r#"{"code":"nope","click":"c1"}"#).await,
+        StatusCode::NOT_FOUND
+    );
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(clicks(&pool).await, 2);
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
 async fn full_queue_sheds_load_with_503(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();

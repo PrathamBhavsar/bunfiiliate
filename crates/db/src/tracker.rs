@@ -1,4 +1,4 @@
-//! Tracker queries: config snapshot rows and the click batch insert.
+//! Tracker queries: config snapshot rows and the click and inbound-event batch inserts.
 
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -94,6 +94,49 @@ pub async fn insert_clicks(pool: &PgPool, clicks: &[Click]) -> Result<u64, sqlx:
     .bind(col!(browser))
     .bind(col!(referrer_host))
     .bind(col!(landing_path))
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected())
+}
+
+/// One verified conversion delivery; also the spool payload (JSON).
+/// `source` is an `event_source` label, `received_ms` is unix millis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InboundEvent {
+    pub id: Uuid,
+    pub program_id: Uuid,
+    pub source: String,
+    pub external_id: String,
+    pub payload: serde_json::Value,
+    pub received_ms: i64,
+}
+
+/// Batch insert; redeliveries and spool replays are no-ops on the dedup key.
+pub async fn insert_events(pool: &PgPool, events: &[InboundEvent]) -> Result<u64, sqlx::Error> {
+    let res = sqlx::query(
+        "INSERT INTO inbound_events (id, program_id, source, external_id, payload, received_at) \
+         SELECT id, program_id, source::event_source, external_id, payload::jsonb, \
+                TIMESTAMPTZ 'epoch' + received_ms * INTERVAL '1 millisecond' \
+         FROM UNNEST($1::uuid[], $2::uuid[], $3::text[], $4::text[], $5::text[], $6::bigint[]) \
+              AS t(id, program_id, source, external_id, payload, received_ms) \
+         ON CONFLICT (program_id, source, external_id) DO NOTHING",
+    )
+    .bind(events.iter().map(|e| e.id).collect::<Vec<_>>())
+    .bind(events.iter().map(|e| e.program_id).collect::<Vec<_>>())
+    .bind(events.iter().map(|e| e.source.clone()).collect::<Vec<_>>())
+    .bind(
+        events
+            .iter()
+            .map(|e| e.external_id.clone())
+            .collect::<Vec<_>>(),
+    )
+    .bind(
+        events
+            .iter()
+            .map(|e| e.payload.to_string())
+            .collect::<Vec<_>>(),
+    )
+    .bind(events.iter().map(|e| e.received_ms).collect::<Vec<_>>())
     .execute(pool)
     .await?;
     Ok(res.rows_affected())
