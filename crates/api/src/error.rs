@@ -2,9 +2,11 @@
 
 use axum::Json;
 use axum::extract::rejection::JsonRejection;
+use axum::extract::{FromRequest, Request};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use utoipa::ToSchema;
 
 #[derive(Debug)]
@@ -12,6 +14,8 @@ pub enum AppError {
     BadRequest(String),
     Unauthorized(&'static str),
     Forbidden(&'static str),
+    NotFound(&'static str),
+    Conflict(&'static str),
     Internal,
 }
 
@@ -32,6 +36,8 @@ impl IntoResponse for AppError {
             Self::BadRequest(m) => (StatusCode::BAD_REQUEST, "bad_request", m),
             Self::Unauthorized(m) => (StatusCode::UNAUTHORIZED, "unauthorized", m.into()),
             Self::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m.into()),
+            Self::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.into()),
+            Self::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.into()),
             Self::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal",
@@ -47,6 +53,11 @@ impl IntoResponse for AppError {
 
 impl From<sqlx::Error> for AppError {
     fn from(e: sqlx::Error) -> Self {
+        if let sqlx::Error::Database(db) = &e
+            && (db.is_unique_violation() || db.is_foreign_key_violation())
+        {
+            return Self::Conflict("conflicts with existing data");
+        }
         tracing::error!(error = %e, "database error");
         Self::Internal
     }
@@ -55,5 +66,16 @@ impl From<sqlx::Error> for AppError {
 impl From<JsonRejection> for AppError {
     fn from(e: JsonRejection) -> Self {
         Self::BadRequest(e.body_text())
+    }
+}
+
+/// `Json<T>` whose parse failures render as `AppError`.
+pub struct AppJson<T>(pub T);
+
+impl<T: DeserializeOwned, S: Send + Sync> FromRequest<S> for AppJson<T> {
+    type Rejection = AppError;
+
+    async fn from_request(req: Request, state: &S) -> Result<Self, AppError> {
+        Ok(Self(Json::<T>::from_request(req, state).await?.0))
     }
 }

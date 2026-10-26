@@ -16,7 +16,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T17 | feat/worker-ingest | todo |
 | T18 | feat/payouts-reversals | todo |
 | T20 | feat/api-auth | done, merged (Sonnet); JWT hand-rolled HS256 (rsa advisory), review in T60 |
-| T21-T25 | api routes, analytics, ops, SDK | todo |
+| T21 | feat/api-programs-affiliates | done on branch (Sonnet); `cargo test -p api programs` 8 tests |
+| T22-T25 | api routes, analytics, ops, SDK | todo |
 | T30-T34 | web shell + pages | todo |
 | T40-T44 | fraud, observability, geoip, load test, deploy | todo |
 | T50 | feat/oss-docs | done on branch (agy/antigravity) |

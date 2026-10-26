@@ -20,6 +20,7 @@ use crate::auth::{
     hash_refresh_token, issue_access, new_refresh_token, verify_password,
 };
 use crate::error::{AppError, ErrorBody, ErrorDetail};
+use crate::{affiliates, programs, workspaces};
 
 const REFRESH_PATH: &str = "/api/v1/auth";
 
@@ -38,7 +39,23 @@ impl Modify for CookieAuth {
 
 #[derive(OpenApi)]
 #[openapi(
-    paths(login, refresh, logout, me),
+    paths(
+        login, refresh, logout, me,
+        workspaces::create_workspace, workspaces::list_workspaces,
+        workspaces::invite_member, workspaces::list_members,
+        programs::create_program, programs::list_programs, programs::get_program,
+        programs::update_program, programs::delete_program, programs::rotate_secrets,
+        programs::add_site, programs::list_sites, programs::delete_site,
+        programs::create_conversion_type, programs::list_conversion_types,
+        programs::delete_conversion_type,
+        programs::create_plan, programs::list_plans, programs::delete_plan,
+        affiliates::register, affiliates::list_affiliates, affiliates::get_affiliate,
+        affiliates::update_affiliate, affiliates::approve, affiliates::suspend,
+        affiliates::reactivate, affiliates::enroll, affiliates::list_enrollments,
+        affiliates::unenroll, affiliates::create_code, affiliates::list_codes,
+        affiliates::delete_code, affiliates::me_affiliate, affiliates::me_update,
+        affiliates::me_create_code, affiliates::me_list_codes, affiliates::me_delete_code,
+    ),
     components(schemas(LoginRequest, UserView, ErrorBody, ErrorDetail)),
     modifiers(&CookieAuth),
     info(title = "bunfiiliate API", version = "0.1.0")
@@ -52,6 +69,9 @@ pub fn routes() -> Router<AppState> {
         .route("/api/v1/auth/refresh", post(refresh))
         .route("/api/v1/auth/logout", post(logout))
         .route("/api/v1/auth/me", get(me))
+        .merge(workspaces::routes())
+        .merge(programs::routes())
+        .merge(affiliates::routes())
 }
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {

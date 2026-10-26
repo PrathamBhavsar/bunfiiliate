@@ -1,10 +1,14 @@
 //! bunfiiliate API: auth, roles, OpenAPI.
 
+pub mod affiliates;
 pub mod audit;
 pub mod auth;
 pub mod bootstrap;
 pub mod error;
+pub mod page;
+pub mod programs;
 pub mod routes;
+pub mod workspaces;
 
 use std::sync::Arc;
 

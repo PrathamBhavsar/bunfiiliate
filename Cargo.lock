@@ -83,6 +83,7 @@ dependencies = [
  "argon2",
  "axum",
  "base64",
+ "bf-core",
  "bf-db",
  "bf-rt",
  "chrono",
@@ -222,6 +223,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "tokio",
+ "utoipa",
  "uuid",
 ]
 

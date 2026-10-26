@@ -1,8 +1,11 @@
 //! Postgres access: pool, migrations, repos.
 
+pub mod affiliates;
 pub mod auth;
 pub mod ledger;
+pub mod programs;
 pub mod tracker;
+pub mod workspaces;
 
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;

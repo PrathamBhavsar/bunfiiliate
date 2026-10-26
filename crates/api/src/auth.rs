@@ -46,11 +46,16 @@ pub fn verify_password(password: &str, hash: &str) -> bool {
     })
 }
 
-/// 256 random bits, hex encoded.
-pub fn new_refresh_token() -> String {
-    let mut bytes = [0u8; 32];
+/// `n` random bytes, hex encoded.
+pub fn random_hex(n: usize) -> String {
+    let mut bytes = vec![0u8; n];
     OsRng.fill_bytes(&mut bytes);
     bytes.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// 256 random bits, hex encoded.
+pub fn new_refresh_token() -> String {
+    random_hex(32)
 }
 
 /// Only the SHA-256 of a refresh token is stored.

@@ -141,3 +141,13 @@ pub async fn insert_events(pool: &PgPool, events: &[InboundEvent]) -> Result<u64
     .await?;
     Ok(res.rows_affected())
 }
+
+/// Tell the tracker to reload its snapshot. Delivered on commit, so call it inside the
+/// transaction that changed codes, enrollments or program keys.
+pub async fn notify_config(db: impl sqlx::PgExecutor<'_>) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_notify($1, '')")
+        .bind(CONFIG_CHANNEL)
+        .execute(db)
+        .await?;
+    Ok(())
+}
