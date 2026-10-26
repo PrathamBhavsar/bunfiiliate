@@ -4,6 +4,10 @@
 
 - **Creation**: `api::analytics`: `rollup` tick (advisory-locked, per-program watermark = last rolled-up day minus 1, delete + upsert, folds clicks and conversions into `daily_rollups` for dims total|country|os|browser|device|referrer) run every 60s by `worker::run`; `GET /analytics/summary`, `/analytics/timeseries`, `/reports/analytics.csv`. `programs::{viewer,require_program}` now `pub(crate)`. Details: [Analytics](/architecture/analytics.md).
 - **Update**: [Tasks](/tasks/index.md) T23 done on branch. `cargo test -p api analytics` (5, real PG16): idempotent + incremental rollup, breakdown sums = totals for every dim, affiliate cannot read another affiliate, workspace isolation, exact CSV. `make openapi` regenerated `sdks/ts`. Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 24.
+## [2026-10-26] T18 payouts + reversals
+
+- **Creation**: `api::payouts::{create_batch, approve_batch, cancel_batch, mark_paid, batch_csv, export_csv}`, `bf_db::payouts::{owed, batch_rows}`, migration `0018_conversion_payout.sql` (`conversions.payout_id`). Worker ingest now handles refund/chargeback events (generic, Stripe, Paddle): pending is rejected, approved/paid is reversed with a balanced `AffPayable -> Expense` txn, never touching old ledger rows. Details: [Worker & Ingest](/architecture/worker.md).
+- **Update**: `bf_core` `ConversionStatus::Paid` + `Reverse` is now valid (clawback after payout; table test and proptest invariant still hold). [Ledger](/architecture/ledger.md) and `docs/ledger.md` postings updated; `worker::post` is `pub(crate)`, takes `(conversion, payout)` ids and returns the txn id. [Tasks](/tasks/index.md) T18 done on branch. `cargo test -p api payouts`: threshold + no double-claim, paid flow balanced with `payable+pending == live - paid`, refund before approval, chargeback after payout nets next batch (append-only checked), reversal inside an open batch, provider refunds, cancel, double `mark_paid` rejected, exact CSV. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 24, [Time-Traps](/wisdom/time-traps.md).
 
 ## [2026-10-26] T42 geoip
 

@@ -21,4 +21,6 @@ timestamp: 2026-10-26
 - **Parallel branches** all edit root `Cargo.toml` + `brain/log.md`: expect trivial merge conflicts, keep both sides.
 - **`cargo test --workspace` requires DATABASE_URL**: Integration tests (`tests/auth.rs`, `tests/ledger.rs`, etc.) panic with `DATABASE_URL must be set` unless `DATABASE_URL=postgres://pratham@localhost:5433/postgres` is in the environment.
 - **`markdownlint-cli2`**: Default MD013 (line-length 80) is unreasonable for documentation tables/diagrams; configure `.markdownlint.json` with `{"MD013": false}` and format table separators with spaces (`| --- |`).
+- **`cargo test -p api payouts` filters by test fn name, not file name**: name integration tests `payouts_*` or the filter runs only unit tests (0 integration tests run, still green).
+- **`tracker` `crash_before_flush_replays_exactly_once` `PoolTimedOut`** in a full `cargo test --workspace` on the shared cluster; passes with `--test-threads=2`.
 - **`#[sqlx::test]` on the shared PG16 cluster**: a test binary start drops leftover `_sqlx_test_*` databases, killing other workers' live runs (`dropdb ... is being accessed by other users`, tracker/api tests fail). Not a code bug: rerun when no sibling worker is testing.

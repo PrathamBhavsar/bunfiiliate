@@ -279,6 +279,9 @@ impl PlanRow {
 async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
     let payload: Value =
         serde_json::from_str(&ev.payload).map_err(|e| Fail::Rejected(e.to_string()))?;
+    if let Some(r) = reversal(&ev.source, &payload) {
+        return reverse(c, ev, r).await;
+    }
     let Some(f) = parse(&ev.source, &payload, ev.received_at).map_err(Fail::Rejected)? else {
         return Ok(());
     };
@@ -427,7 +430,7 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
     }
 
     let txn = conversion_created(commission).map_err(|e| Fail::Rejected(e.to_string()))?;
-    post(c, &txn, ev.program_id, affiliate, conversion).await?;
+    post(c, &txn, ev.program_id, affiliate, (Some(conversion), None)).await?;
     outbox(
         c,
         "conversion.created",
@@ -439,6 +442,172 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
             "commission_cents": commission.cents,
             "currency": program.currency,
             "status": "pending",
+        }),
+    )
+    .await?;
+    Ok(())
+}
+
+/// A refund or chargeback that points at an earlier conversion.
+struct Reversal {
+    reason: &'static str,
+    target: Target,
+}
+
+enum Target {
+    /// Generic events name the original event's external id.
+    External(String),
+    /// Stripe/Paddle events carry provider ids found in the original conversion event.
+    Refs(Vec<String>),
+}
+
+/// `None`: not a refund or chargeback.
+fn reversal(source: &str, p: &Value) -> Option<Reversal> {
+    let kind = |ptr: &str| p.pointer(ptr).and_then(Value::as_str);
+    let refs = |ptrs: &[&str]| Target::Refs(ptrs.iter().filter_map(|x| text(p, x)).collect());
+    let (reason, target) = match (source, kind("/type"), kind("/event_type")) {
+        ("stripe", Some("charge.refunded"), _) => (
+            "refund",
+            refs(&[
+                "/data/object/id",
+                "/data/object/invoice",
+                "/data/object/payment_intent",
+            ]),
+        ),
+        ("stripe", Some("charge.dispute.created"), _) => (
+            "chargeback",
+            refs(&["/data/object/charge", "/data/object/payment_intent"]),
+        ),
+        ("paddle", _, Some("adjustment.created")) => (
+            match kind("/data/action")? {
+                "refund" => "refund",
+                "chargeback" => "chargeback",
+                _ => return None,
+            },
+            refs(&["/data/transaction_id"]),
+        ),
+        ("generic", Some(t @ ("refund" | "chargeback")), _) => (
+            if t == "refund" {
+                "refund"
+            } else {
+                "chargeback"
+            },
+            Target::External(text(p, "/conversion")?),
+        ),
+        _ => return None,
+    };
+    Some(Reversal { reason, target })
+}
+
+#[derive(sqlx::FromRow)]
+struct Reversible {
+    id: Uuid,
+    affiliate_id: Uuid,
+    commission_cents: i64,
+    currency: String,
+    status: String,
+    payout_id: Option<Uuid>,
+}
+
+/// Undo a conversion's commission: pending is rejected, approved or paid is reversed. A paid
+/// conversion leaves the affiliate's payable negative, netted against their next payout.
+/// Unknown (organic) and already reversed conversions are a no-op, so replays are safe.
+async fn reverse(c: &mut PgConnection, ev: &Event, r: Reversal) -> Result<(), Fail> {
+    const COLS: &str = "c.id, c.affiliate_id, c.commission_cents, c.currency, c.status::text AS status, c.payout_id";
+    let conv: Option<Reversible> = match &r.target {
+        Target::External(id) => {
+            sqlx::query_as(&format!(
+                "SELECT {COLS} FROM conversions c WHERE c.program_id = $1 AND c.external_id = $2 \
+                 FOR UPDATE OF c"
+            ))
+            .bind(ev.program_id)
+            .bind(id)
+            .fetch_optional(&mut *c)
+            .await?
+        }
+        Target::Refs(refs) => {
+            sqlx::query_as(&format!(
+                "SELECT {COLS} FROM inbound_events e \
+                   JOIN conversions c ON c.program_id = e.program_id AND c.external_id = e.external_id \
+                 WHERE e.program_id = $1 AND e.source = $2::event_source AND ( \
+                   e.payload #>> '{{data,object,id}}' = ANY($3) \
+                   OR e.payload #>> '{{data,object,charge}}' = ANY($3) \
+                   OR e.payload #>> '{{data,object,payment_intent}}' = ANY($3) \
+                   OR e.payload #>> '{{data,id}}' = ANY($3)) \
+                 ORDER BY e.received_at, e.id LIMIT 1 FOR UPDATE OF c"
+            ))
+            .bind(ev.program_id)
+            .bind(&ev.source)
+            .bind(refs)
+            .fetch_optional(&mut *c)
+            .await?
+        }
+    };
+    let Some(conv) = conv else {
+        return Ok(());
+    };
+    let status = match conv.status.as_str() {
+        "pending" => ConversionStatus::Pending,
+        "approved" => ConversionStatus::Approved,
+        "paid" => ConversionStatus::Paid,
+        _ => return Ok(()), // already rejected or reversed
+    };
+    let Some(currency) = Currency::new(&conv.currency) else {
+        return reject("invalid conversion currency");
+    };
+    let m = Money::new(conv.commission_cents, currency);
+    let event = if status == ConversionStatus::Pending {
+        ConversionEvent::Reject(m)
+    } else {
+        ConversionEvent::Reverse(m)
+    };
+    let (to, txn) = status
+        .transition(event)
+        .map_err(|e| Fail::Rejected(e.to_string()))?;
+    sqlx::query(
+        "UPDATE conversions SET status = $2::conversion_status, reversed_at = now() WHERE id = $1",
+    )
+    .bind(conv.id)
+    .bind(if to == ConversionStatus::Rejected {
+        "rejected"
+    } else {
+        "reversed"
+    })
+    .execute(&mut *c)
+    .await?;
+    if let Some(txn) = txn {
+        post(
+            c,
+            &txn,
+            ev.program_id,
+            conv.affiliate_id,
+            (Some(conv.id), None),
+        )
+        .await?;
+    }
+    // A payout not yet paid was sized with this commission; shrink it. (Paid payouts are
+    // left alone: the negative payable nets against the next batch.)
+    if let Some(payout) = conv.payout_id {
+        sqlx::query(
+            "UPDATE payouts SET amount_cents = amount_cents - $2 \
+             WHERE id = $1 AND status IN ('draft', 'approved')",
+        )
+        .bind(payout)
+        .bind(conv.commission_cents)
+        .execute(&mut *c)
+        .await?;
+    }
+    outbox(
+        c,
+        "conversion.reversed",
+        json!({
+            "conversion_id": conv.id,
+            "program_id": ev.program_id,
+            "affiliate_id": conv.affiliate_id,
+            "commission_cents": conv.commission_cents,
+            "currency": conv.currency,
+            "status": if to == ConversionStatus::Rejected { "rejected" } else { "reversed" },
+            "reason": r.reason,
         }),
     )
     .await?;
@@ -511,16 +680,17 @@ fn db_account(a: Account) -> ledger::Account {
     }
 }
 
-/// Write a state-machine txn to the ledger. Zero-amount txns carry no money, so skip them.
-async fn post(
+/// Write a state-machine txn to the ledger and return its id. Zero-amount txns carry no
+/// money, so skip them.
+pub(crate) async fn post(
     c: &mut PgConnection,
     txn: &LedgerTxn,
     program: Uuid,
     affiliate: Uuid,
-    conversion: Uuid,
-) -> Result<(), sqlx::Error> {
+    (conversion, payout): (Option<Uuid>, Option<Uuid>),
+) -> Result<Option<Uuid>, sqlx::Error> {
     if txn.postings().iter().all(|p| p.amount.cents == 0) {
-        return Ok(());
+        return Ok(None);
     }
     let entries: Vec<NewEntry> = txn
         .postings()
@@ -531,14 +701,20 @@ async fn post(
             affiliate_id: (p.account != Account::Expense).then_some(affiliate),
             amount_cents: p.amount.cents,
             currency: p.amount.currency.as_str().to_owned(),
-            conversion_id: Some(conversion),
-            payout_id: None,
+            conversion_id: conversion,
+            payout_id: payout,
         })
         .collect();
-    ledger::insert_entries(c, Uuid::now_v7(), &entries).await
+    let id = Uuid::now_v7();
+    ledger::insert_entries(c, id, &entries).await?;
+    Ok(Some(id))
 }
 
-async fn outbox(c: &mut PgConnection, topic: &str, payload: Value) -> Result<(), sqlx::Error> {
+pub(crate) async fn outbox(
+    c: &mut PgConnection,
+    topic: &str,
+    payload: Value,
+) -> Result<(), sqlx::Error> {
     sqlx::query("INSERT INTO outbox (topic, payload) VALUES ($1, $2::text::jsonb)")
         .bind(topic)
         .bind(payload.to_string())
@@ -606,7 +782,14 @@ async fn approve_batch(pool: &PgPool) -> Result<u64, sqlx::Error> {
         .execute(&mut *tx)
         .await?;
         if let Some(txn) = txn {
-            post(&mut tx, &txn, d.program_id, d.affiliate_id, d.id).await?;
+            post(
+                &mut tx,
+                &txn,
+                d.program_id,
+                d.affiliate_id,
+                (Some(d.id), None),
+            )
+            .await?;
         }
         outbox(
             &mut tx,

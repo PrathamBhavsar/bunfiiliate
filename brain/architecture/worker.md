@@ -21,6 +21,15 @@ timestamp: 2026-10-26
 ## Auto-approve tick
 `pg_try_advisory_xact_lock`, then pending conversions of `auto_approve` programs with `occurred_at <= now() - hold_days`, active enrolled affiliates only (suspended stay pending for manual review), batch 100 `FOR UPDATE SKIP LOCKED`: `ConversionStatus::transition(Approve)`, ledger txn, outbox `conversion.approved`.
 
-Not here yet: fraud holds (T40), reversals/payouts (T18), outbox dispatch (T24).
+## Reversals (T18)
+Refund/chargeback events are handled before conversion parsing in `handle` (`worker::reversal`, `reverse`): generic `{type: refund|chargeback, conversion: <original external_id>}`; Stripe `charge.refunded` / `charge.dispute.created`; Paddle `adjustment.created` with `data.action` refund/chargeback. Stripe/Paddle find the original through the earlier conversion event's payload (`data.object.{id,charge,payment_intent}` / `data.id` vs the refund's ids). Always the full commission (no partial refunds). Conversion is locked, then: pending -> `Reject` (rejected); approved or paid -> `Reverse` (reversed, `AffPayable` debit, goes negative after payout). Already rejected/reversed or unknown (organic) = no-op, so replays are safe. Outbox `conversion.reversed`. A conversion claimed by a draft/approved payout shrinks that payout by its commission.
+
+## Payouts (`api::payouts`, `bf_db::payouts`; routes in T22)
+- `create_batch(program, created_by) -> Option<batch>`: locks the program row (`FOR NO KEY UPDATE`), pays every active affiliate whose payable minus their open (draft/approved) payouts is > 0 and >= `payout_min_cents`. Payout = that whole amount, so clawbacks net automatically; the affiliate's approved unclaimed conversions get `conversions.payout_id` (migration 0018). Nothing is posted yet.
+- `approve_batch`, `cancel_batch` (draft only, releases the conversions), `mark_paid` (approved only: per payout `AffPayable -> Cash` txn with `payout_id`, `payouts.ledger_txn_id`, claimed approved conversions become `paid`). Invalid transition = `AppError::Conflict`, unknown batch = `NotFound`; a second `mark_paid` is rejected and posts nothing.
+- `batch_csv` / pure `export_csv`: `email,amount,currency`, amount decimal with two places (assumes 2-digit currencies), email = `payout_email` else the user's email.
+- Edge: a reversal can shrink an open payout to <= 0 when a clawback was netted into it; `mark_paid` then returns Conflict (negative amount) and the operator cancels the batch.
+
+Not here yet: fraud holds (T40), outbox dispatch (T24).
 
 See [Ledger](/architecture/ledger.md).
