@@ -1,0 +1,12 @@
+{
+  "name": "bunfiiliate",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:js": "esbuild crates/tracker/js/tracker.src.js --minify --target=es2017 --outfile=crates/tracker/js/tracker.min.js",
+    "test:js": "node scripts/size-check.mjs && node --test scripts/"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}
