@@ -16,7 +16,7 @@ timestamp: 2026-10-26
 6. Channel full: 503 load shedding. Never unbounded memory. Clicks stop at 90% of the queue; the last tenth is for signed webhook events.
 7. Spool write failures are all-or-nothing per group: every ack in the group gets an error, the file is truncated back to the group start. If the truncate (or a segment rotation) cannot be undone the writer is poisoned: all later writes fail until restart, so no acked record ever sits behind a hole and the checkpoint cannot skip over lost data.
 8. Postgres rejecting a record for good (SQLSTATE 22/23) dead-letters it: the batch is retried row by row, bad rows are logged and counted (`bf_dead_lettered_total`), the checkpoint moves on. Transient errors are retried; replay at startup does the same, so one bad record cannot crash-loop the tracker.
-9. Config reloads from `bf_config` NOTIFY are debounced (250 ms quiet, 2 s max) so a burst costs one table load.
+9. Config reloads from `bf_config` NOTIFY are rate-limited, not delayed: the first change after a quiet spell reloads at once, later ones within 250 ms share one trailing reload.
 
 Webhooks (generic/Stripe/Paddle): tracker only verifies signature (`tracker::webhook::Source::verify`, 5-minute tolerance for all three; generic signs `<X-Bf-Timestamp>.<Idempotency-Key>.<body>` so a captured request cannot be replayed under a new key) + spools to `inbound_events` through the same spool/queue/writer path as clicks (`Record::Event`). Dedup via `ON CONFLICT (program_id, source, external_id) DO NOTHING`, external_id = Idempotency-Key / Stripe `id` / Paddle `event_id`. Business logic lives in worker.
 

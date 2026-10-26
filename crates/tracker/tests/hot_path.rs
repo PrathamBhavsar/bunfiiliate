@@ -837,3 +837,30 @@ async fn a_burst_of_config_changes_converges_on_the_new_snapshot(pool: PgPool) {
     assert!(swapped_once);
     std::fs::remove_dir_all(&dir).ok();
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn a_lone_config_change_is_live_without_waiting(pool: PgPool) {
+    seed(&pool, "abc").await;
+    let dir = spool_dir();
+    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
+        .await
+        .unwrap();
+    // Let the quiet period pass so the change is the first of a new burst.
+    tokio::time::sleep(Duration::from_millis(400)).await;
+    add_code(&pool, "instant").await;
+    sqlx::query("SELECT pg_notify('bf_config', '')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let began = std::time::Instant::now();
+    while !t.state.snapshot.load().codes.contains_key("instant") {
+        assert!(began.elapsed() < Duration::from_secs(2), "never reloaded");
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert!(
+        began.elapsed() < Duration::from_millis(200),
+        "a code made in the UI must work at once, took {:?}",
+        began.elapsed()
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}

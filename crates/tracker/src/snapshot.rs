@@ -64,11 +64,11 @@ impl Snapshot {
     }
 }
 
-/// A reload waits this long for further notifications, so a burst of config changes (a bulk
-/// import, a code-creation flood) costs one reload of the full tables, not one per change.
-const RELOAD_DEBOUNCE: Duration = Duration::from_millis(250);
-/// ...but never longer than this after the first one, however long the burst lasts.
-const RELOAD_MAX_DELAY: Duration = Duration::from_secs(2);
+/// Reloads are at least this far apart. The first change after a quiet spell reloads at once
+/// (a code created in the UI works immediately); changes inside the window share the next
+/// reload, so a burst (bulk import, code-creation flood) costs about four table loads a
+/// second, not one per change.
+const RELOAD_MIN_INTERVAL: Duration = Duration::from_millis(250);
 
 /// Load the snapshot, then keep it fresh: reload after `bf_config` notifications (coalesced).
 /// LISTEN is established before the first load so no change is missed.
@@ -80,28 +80,26 @@ pub async fn load_and_watch(
     let cell = Arc::new(ArcSwap::from_pointee(Snapshot::load(&pool).await?));
     let watched = Arc::clone(&cell);
     let task = tokio::spawn(async move {
-        // (first, latest) notification times of the burst waiting to be reloaded.
-        let mut pending: Option<(Instant, Instant)> = None;
+        let mut last_reload = Instant::now();
+        let mut pending = false;
         loop {
-            let due =
-                pending.map(|(first, last)| (last + RELOAD_DEBOUNCE).min(first + RELOAD_MAX_DELAY));
+            let due = last_reload + RELOAD_MIN_INTERVAL;
             tokio::select! {
                 got = listener.recv() => {
                     // After a dropped connection recv() reconnects; the reload covers
                     // notifications missed meanwhile.
-                    let now = Instant::now();
-                    pending = Some((pending.map_or(now, |(first, _)| first), now));
+                    pending = true;
                     if let Err(e) = got {
                         tracing::warn!(error = %e, "bf_config listener error");
-                        reload(&pool, &watched).await;
-                        pending = None;
                         tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
-                _ = async { tokio::time::sleep_until(due.expect("guarded").into()).await }, if due.is_some() => {
-                    reload(&pool, &watched).await;
-                    pending = None;
-                }
+                _ = tokio::time::sleep_until(due.into()), if pending => {}
+            }
+            if pending && Instant::now() >= due {
+                reload(&pool, &watched).await;
+                last_reload = Instant::now();
+                pending = false;
             }
         }
     });
