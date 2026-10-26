@@ -16,6 +16,10 @@
   --danger: #b91c1c;
   --success: #15803d;
   --warning: #b45309;
+  /* Chart series, fixed order: blue, orange, aqua. Dark steps are chosen for the dark surface. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
   color-scheme: light;
 }
 
@@ -30,6 +34,9 @@
   --danger: #f87171;
   --success: #4ade80;
   --warning: #fbbf24;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
   color-scheme: dark;
 }
 
