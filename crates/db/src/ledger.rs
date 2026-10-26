@@ -1,6 +1,6 @@
 //! Minimal ledger repo. Debit > 0, credit < 0; a txn must sum to zero.
 
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
@@ -37,6 +37,17 @@ pub async fn insert_txn(
     entries: &[NewEntry],
 ) -> Result<(), sqlx::Error> {
     let mut tx = pool.begin().await?;
+    insert_entries(&mut tx, txn_id, entries).await?;
+    tx.commit().await
+}
+
+/// Insert the entries of one txn on an open connection; the balance check runs
+/// when the caller's transaction commits.
+pub async fn insert_entries(
+    conn: &mut PgConnection,
+    txn_id: Uuid,
+    entries: &[NewEntry],
+) -> Result<(), sqlx::Error> {
     for e in entries {
         sqlx::query(
             "INSERT INTO ledger_entries \
@@ -52,10 +63,10 @@ pub async fn insert_txn(
         .bind(&e.currency)
         .bind(e.conversion_id)
         .bind(e.payout_id)
-        .execute(&mut *tx)
+        .execute(&mut *conn)
         .await?;
     }
-    tx.commit().await
+    Ok(())
 }
 
 /// Balance for an affiliate in a program (zero if no entries yet).

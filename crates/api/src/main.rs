@@ -16,7 +16,12 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Run the HTTP API.
-    Serve,
+    Serve {
+        /// Also run the background worker in this process.
+        #[arg(long)]
+        with_worker: bool,
+    },
+    /// Run the background worker (ingest processor, auto-approve).
     Worker,
     /// Print the OpenAPI document.
     Openapi,
@@ -36,7 +41,7 @@ enum Command {
 async fn main() -> Result<(), Box<dyn Error>> {
     bf_rt::init_tracing();
     match Cli::parse().command {
-        Command::Serve => serve().await?,
+        Command::Serve { with_worker } => serve(with_worker).await?,
         Command::Openapi => println!("{}", ApiDoc::openapi().to_pretty_json()?),
         Command::Bootstrap {
             email,
@@ -50,16 +55,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 .map_err(|e| format!("bootstrap failed: {e:?}"))?;
             println!("created super_admin {id}");
         }
-        Command::Worker => println!("worker: not implemented"),
+        Command::Worker => {
+            let pool = bf_db::connect(&Config::from_env()?.database_url).await?;
+            bf_db::migrate(&pool).await?;
+            tracing::info!("worker running");
+            tokio::select! {
+                () = api::worker::run(pool) => {}
+                _ = tokio::signal::ctrl_c() => {}
+            }
+        }
         Command::SeedDemo => println!("seed-demo: not implemented"),
     }
     Ok(())
 }
 
-async fn serve() -> Result<(), Box<dyn Error>> {
+async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
     let cfg = Config::from_env()?;
     let pool = bf_db::connect(&cfg.database_url).await?;
     bf_db::migrate(&pool).await?;
+    let worker = with_worker.then(|| tokio::spawn(api::worker::run(pool.clone())));
     let state = AppState {
         pool,
         jwt_secret: Arc::from(cfg.jwt_secret),
@@ -72,5 +86,8 @@ async fn serve() -> Result<(), Box<dyn Error>> {
             let _ = tokio::signal::ctrl_c().await;
         })
         .await?;
+    if let Some(w) = worker {
+        w.abort();
+    }
     Ok(())
 }
