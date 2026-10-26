@@ -1,0 +1,32 @@
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	# Tracker endpoints
+	handle /r/* {
+		reverse_proxy {$TRACKER_UPSTREAM:tracker:8081}
+	}
+	handle /c {
+		reverse_proxy {$TRACKER_UPSTREAM:tracker:8081}
+	}
+	handle /t.js {
+		reverse_proxy {$TRACKER_UPSTREAM:tracker:8081}
+	}
+	handle /v1/events/* {
+		reverse_proxy {$TRACKER_UPSTREAM:tracker:8081}
+	}
+	handle /v1/webhooks/* {
+		reverse_proxy {$TRACKER_UPSTREAM:tracker:8081}
+	}
+
+	# API endpoints
+	handle /api/* {
+		reverse_proxy {$API_UPSTREAM:api:8080}
+	}
+
+	# Static web app export (Next.js static export)
+	handle {
+		root * /srv/web
+		try_files {path} {path}.html {path}/ /index.html
+		file_server
+	}
+}

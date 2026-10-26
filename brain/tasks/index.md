@@ -25,7 +25,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T31 | feat/web-admin-core | done, merged (Sonnet); programs, sites, plans, affiliates, codes. Browser-verified |
 | T32-T34 | web pages | todo |
 | T40 | feat/fraud-rules | in progress (Sonnet) |
-| T41, T43, T44 | observability, load test, deploy | todo |
+| T41, T43 | observability, load test | todo |
+| T44 | feat/deploy | done (agy/antigravity); Dockerfile, compose, Caddyfile, systemd, self-hosting.md |
 | T42 | feat/geoip | done, merged (Sonnet); `cargo test -p tracker geo` 6 tests |
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
 | T51 | feat/release-page | todo |

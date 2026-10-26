@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-26] T44 deploy assets & self-hosting docs
+
+- **Creation**: `deploy/` directory containing multi-stage `Dockerfile` (builds `api` and `tracker` release binaries plus web static export into a lean Debian Bookworm runtime with `libssl3` and `ca-certificates`), `deploy/docker-compose.yml` and symlink `deploy/compose.yml` (`postgres:16`, `tracker`, `api` with `--with-worker`, `caddy` serving web static export and reverse proxying `/api` to port 8080 and tracker routes `/r/*`, `/c`, `/t.js`, `/v1/events/*`, `/v1/webhooks/*` to port 8081), `deploy/Caddyfile`, systemd units (`deploy/systemd/bunfiiliate-api.service`, `bunfiiliate-tracker.service`, `bunfiiliate-worker.service`), comprehensive `.env.example` documenting all 14 environment variables read by the codebase, and `docs/self-hosting.md` covering VPS requirements, first-run `api bootstrap`, automatic TLS, same-origin reverse proxying, GeoIP/CF-IPCountry, backups, upgrades, and systemd installations.
+- **Update**: [Tasks](/tasks/index.md) T44 done on branch. Acceptance passed: `caddy validate --config deploy/Caddyfile` (Valid configuration), `npx markdownlint-cli2 "**/*.md" "#node_modules" "#brain"` (0 issues). `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` all pass.
+
+
 ## [2026-10-26] T23 analytics rollups
 
 - **Creation**: `api::analytics`: `rollup` tick (advisory-locked, per-program watermark = last rolled-up day minus 1, delete + upsert, folds clicks and conversions into `daily_rollups` for dims total|country|os|browser|device|referrer) run every 60s by `worker::run`; `GET /analytics/summary`, `/analytics/timeseries`, `/reports/analytics.csv`. `programs::{viewer,require_program}` now `pub(crate)`. Details: [Analytics](/architecture/analytics.md).

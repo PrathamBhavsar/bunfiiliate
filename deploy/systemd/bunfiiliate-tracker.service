@@ -1,0 +1,29 @@
+[Unit]
+Description=bunfiiliate Click and Conversion Tracker Service
+Documentation=https://github.com/bunfiiliate/bunfiiliate
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=bunfiiliate
+Group=bunfiiliate
+WorkingDirectory=/var/lib/bunfiiliate
+EnvironmentFile=/etc/bunfiiliate/bunfiiliate.env
+ExecStart=/usr/local/bin/tracker
+Restart=always
+RestartSec=3s
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/bunfiiliate /var/spool/bunfiiliate
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
