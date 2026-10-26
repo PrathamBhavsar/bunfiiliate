@@ -225,12 +225,18 @@ pub fn export_csv(rows: &[CsvRow]) -> String {
     out
 }
 
-/// RFC 4180 quoting, only when needed.
+/// RFC 4180 quoting, only when needed. A leading `= + - @` (or tab/CR) is defused with a
+/// quote so a spreadsheet never reads an affiliate-controlled email as a formula.
 fn field(s: &str) -> String {
+    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) {
+        format!("'{s}")
+    } else {
+        s.to_owned()
+    };
     if s.contains([',', '"', '\n', '\r']) {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {
-        s.to_owned()
+        s
     }
 }
 
@@ -649,6 +655,10 @@ mod tests {
         assert_eq!(
             export_csv(&[row("a@x.io", 5), row("b,\"c\"@x.io", 123_456)]),
             "email,amount,currency\na@x.io,0.05,USD\n\"b,\"\"c\"\"@x.io\",1234.56,USD\n"
+        );
+        assert_eq!(
+            export_csv(&[row("=HYPERLINK(\"x\")@x.io", 100), row("@a.io", 100)]),
+            "email,amount,currency\n\"'=HYPERLINK(\"\"x\"\")@x.io\",1.00,USD\n'@a.io,1.00,USD\n"
         );
     }
 }
