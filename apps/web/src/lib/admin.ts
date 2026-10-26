@@ -83,12 +83,6 @@ export function formatCents(cents: number, currency: string) {
   return `${cents < 0 ? "-" : ""}${Math.floor(abs / 100)}.${pad2(abs % 100)} ${currency}`.trimEnd();
 }
 
-/** An API timestamp in the viewer's locale; the raw string if it does not parse. */
-export function formatTime(iso: string) {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
-}
-
 /** Basis points as a percent: 1250 -> `12.50%`. */
 export const formatBps = (bps: number) => `${Math.floor(bps / 100)}.${pad2(bps % 100)}%`;
 
