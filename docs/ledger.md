@@ -9,7 +9,7 @@ A `LedgerTxn` is a set of signed `Posting{account, amount}` that sums to zero pe
 Accounts: `Expense`, `AffPending`, `AffPayable`, `Cash`.
 
 | Event | Debit | Credit |
-|---|---|---|
+| --- | --- | --- |
 | Conversion | Expense | AffPending |
 | Approve | AffPending | AffPayable |
 | Reject/refund before approval | AffPending | Expense |
@@ -32,7 +32,7 @@ Examples at 10% (1000 bps): 5c -> 0.5 -> 1c; 4c -> 0.4 -> 0c; 10c at 15% -> 1.5 
 `months_since_attribution` is whole months since the customer was attributed (0 = the first month). Outside the window the commission is zero (not an error):
 
 | Duration | Earns when |
-|---|---|
+| --- | --- |
 | `one_month` | months == 0 |
 | `x_months(n)` | months < n |
 | `lifetime` | always |
