@@ -20,7 +20,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T22-T25 | api routes, analytics, ops, SDK | todo (SDK pipeline already in T30) |
 | T30 | feat/web-shell | done, merged (Sonnet); SDK pipeline + apps/web shell. CI uses pnpm 9: bump to 12 for the workspace lockfile |
 | T31-T34 | web pages | todo |
-| T40-T44 | fraud, observability, geoip, load test, deploy | todo |
+| T40, T41, T43, T44 | fraud, observability, load test, deploy | todo |
+| T42 | feat/geoip | done on branch (Sonnet); `cargo test -p tracker geo` 6 tests |
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
 | T51 | feat/release-page | todo |
 | T60 | final gate (make ci, ocr, e2e) | todo |

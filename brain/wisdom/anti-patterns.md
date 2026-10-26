@@ -29,5 +29,6 @@ timestamp: 2026-10-26
 19. Proxying `/api` with Next `rewrites` in dev. They replace `Host`, so the api Origin check returns 403 on every mutation. Use `apps/web/scripts/dev.mjs` (keeps `Host`).
 20. `pnpm` run in a sub-package when the repo root also has an npm `package.json`: the root is always part of a pnpm workspace and gets installed too. Keep one root `pnpm-workspace.yaml`; pnpm 12 fails install on unreviewed build scripts, so list them under `allowBuilds` (`esbuild`, `unrs-resolver`: false).
 21. Importing the SDK by `link:` or a path alias from `apps/web`: Turbopack refuses files outside its root and the SDK cannot find its own `node_modules`. Use `workspace:*` + `transpilePackages` + `turbopack.root`.
+22. Vendoring a third-party mmdb as a test fixture (licence, size). Hand-build a one-node IPv4 tree in the test (24-bit records, `node_count=1`, left record `node_count+16+offset`, right record `node_count` = not found; all nine metadata keys are required); see `tracker::geo` tests. Test priority logic with a closure so the db path stays out of it.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

@@ -13,7 +13,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
     let pool = bf_db::connect(&cfg.database_url).await?;
     let spool = SpoolConfig::new(&cfg.spool_dir).with_fsync_mode(fsync);
-    let tracker = tracker::start(pool, spool, &cfg.jwt_secret).await?;
+    // Optional DB-IP lite country database (`scripts/fetch-dbip.sh`); unset = header only.
+    let geo = match std::env::var_os("BF_GEOIP_DB") {
+        Some(path) => tracker::geo::Geo::open(path.as_ref())?,
+        None => tracker::geo::Geo::disabled(),
+    };
+    let tracker = tracker::start(pool, spool, &cfg.jwt_secret, geo).await?;
 
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", cfg.tracker_port)).await?;
     tracing::info!(port = cfg.tracker_port, "tracker started");

@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-10-26] T42 geoip
+
+- **Creation**: `tracker::geo::Geo` (optional DB-IP lite country mmdb via `maxminddb` 0.32, `country.iso_code`). Click country = `CF-IPCountry` (valid) first, then mmdb lookup of the same client ip used for `ip_hash`, else null. `BF_GEOIP_DB` env path in `tracker` main: unset = disabled, set but unreadable = startup error. `tracker::start` takes a `Geo`; `AppState.geo: Arc<Geo>`. `scripts/fetch-dbip.sh [YYYY-MM]` downloads the month's `dbip-country-lite` mmdb.gz into gitignored `data/`. CC BY 4.0 attribution in README License section; `.env.example` documents the var.
+- **Update**: [Tasks](/tasks/index.md) T42 done on branch. `cargo test -p tracker geo`: header-wins (db never asked), XX/T1/junk fall through, no ip = null, real mmdb lookup on a hand-built 1-node fixture, disabled, missing file. Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 22. Note: `crash_before_flush_replays_exactly_once` failed once in a full parallel run (passes alone and on rerun): timing-sensitive, not geo related.
 ## [2026-10-26] T50 feat/oss-docs
 
 - **Creation**: `CONTRIBUTING.md` (clean-room rules, 3-tier git flow `prod` <- `staging` <- `feat/*`, short commit message style, `make ci`, local Postgres 16 on port 5433, `brain/` upkeep, doc linting); `SECURITY.md` (private vulnerability disclosure via GitHub Security Advisories, response SLA, version support table, threat model scope & exclusions); `docs/architecture.md` (system layout, crate dependency graph mermaid, tracker hot path sequence mermaid, double-entry ledger postings table & state transitions, background worker loops, auth & tenancy model derived strictly from `docs/PLAN.md` and `brain/architecture/*`); `.markdownlint.json` (MD013 disabled, MD024 siblings_only).
