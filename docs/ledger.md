@@ -13,7 +13,7 @@ Accounts: `Expense`, `AffPending`, `AffPayable`, `Cash`.
 | Conversion | Expense | AffPending |
 | Approve | AffPending | AffPayable |
 | Reject/refund before approval | AffPending | Expense |
-| Chargeback after approval | AffPayable | Expense (balance may go negative; clawback rolls into next payout) |
+| Chargeback or refund after approval, paid out or not | AffPayable | Expense (balance may go negative; clawback rolls into next payout) |
 | Payout paid | AffPayable | Cash |
 
 ## Commission rounding

@@ -18,7 +18,7 @@ pub enum ConversionEvent {
     Approve(Money),
     /// Reject or refund before approval.
     Reject(Money),
-    /// Chargeback after approval.
+    /// Chargeback or refund after approval, paid out or not.
     Reverse(Money),
     /// Posts nothing: the cash movement belongs to the payout.
     MarkPaid,
@@ -90,7 +90,9 @@ impl ConversionStatus {
                 S::Rejected,
                 Some(transfer(Account::AffPending, Account::Expense, m)?),
             )),
-            (S::Approved, E::Reverse(m)) => Ok((
+            // After payout the debit leaves payable negative: a clawback netted against the
+            // affiliate's next payable.
+            (S::Approved | S::Paid, E::Reverse(m)) => Ok((
                 S::Reversed,
                 Some(transfer(Account::AffPayable, Account::Expense, m)?),
             )),
@@ -188,6 +190,14 @@ mod tests {
             legs(&t.unwrap()),
             [(Account::AffPayable, 500), (Account::Expense, -500)]
         );
+        let (s, t) = ConversionStatus::Paid
+            .transition(ConversionEvent::Reverse(m))
+            .unwrap();
+        assert_eq!(s, ConversionStatus::Reversed);
+        assert_eq!(
+            legs(&t.unwrap()),
+            [(Account::AffPayable, 500), (Account::Expense, -500)]
+        );
         let (s, t) = ConversionStatus::Approved
             .transition(ConversionEvent::MarkPaid)
             .unwrap();
@@ -220,6 +230,7 @@ mod tests {
             (S::Pending, 1, S::Rejected),
             (S::Approved, 2, S::Reversed),
             (S::Approved, 3, S::Paid),
+            (S::Paid, 2, S::Reversed),
         ];
         for from in CONV_STATUSES {
             for (i, ev) in conv_events(money(1)).into_iter().enumerate() {
