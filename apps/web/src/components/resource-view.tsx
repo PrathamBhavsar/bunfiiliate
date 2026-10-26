@@ -12,11 +12,11 @@ import { Dialog, DialogDescription, DialogTitle, SheetContent } from "./ui/dialo
 import { Input, Select } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
 
-export type FilterDef = {
-  id: string;
-  label: string;
-  options: { value: string; label: string }[];
-};
+/** A select filter, or a `date` filter whose value is `YYYY-MM-DD` (empty = unset). */
+export type FilterDef = { id: string; label: string } & (
+  | { type?: "select"; options: { value: string; label: string }[] }
+  | { type: "date" }
+);
 
 export type ResourceConfig<T extends { id: string }> = {
   title: string;
@@ -89,22 +89,34 @@ export function ResourceView<T extends { id: string }>({ config }: { config: Res
               />
             </form>
           )}
-          {config.filters?.map((f) => (
-            <Select
-              key={f.id}
-              aria-label={f.label}
-              className="w-auto"
-              value={params.filters[f.id] ?? ""}
-              onChange={(e) => change({ filters: { ...params.filters, [f.id]: e.target.value } })}
-            >
-              <option value="">{f.label}: all</option>
-              {f.options.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
-          ))}
+          {config.filters?.map((f) =>
+            f.type === "date" ? (
+              <label key={f.id} className="flex items-center gap-1.5 text-xs text-muted">
+                {f.label}
+                <Input
+                  type="date"
+                  className="w-auto text-foreground"
+                  value={params.filters[f.id] ?? ""}
+                  onChange={(e) => change({ filters: { ...params.filters, [f.id]: e.target.value } })}
+                />
+              </label>
+            ) : (
+              <Select
+                key={f.id}
+                aria-label={f.label}
+                className="w-auto"
+                value={params.filters[f.id] ?? ""}
+                onChange={(e) => change({ filters: { ...params.filters, [f.id]: e.target.value } })}
+              >
+                <option value="">{f.label}: all</option>
+                {f.options.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            ),
+          )}
         </div>
       )}
 

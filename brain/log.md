@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T32 web money pages
+
+- **Creation**: admin `/conversions` (program, affiliate, status, from/to filters; detail sheet; approve/reject/reverse with confirm), `/customers` (program, affiliate filters; detail), `/ledger` (Entries with account + txn-id filters and detail, Balances; header toggle), `/payouts` (new batch dialog, list with program/status filters, batch sheet with payout lines, approve, mark paid, cancel, CSV download). `ResourceView` filters gain `type: "date"`; `lib/admin.ts` gains money types, `useLookups`, `formatTime`. No routes beyond the API's; money only through `formatCents`.
+- **Update**: [Tasks](/tasks/index.md) T32 done on branch. `pnpm -C apps/web build && typecheck && lint` pass. Verified in Chrome against `api serve --with-worker` on a seeded DB (42 conversions, 2 programs, 3 affiliates): list, filters incl. date range and the `from > to` 400 shown as an error state, detail, approve, reverse, stale-row approve showing the API's 409 message, batch create, "nobody is owed" 409 in the dialog, approve, mark paid (ledger cash legs -210.00 / 210.00 aff payable, balances updated), cancel, CSV file saved with exact rows, entries by txn id, balances, customers. Lesson: [Time-Traps](/wisdom/time-traps.md) (cookies across localhost ports).
+
 ## [2026-10-26] T41 observability
 
 - **Creation**: `bf_rt::metrics` (hand-rolled Prometheus text registry: static atomics `Counter`/`Gauge`/`Histogram`, `router`, `serve`; no new crates, only `axum` + `tokio/net` on `bf-rt`), `tracker::metrics`, `api::metrics`. Tracker: `bf_ingest_latency_seconds`, `bf_batch_size`, `bf_shed_total`, `bf_spool_bytes`, `bf_spool_lag`. API/worker: `bf_outbox_depth`, `bf_webhook_delivery_failures_total`, `bf_ingest_events_processed_total`, `bf_rollup_tick_seconds`, `bf_approve_tick_seconds`. Details: [Observability](/architecture/observability.md).
