@@ -8,3 +8,4 @@
 - [Web Shell & TS SDK](/architecture/web.md) — openapi pipeline, static-export app, dev proxy, ResourceView
 - [Worker & Ingest](/architecture/worker.md) — T17 event processor, attribution, plan resolution, auto-approve
 - [Analytics Rollups & Reports](/architecture/analytics.md) — T23 rollup tick, watermark, summary/timeseries/CSV routes
+- [Ops Routes, Webhooks and Email](/architecture/ops.md) — T24 outbox dispatcher, signed webhooks + retry, lettre templates, notifications, contacts, settings, audit

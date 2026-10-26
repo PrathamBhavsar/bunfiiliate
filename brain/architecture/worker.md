@@ -31,5 +31,6 @@ Refund/chargeback events are handled before conversion parsing in `handle` (`wor
 - Edge: a reversal can shrink an open payout to <= 0 when a clawback was netted into it; `mark_paid` then returns Conflict (negative amount) and the operator cancels the batch.
 
 Not here yet: fraud holds (T40), outbox dispatch (T24).
+Outbox dispatch (webhooks, email, notifications) is [Ops Routes](/architecture/ops.md); the worker also runs its two 1s ticks. Not here yet: fraud holds (T40), reversals/payouts (T18).
 
 See [Ledger](/architecture/ledger.md).

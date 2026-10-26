@@ -17,12 +17,15 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T18 | feat/payouts-reversals | done on branch (Sonnet); `cargo test -p api payouts` 8 integration + 1 unit test |
 | T20 | feat/api-auth | done, merged (Sonnet); JWT hand-rolled HS256 (rsa advisory), review in T60 |
 | T21 | feat/api-programs-affiliates | done, merged (Sonnet); `cargo test -p api programs` 8 tests |
-| T22, T24, T25 | api money routes, ops routes, SDK | todo (SDK pipeline already in T30) |
-| T23 | feat/analytics-rollups | done on branch (Sonnet); `cargo test -p api analytics` 5 tests, `make openapi-check` |
+| T23 | feat/analytics-rollups | done, merged (Sonnet); `cargo test -p api analytics` 5 tests, `make openapi-check` |
+| T22 | feat/api-money-routes | in progress (Sonnet) |
+| T25 | feat/ts-sdk | todo (SDK pipeline already in T30; regenerated per route task) |
+| T24 | feat/ops-routes | done, merged (Sonnet); `cargo test -p api ops` 10 tests, `make openapi-check` |
 | T30 | feat/web-shell | done, merged (Sonnet); SDK pipeline + apps/web shell. CI uses pnpm 9: bump to 12 for the workspace lockfile |
 | T31 | feat/web-admin-core | done, merged (Sonnet); programs, sites, plans, affiliates, codes. Browser-verified |
 | T32-T34 | web pages | todo |
-| T40, T41, T43, T44 | fraud, observability, load test, deploy | todo |
+| T40 | feat/fraud-rules | in progress (Sonnet) |
+| T41, T43, T44 | observability, load test, deploy | todo |
 | T42 | feat/geoip | done, merged (Sonnet); `cargo test -p tracker geo` 6 tests |
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
 | T51 | feat/release-page | todo |

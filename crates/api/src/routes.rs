@@ -20,7 +20,7 @@ use crate::auth::{
     hash_refresh_token, issue_access, new_refresh_token, verify_password,
 };
 use crate::error::{AppError, ErrorBody, ErrorDetail};
-use crate::{affiliates, analytics, programs, workspaces};
+use crate::{affiliates, analytics, mail, ops, programs, webhooks, workspaces};
 
 const REFRESH_PATH: &str = "/api/v1/auth";
 
@@ -56,6 +56,14 @@ impl Modify for CookieAuth {
         affiliates::delete_code, affiliates::me_affiliate, affiliates::me_update,
         affiliates::me_create_code, affiliates::me_list_codes, affiliates::me_delete_code,
         analytics::summary, analytics::timeseries, analytics::report_csv,
+        webhooks::create_endpoint, webhooks::list_endpoints, webhooks::get_endpoint,
+        webhooks::update_endpoint, webhooks::delete_endpoint, webhooks::list_deliveries,
+        webhooks::redeliver,
+        mail::create_template, mail::list_templates, mail::get_template,
+        mail::update_template, mail::delete_template,
+        ops::list_notifications, ops::mark_read,
+        ops::create_contact, ops::list_contacts, ops::update_contact,
+        ops::get_settings, ops::put_settings, ops::list_audit,
     ),
     components(schemas(LoginRequest, UserView, ErrorBody, ErrorDetail)),
     modifiers(&CookieAuth),
@@ -74,6 +82,9 @@ pub fn routes() -> Router<AppState> {
         .merge(programs::routes())
         .merge(affiliates::routes())
         .merge(analytics::routes())
+        .merge(webhooks::routes())
+        .merge(mail::routes())
+        .merge(ops::routes())
 }
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {

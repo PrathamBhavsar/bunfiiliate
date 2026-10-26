@@ -5,11 +5,15 @@ pub mod analytics;
 pub mod audit;
 pub mod auth;
 pub mod bootstrap;
+pub mod dispatch;
 pub mod error;
+pub mod mail;
+pub mod ops;
 pub mod page;
 pub mod payouts;
 pub mod programs;
 pub mod routes;
+pub mod webhooks;
 pub mod worker;
 pub mod workspaces;
 

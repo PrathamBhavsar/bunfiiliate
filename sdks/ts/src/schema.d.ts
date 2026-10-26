@@ -141,6 +141,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's audit log, newest first. */
+        get: operations["list_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -209,6 +226,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contact-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List contact requests, newest first, optionally by status. */
+        get: operations["list_contacts"];
+        put?: never;
+        /** Public contact form: stores a `new` request for the workspace's admins. */
+        post: operations["create_contact"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/contact-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set a contact request's status. */
+        patch: operations["update_contact"];
+        trace?: never;
+    };
+    "/api/v1/email-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the workspace's template overrides. */
+        get: operations["list_templates"];
+        put?: never;
+        /**
+         * Override the built-in text for one email. Variables: every scalar of the event payload
+         *     (`commission_cents`, `currency`, ...) plus the amount as `commission`/`amount`.
+         */
+        post: operations["create_template"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/email-templates/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One template. */
+        get: operations["get_template"];
+        put?: never;
+        post?: never;
+        /** Delete an override; the built-in text applies again. */
+        delete: operations["delete_template"];
+        options?: never;
+        head?: never;
+        /** Change a template's subject and/or body. */
+        patch: operations["update_template"];
+        trace?: never;
+    };
     "/api/v1/me/affiliate": {
         parameters: {
             query?: never;
@@ -274,6 +366,40 @@ export interface paths {
         put?: never;
         /** Add an admin to the workspace. */
         post: operations["invite_member"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user's notifications, newest first. */
+        get: operations["list_notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark one of the signed-in user's notifications read. */
+        post: operations["mark_read"];
         delete?: never;
         options?: never;
         head?: never;
@@ -526,6 +652,98 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's settings object. */
+        get: operations["get_settings"];
+        /** Replace the workspace's settings with the given JSON object (max 16 KiB). */
+        put: operations["put_settings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Delivery log, newest first. */
+        get: operations["list_deliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/deliveries/{id}/redeliver": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a finished (delivered or dead) delivery again, with a fresh set of attempts. */
+        post: operations["redeliver"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/endpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List endpoints. */
+        get: operations["list_endpoints"];
+        put?: never;
+        /**
+         * Register an endpoint. Deliveries are POSTed as JSON with
+         *     `X-Bf-Signature: t=<unix>,v1=<hex HMAC-SHA256 of "<t>.<body>" keyed by the secret>`.
+         */
+        post: operations["create_endpoint"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/endpoints/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One endpoint. */
+        get: operations["get_endpoint"];
+        put?: never;
+        post?: never;
+        /** Delete an endpoint and its delivery log. */
+        delete: operations["delete_endpoint"];
+        options?: never;
+        head?: never;
+        /** Change an endpoint's url, topics or active flag. */
+        patch: operations["update_endpoint"];
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -564,6 +782,37 @@ export interface components {
         };
         /** @enum {string} */
         AttributionModel: "first_touch" | "last_touch";
+        AuditRecord: {
+            action: string;
+            /** Format: uuid */
+            actor_id?: string | null;
+            /** Format: date-time */
+            at: string;
+            diff?: Record<string, never> | null;
+            entity: string;
+            entity_id: string;
+            /** Format: uuid */
+            id: string;
+        };
+        ContactPatch: {
+            /** @description `new`, `read` or `closed`. */
+            status: string;
+        };
+        ContactRequest: {
+            /** Format: date-time */
+            created_at: string;
+            email: string;
+            /** Format: uuid */
+            id: string;
+            message: string;
+            name: string;
+            /** Format: uuid */
+            program_id?: string | null;
+            /** @description `new`, `read` or `closed`. */
+            status: string;
+            /** Format: uuid */
+            workspace_id: string;
+        };
         ConversionType: {
             /** Format: uuid */
             id: string;
@@ -574,6 +823,21 @@ export interface components {
         };
         /** @enum {string} */
         Dim: "total" | "country" | "os" | "browser" | "device" | "referrer";
+        EmailTemplate: {
+            body: string;
+            /** Format: uuid */
+            id: string;
+            key: string;
+            subject: string;
+            /** Format: uuid */
+            workspace_id: string;
+        };
+        EndpointPatch: {
+            /** @description `false` stops new and pending deliveries until switched back on. */
+            active?: boolean | null;
+            events?: string[] | null;
+            url?: string | null;
+        };
         Enrollment: {
             /** Format: uuid */
             affiliate_id: string;
@@ -627,10 +891,24 @@ export interface components {
             /** Format: uuid */
             program_id: string;
         };
+        NewContact: {
+            email: string;
+            message: string;
+            name: string;
+            /** Format: uuid */
+            program_id?: string | null;
+            /** @description Slug of the workspace to write to. */
+            workspace: string;
+        };
         NewConversionType: {
             /** @description Stable identifier sent by events, e.g. `signup`. */
             key: string;
             name: string;
+        };
+        NewEndpoint: {
+            /** @description Topics to receive (`conversion.created`, `conversion.approved`, ...); empty or omitted = all. */
+            events?: string[];
+            url: string;
         };
         NewEnrollment: {
             /** Format: uuid */
@@ -700,10 +978,27 @@ export interface components {
             /** @description Bare host, e.g. `shop.example.com`. */
             domain: string;
         };
+        NewTemplate: {
+            body: string;
+            /** @description `conversion_approved` or `payout_paid`. */
+            key: string;
+            /** @description One line; `{{var}}` placeholders are substituted. */
+            subject: string;
+        };
         NewWorkspace: {
             name: string;
             /** @description Defaults to a slug of `name`. */
             slug?: string | null;
+        };
+        Notification: {
+            body: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            id: string;
+            kind: string;
+            /** Format: date-time */
+            read_at?: string | null;
         };
         Paged_Affiliate: {
             items: {
@@ -730,6 +1025,55 @@ export interface components {
              */
             total: number;
         };
+        Paged_AuditRecord: {
+            items: {
+                action: string;
+                /** Format: uuid */
+                actor_id?: string | null;
+                /** Format: date-time */
+                at: string;
+                diff?: Record<string, never> | null;
+                entity: string;
+                entity_id: string;
+                /** Format: uuid */
+                id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_ContactRequest: {
+            items: {
+                /** Format: date-time */
+                created_at: string;
+                email: string;
+                /** Format: uuid */
+                id: string;
+                message: string;
+                name: string;
+                /** Format: uuid */
+                program_id?: string | null;
+                /** @description `new`, `read` or `closed`. */
+                status: string;
+                /** Format: uuid */
+                workspace_id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_ConversionType: {
             items: {
                 /** Format: uuid */
@@ -738,6 +1082,26 @@ export interface components {
                 name: string;
                 /** Format: uuid */
                 program_id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_EmailTemplate: {
+            items: {
+                body: string;
+                /** Format: uuid */
+                id: string;
+                key: string;
+                subject: string;
+                /** Format: uuid */
+                workspace_id: string;
             }[];
             /** Format: int64 */
             limit: number;
@@ -774,6 +1138,27 @@ export interface components {
                 /** Format: uuid */
                 id: string;
                 role: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_Notification: {
+            items: {
+                body: string;
+                /** Format: date-time */
+                created_at: string;
+                /** Format: uuid */
+                id: string;
+                kind: string;
+                /** Format: date-time */
+                read_at?: string | null;
             }[];
             /** Format: int64 */
             limit: number;
@@ -866,6 +1251,61 @@ export interface components {
         Paged_Site: {
             items: {
                 domain: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_WebhookDelivery: {
+            items: {
+                /**
+                 * Format: int32
+                 * @description Attempts made so far.
+                 */
+                attempt: number;
+                /** Format: uuid */
+                endpoint_id: string;
+                /** Format: uuid */
+                id: string;
+                /** Format: date-time */
+                next_attempt_at?: string | null;
+                /** Format: int64 */
+                outbox_id: number;
+                /**
+                 * Format: int32
+                 * @description Last HTTP status; null before the first attempt or after a network error.
+                 */
+                status_code?: number | null;
+                topic: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_WebhookEndpoint: {
+            items: {
+                active: boolean;
+                /** @description Topics to deliver; empty means every topic. */
+                events: string[];
+                /** Format: uuid */
+                id: string;
+                /** @description Signing secret; only admins can read it. */
+                secret: string;
+                url: string;
+                /** Format: uuid */
+                workspace_id: string;
             }[];
             /** Format: int64 */
             limit: number;
@@ -991,6 +1431,10 @@ export interface components {
             from: string;
             to: string;
         };
+        TemplatePatch: {
+            body?: string | null;
+            subject?: string | null;
+        };
         UserView: {
             email: string;
             /** Format: uuid */
@@ -999,6 +1443,43 @@ export interface components {
             role: string;
             /** Format: uuid */
             workspace_id?: string | null;
+        };
+        /**
+         * @description One endpoint x outbox row. `next_attempt_at` set = still pending; unset with a 2xx
+         *     `status_code` = delivered; unset otherwise = dead (attempts exhausted).
+         */
+        WebhookDelivery: {
+            /**
+             * Format: int32
+             * @description Attempts made so far.
+             */
+            attempt: number;
+            /** Format: uuid */
+            endpoint_id: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            next_attempt_at?: string | null;
+            /** Format: int64 */
+            outbox_id: number;
+            /**
+             * Format: int32
+             * @description Last HTTP status; null before the first attempt or after a network error.
+             */
+            status_code?: number | null;
+            topic: string;
+        };
+        WebhookEndpoint: {
+            active: boolean;
+            /** @description Topics to deliver; empty means every topic. */
+            events: string[];
+            /** Format: uuid */
+            id: string;
+            /** @description Signing secret; only admins can read it. */
+            secret: string;
+            url: string;
+            /** Format: uuid */
+            workspace_id: string;
         };
         Workspace: {
             /** Format: uuid */
@@ -1372,6 +1853,42 @@ export interface operations {
             };
         };
     };
+    list_audit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Entity type, e.g. `program`. */
+                entity: string | null;
+                /** @description Action, e.g. `program.create`. */
+                action: string | null;
+                /** @description 1-based page number (default 1). */
+                page: number | null;
+                /** @description Items per page (default 50, max 200). */
+                limit: number | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_AuditRecord"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -1470,6 +1987,302 @@ export interface operations {
             };
             /** @description Missing, expired or reused token */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_contacts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `new`, `read` or `closed`. */
+                status: string | null;
+                /** @description 1-based page number (default 1). */
+                page: number | null;
+                /** @description Items per page (default 50, max 200). */
+                limit: number | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_ContactRequest"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewContact"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactRequest"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_contact: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Contact request id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ContactPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContactRequest"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 1-based page number (default 1). */
+                page: number | null;
+                /** @description Items per page (default 50, max 200). */
+                limit: number | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_EmailTemplate"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewTemplate"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTemplate"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Key already has a template */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Template id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTemplate"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Template id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_template: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Template id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TemplatePatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailTemplate"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1721,6 +2534,70 @@ export interface operations {
             };
             /** @description Email taken */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_notifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Only unread notifications. */
+                unread: boolean;
+                /** @description 1-based page number (default 1). */
+                page: number | null;
+                /** @description Items per page (default 50, max 200). */
+                limit: number | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_Notification"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    mark_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Notification id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2532,6 +3409,318 @@ export interface operations {
                 };
             };
             /** @description Unknown program or other affiliate */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings object */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    put_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description New settings object */
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Stored settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_deliveries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpoint_id: string | null;
+                /** @description 1-based page number (default 1). */
+                page: number | null;
+                /** @description Items per page (default 50, max 200). */
+                limit: number | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_WebhookDelivery"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    redeliver: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Delivery id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDelivery"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Still being retried */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_endpoints: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description 1-based page number (default 1). */
+                page: number | null;
+                /** @description Items per page (default 50, max 200). */
+                limit: number | null;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_WebhookEndpoint"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    create_endpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewEndpoint"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEndpoint"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_endpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Endpoint id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEndpoint"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_endpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Endpoint id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    update_endpoint: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Endpoint id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndpointPatch"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookEndpoint"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
             404: {
                 headers: {
                     [name: string]: unknown;

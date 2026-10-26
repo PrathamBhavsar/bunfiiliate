@@ -24,3 +24,5 @@ timestamp: 2026-10-26
 - **`cargo test -p api payouts` filters by test fn name, not file name**: name integration tests `payouts_*` or the filter runs only unit tests (0 integration tests run, still green).
 - **`tracker` `crash_before_flush_replays_exactly_once` `PoolTimedOut`** in a full `cargo test --workspace` on the shared cluster; passes with `--test-threads=2`.
 - **`#[sqlx::test]` on the shared PG16 cluster**: a test binary start drops leftover `_sqlx_test_*` databases, killing other workers' live runs (`dropdb ... is being accessed by other users`, tracker/api tests fail). Not a code bug: rerun when no sibling worker is testing.
+- **`cargo test -p api ops` is a name filter**, not a file selector: it runs tests whose path contains `ops`. Name every test of a task `ops_*` (integration and unit), or the acceptance command runs nothing.
+- **TLS for `reqwest`/`lettre`**: default `reqwest` pulls `rustls` + `aws-lc-rs` (OpenSSL licence, fails `cargo deny`). Use `default-features = false` with `native-tls` for both (OpenSSL on Linux, Security.framework on macOS; Docker image needs libssl). lettre also needs `0BSD` allowed in `deny.toml`.
