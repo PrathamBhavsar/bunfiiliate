@@ -16,12 +16,12 @@ Money = integer cents + currency. Bps math, round-half-up. Balances derived from
 | Conversion | Expense | AffPending |
 | Approve | AffPending | AffPayable |
 | Reject/refund pre-approval | AffPending | Expense |
-| Chargeback post-approval | AffPayable | Expense (may go negative; clawback next payout) |
+| Chargeback/refund post-approval (also after payout) | AffPayable | Expense (may go negative; clawback next payout) |
 | Payout paid | AffPayable | Cash |
 
 ## State machines
 Enum + transition table (`transition(self, ev) -> Result<(Status, Option<LedgerTxn>), InvalidTransition>` (events carry the amount; `None` when nothing posts)), not typestate generics: entities load from DB at runtime.
-Conversion: pending -> approved -> paid; pending -> rejected; approved -> reversed.
+Conversion: pending -> approved -> paid; pending -> rejected; approved -> reversed; paid -> reversed (clawback, T18).
 Payout: draft -> approved -> paid; draft -> cancelled.
 
 ## Invariants (proptest)

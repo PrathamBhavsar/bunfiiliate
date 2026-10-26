@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T18 payouts + reversals
+
+- **Creation**: `api::payouts::{create_batch, approve_batch, cancel_batch, mark_paid, batch_csv, export_csv}`, `bf_db::payouts::{owed, batch_rows}`, migration `0018_conversion_payout.sql` (`conversions.payout_id`). Worker ingest now handles refund/chargeback events (generic, Stripe, Paddle): pending is rejected, approved/paid is reversed with a balanced `AffPayable -> Expense` txn, never touching old ledger rows. Details: [Worker & Ingest](/architecture/worker.md).
+- **Update**: `bf_core` `ConversionStatus::Paid` + `Reverse` is now valid (clawback after payout; table test and proptest invariant still hold). [Ledger](/architecture/ledger.md) and `docs/ledger.md` postings updated; `worker::post` is `pub(crate)`, takes `(conversion, payout)` ids and returns the txn id. [Tasks](/tasks/index.md) T18 done on branch. `cargo test -p api payouts`: threshold + no double-claim, paid flow balanced with `payable+pending == live - paid`, refund before approval, chargeback after payout nets next batch (append-only checked), reversal inside an open batch, provider refunds, cancel, double `mark_paid` rejected, exact CSV. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 24, [Time-Traps](/wisdom/time-traps.md).
+
 ## [2026-10-26] T42 geoip
 
 - **Creation**: `tracker::geo::Geo` (optional DB-IP lite country mmdb via `maxminddb` 0.32, `country.iso_code`). Click country = `CF-IPCountry` (valid) first, then mmdb lookup of the same client ip used for `ip_hash`, else null. `BF_GEOIP_DB` env path in `tracker` main: unset = disabled, set but unreadable = startup error. `tracker::start` takes a `Geo`; `AppState.geo: Arc<Geo>`. `scripts/fetch-dbip.sh [YYYY-MM]` downloads the month's `dbip-country-lite` mmdb.gz into gitignored `data/`. CC BY 4.0 attribution in README License section; `.env.example` documents the var.
