@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/db", "crates/spool", "crates/rt", "crates/tracker", "crates/api"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+publish = false
+
+[workspace.dependencies]
+bf-core = { path = "crates/core" }
+bf-db = { path = "crates/db" }
+bf-spool = { path = "crates/spool" }
+bf-rt = { path = "crates/rt" }
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
