@@ -6,6 +6,7 @@ pub mod audit;
 pub mod auth;
 pub mod bootstrap;
 pub mod error;
+pub mod money;
 pub mod page;
 pub mod payouts;
 pub mod programs;

@@ -6,7 +6,7 @@ import { FormDialog } from "@/components/form-dialog";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { type Affiliate, listParams, ok, refresh, toPage, wholeNumber } from "@/lib/admin";
+import { type Affiliate, ok, refresh, toPage, wholeNumber } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { ListFn } from "@/lib/use-resource";
 
@@ -15,7 +15,7 @@ const list: ListFn<Affiliate> = async ({ page, pageSize, filters }, signal) =>
     await ok(
       api.GET("/api/v1/affiliates", {
         signal,
-        params: listParams({}, { page, limit: pageSize, status: filters.status || null }),
+        params: { query: { page, limit: pageSize, status: filters.status || undefined } },
       }),
     ),
   );

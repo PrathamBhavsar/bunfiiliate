@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-10-26] T22 money routes
+
+- **Creation**: `api::money` (customers list/get, conversions list/get with program|affiliate|status|from|to filters, admin `approve|reject|reverse`, `ledger/entries`, `ledger/balances`, affiliate `me/earnings`) and routes in `api::payouts` (create/list/get batch, `approve`, `mark-paid`, `cancel`, `export.csv`, affiliate `me/payouts`). Details: [Money Routes](/architecture/api-routes.md).
+- **Update**: `worker::settle` is now the single place a conversion changes status (status column, balanced ledger txn, open-payout shrink, outbox); the refund/chargeback handler, the auto-approve tick and the admin actions all call it. [Worker & Ingest](/architecture/worker.md). Fixed the OpenAPI bug: every `IntoParams` struct now has `#[into_params(parameter_in = Query)]`, so `page`, `limit`, `status`, filters are query params; `make openapi` regenerated `sdks/ts`, and the web `listParams` workaround was removed (call sites use `params.query`). [Tasks](/tasks/index.md) T22 done on branch. `cargo test -p api money_routes` (6, real PG16): role guards, workspace isolation, affiliate sees only own, approve/reject/reverse keep every txn balanced, create->approve->paid->CSV exact, OpenAPI declares no stray path params. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 24, 27.
 ## [2026-10-26] T23 analytics rollups
 
 - **Creation**: `api::analytics`: `rollup` tick (advisory-locked, per-program watermark = last rolled-up day minus 1, delete + upsert, folds clicks and conversions into `daily_rollups` for dims total|country|os|browser|device|referrer) run every 60s by `worker::run`; `GET /analytics/summary`, `/analytics/timeseries`, `/reports/analytics.csv`. `programs::{viewer,require_program}` now `pub(crate)`. Details: [Analytics](/architecture/analytics.md).

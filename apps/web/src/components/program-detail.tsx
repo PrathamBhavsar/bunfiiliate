@@ -9,7 +9,6 @@ import {
   type Program,
   formatBps,
   formatCents,
-  listParams,
   MAX_LIMIT,
   ok,
   optionalNumber,
@@ -194,7 +193,7 @@ function Sites({ program }: { program: Program }) {
         await ok(
           api.GET("/api/v1/programs/{id}/sites", {
             signal,
-            params: listParams({ id: program.id }, { page: 1, limit: MAX_LIMIT }),
+            params: { path: { id: program.id }, query: { page: 1, limit: MAX_LIMIT } },
           }),
         )
       ).items,
@@ -263,7 +262,7 @@ function usePlans(programId: string) {
         await ok(
           api.GET("/api/v1/programs/{id}/plans", {
             signal,
-            params: listParams({ id: programId }, { page: 1, limit: MAX_LIMIT }),
+            params: { path: { id: programId }, query: { page: 1, limit: MAX_LIMIT } },
           }),
         )
       ).items,
@@ -375,7 +374,7 @@ function Enrollments({ program, plans }: { program: Program; plans: Plan[] }) {
         await ok(
           api.GET("/api/v1/programs/{id}/enrollments", {
             signal,
-            params: listParams({ id: program.id }, { page: 1, limit: MAX_LIMIT }),
+            params: { path: { id: program.id }, query: { page: 1, limit: MAX_LIMIT } },
           }),
         )
       ).items,

@@ -8,7 +8,6 @@ import { FormDialog } from "@/components/form-dialog";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { Button } from "@/components/ui/button";
 import {
-  listParams,
   ok,
   refresh,
   required,
@@ -26,10 +25,14 @@ const list: ListFn<Row> = async ({ page, pageSize, filters }, signal) => {
   const { items, total } = await ok(
     api.GET("/api/v1/referral-codes", {
       signal,
-      params: listParams(
-        {},
-        { page, limit: pageSize, program_id: filters.program_id || null, affiliate_id: filters.affiliate_id || null },
-      ),
+      params: {
+        query: {
+          page,
+          limit: pageSize,
+          program_id: filters.program_id || undefined,
+          affiliate_id: filters.affiliate_id || undefined,
+        },
+      },
     }),
   );
   return toPage({ items: items.map((c) => ({ ...c, id: c.code })), total });

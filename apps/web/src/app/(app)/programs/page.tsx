@@ -5,12 +5,12 @@ import { programBody, programFields, ProgramDetail } from "@/components/program-
 import { FormDialog } from "@/components/form-dialog";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { Button } from "@/components/ui/button";
-import { listParams, ok, refresh, required, toPage, type Program } from "@/lib/admin";
+import { ok, refresh, required, toPage, type Program } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { ListFn } from "@/lib/use-resource";
 
 const list: ListFn<Program> = async ({ page, pageSize }, signal) =>
-  toPage(await ok(api.GET("/api/v1/programs", { signal, params: listParams({}, { page, limit: pageSize }) })));
+  toPage(await ok(api.GET("/api/v1/programs", { signal, params: { query: { page, limit: pageSize } } })));
 
 const config: ResourceConfig<Program> = {
   title: "Programs",

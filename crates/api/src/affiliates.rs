@@ -134,6 +134,7 @@ pub async fn register(
 }
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct StatusFilter {
     /// `pending`, `active` or `suspended`.
     status: Option<String>,
@@ -659,6 +660,7 @@ pub async fn create_code(
 }
 
 #[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
 pub struct CodeFilter {
     affiliate_id: Option<Uuid>,
     program_id: Option<Uuid>,

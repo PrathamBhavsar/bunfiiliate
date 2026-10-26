@@ -14,15 +14,6 @@ export type ReferralCode = components["schemas"]["ReferralCode"];
 /** Largest page the API serves. Dropdowns read one page of it. */
 export const MAX_LIMIT = 200;
 
-/**
- * The spec lists `page`, `limit` and `status` as path params (utoipa default), so the typed client
- * has no query slot. Send them as both: path keys without a `{name}` in the URL are ignored, and
- * the cast hides `query` from the (wrong) generated type.
- */
-export function listParams<P extends object, Q extends object>(path: P, query: Q) {
-  return { path: { ...path, ...query }, query } as unknown as { path: P & Q; query?: undefined };
-}
-
 /** Unwrap an SDK call: throw the API's error message on a non-2xx, return the body (undefined on 204). */
 export async function ok<T>(call: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   const { data, error, response } = await call;
@@ -41,7 +32,7 @@ export function usePrograms() {
   return useQuery({
     queryKey: ["programs", "options"],
     queryFn: async ({ signal }) =>
-      (await ok(api.GET("/api/v1/programs", { signal, params: listParams({}, { page: 1, limit: MAX_LIMIT }) }))).items,
+      (await ok(api.GET("/api/v1/programs", { signal, params: { query: { page: 1, limit: MAX_LIMIT } } }))).items,
   });
 }
 
@@ -53,7 +44,7 @@ export function useAffiliates() {
         await ok(
           api.GET("/api/v1/affiliates", {
             signal,
-            params: listParams({}, { page: 1, limit: MAX_LIMIT, status: null }),
+            params: { query: { page: 1, limit: MAX_LIMIT } },
           }),
         )
       ).items,
