@@ -2,7 +2,7 @@
 
 import { type components } from "@bunfiiliate/sdk";
 import { useQuery } from "@tanstack/react-query";
-import { listParams, ok, type Program } from "./admin";
+import { ok, type Program } from "./admin";
 import { api } from "./api";
 
 export type Summary = components["schemas"]["Summary"];
@@ -28,13 +28,13 @@ export function lastDays(n: number): Range {
   return { from: day(n - 1), to: day(0) };
 }
 
-const query = (r: Range, s: Scope) => ({ from: r.from, to: r.to, program_id: s.program_id || null, affiliate_id: s.affiliate_id || null });
+const query = (r: Range, s: Scope) => ({ from: r.from, to: r.to, program_id: s.program_id || undefined, affiliate_id: s.affiliate_id || undefined });
 
 export function useSummary(range: Range, scope: Scope, dim: Dim | null) {
   return useQuery({
     queryKey: ["analytics", "summary", range, scope, dim],
     queryFn: ({ signal }) =>
-      ok(api.GET("/api/v1/analytics/summary", { signal, params: listParams({}, { ...query(range, scope), dim }) })),
+      ok(api.GET("/api/v1/analytics/summary", { signal, params: { query: { ...query(range, scope), dim: dim ?? undefined } } })),
   });
 }
 
@@ -42,7 +42,7 @@ export function useTimeseries(range: Range, scope: Scope) {
   return useQuery({
     queryKey: ["analytics", "timeseries", range, scope],
     queryFn: ({ signal }) =>
-      ok(api.GET("/api/v1/analytics/timeseries", { signal, params: listParams({}, query(range, scope)) })),
+      ok(api.GET("/api/v1/analytics/timeseries", { signal, params: { query: query(range, scope) } })),
   });
 }
 
@@ -61,7 +61,7 @@ export async function downloadReport(range: Range, scope: Scope, dim: Dim) {
   const blob = await ok<Blob>(
     api.GET("/api/v1/reports/analytics.csv", {
       parseAs: "blob",
-      params: listParams({}, { ...query(range, scope), dim }),
+      params: { query: { ...query(range, scope), dim: dim ?? undefined } },
     }) as never,
   );
   const name = `analytics-${range.from}-${range.to}-${dim}.csv`;

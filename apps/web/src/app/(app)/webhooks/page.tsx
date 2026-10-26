@@ -9,7 +9,7 @@ import { FormDialog, type FormValues } from "@/components/form-dialog";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { formatTime, listParams, ok, refresh, required, toPage } from "@/lib/admin";
+import { formatTime, ok, refresh, required, toPage } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { components } from "@bunfiiliate/sdk";
 import type { ListFn } from "@/lib/use-resource";
@@ -20,7 +20,7 @@ type Delivery = components["schemas"]["WebhookDelivery"];
 const TOPICS = "conversion.created, conversion.approved, conversion.reversed, payout.paid";
 
 const list: ListFn<Endpoint> = async ({ page, pageSize }, signal) =>
-  toPage(await ok(api.GET("/api/v1/webhooks/endpoints", { signal, params: listParams({}, { page, limit: pageSize }) })));
+  toPage(await ok(api.GET("/api/v1/webhooks/endpoints", { signal, params: { query: { page, limit: pageSize } } })));
 
 const get = (id: string, signal: AbortSignal) =>
   ok(api.GET("/api/v1/webhooks/endpoints/{id}", { signal, params: { path: { id } } }));
@@ -59,7 +59,7 @@ function Deliveries({ endpointId }: { endpointId: string }) {
   const query = useQuery({
     queryKey: ["webhook-deliveries", endpointId],
     queryFn: async ({ signal }) =>
-      (await ok(api.GET("/api/v1/webhooks/deliveries", { signal, params: listParams({}, { endpoint_id: endpointId, page: 1, limit: 25 }) }))).items,
+      (await ok(api.GET("/api/v1/webhooks/deliveries", { signal, params: { query: { endpoint_id: endpointId, page: 1, limit: 25 } } }))).items,
   });
   return (
     <Section title="Recent deliveries" action={<Button size="sm" onClick={() => query.refetch()}>Refresh</Button>}>

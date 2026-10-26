@@ -4,7 +4,7 @@ import { Facts, Section } from "@/components/admin-ui";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { formatTime, listParams, ok, refresh, toPage } from "@/lib/admin";
+import { formatTime, ok, refresh, toPage } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { components } from "@bunfiiliate/sdk";
 import type { ListFn } from "@/lib/use-resource";
@@ -22,7 +22,7 @@ const list: ListFn<Contact> = async ({ page, pageSize, filters }, signal) =>
     await ok(
       api.GET("/api/v1/contact-requests", {
         signal,
-        params: listParams({}, { page, limit: pageSize, status: filters.status || null }),
+        params: { query: { page, limit: pageSize, status: filters.status || undefined } },
       }),
     ),
   );

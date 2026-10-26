@@ -2,7 +2,7 @@
 
 import { Facts, Section } from "@/components/admin-ui";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
-import { formatTime, listParams, ok, toPage } from "@/lib/admin";
+import { formatTime, ok, toPage } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { components } from "@bunfiiliate/sdk";
 import type { ListFn } from "@/lib/use-resource";
@@ -33,7 +33,7 @@ const list: ListFn<Record> = async ({ page, pageSize, search, filters }, signal)
     await ok(
       api.GET("/api/v1/audit-log", {
         signal,
-        params: listParams({}, { page, limit: pageSize, entity: filters.entity || null, action: search || null }),
+        params: { query: { page, limit: pageSize, entity: filters.entity || undefined, action: search || undefined } },
       }),
     ),
   );

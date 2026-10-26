@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormDialog } from "@/components/form-dialog";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { Button } from "@/components/ui/button";
-import { listParams, ok, refresh, required, toPage } from "@/lib/admin";
+import { ok, refresh, required, toPage } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { components } from "@bunfiiliate/sdk";
 import type { ListFn } from "@/lib/use-resource";
@@ -21,7 +21,7 @@ const KEYS = [
 const VARS_HINT = "Variables like {{commission}}, {{amount}}, {{currency}}. Unknown names render empty.";
 
 const list: ListFn<Template> = async ({ page, pageSize }, signal) =>
-  toPage(await ok(api.GET("/api/v1/email-templates", { signal, params: listParams({}, { page, limit: pageSize }) })));
+  toPage(await ok(api.GET("/api/v1/email-templates", { signal, params: { query: { page, limit: pageSize } } })));
 
 const get = (id: string, signal: AbortSignal) =>
   ok(api.GET("/api/v1/email-templates/{id}", { signal, params: { path: { id } } }));

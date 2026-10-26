@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { StatusBadge } from "@/components/status-badge";
-import { formatTime, listParams, ok, refresh, toPage } from "@/lib/admin";
+import { formatTime, ok, refresh, toPage } from "@/lib/admin";
 import { api } from "@/lib/api";
 import type { components } from "@bunfiiliate/sdk";
 import type { ListFn } from "@/lib/use-resource";
@@ -15,7 +15,7 @@ const list: ListFn<Notification> = async ({ page, pageSize, filters }, signal) =
     await ok(
       api.GET("/api/v1/notifications", {
         signal,
-        params: listParams({}, { page, limit: pageSize, unread: filters.unread === "true" }),
+        params: { query: { page, limit: pageSize, unread: filters.unread === "true" } },
       }),
     ),
   );
