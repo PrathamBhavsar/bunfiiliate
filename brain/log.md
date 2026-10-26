@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-10-26] Wave 2 merged to staging
+
+- **Update**: T11 state machines, T14 tracker hot path, T20 api auth merged. [Tasks](/tasks/index.md) synced.
+
 ## [2026-10-26] T11 core state machines
 
 - **Creation**: `bf-core::state`: `ConversionStatus`/`ConversionEvent`, `PayoutStatus`/`PayoutEvent`, `InvalidTransition`, `conversion_created`. `transition` returns `Result<(Status, Option<LedgerTxn>), InvalidTransition>`; events that post carry the `Money` amount. Conversion `MarkPaid` posts nothing (cash moves on payout paid). Negative amounts are `InvalidTransition`.
