@@ -9,9 +9,9 @@ use crate::audit;
 use crate::auth::{Principal, hash_password};
 use crate::error::AppError;
 
-const MIN_PASSWORD_LEN: usize = 8;
+pub const MIN_PASSWORD_LEN: usize = 8;
 
-fn slugify(name: &str) -> String {
+pub fn slugify(name: &str) -> String {
     let slug = name
         .to_lowercase()
         .split(|c: char| !c.is_ascii_alphanumeric())

@@ -4,3 +4,4 @@
 - [Tracker Hot Path](/architecture/tracker-hot-path.md) — snapshot, WAL spool, group commit, batch writer
 - [Ledger & State Machines](/architecture/ledger.md) — postings, conversion/payout transitions
 - [Auth & Tenancy](/architecture/auth.md) — cookies, refresh rotation, roles, workspace scope
+- [Programs & Affiliates API](/architecture/api-routes.md) — T21 routes, scoping, tracker NOTIFY, referral-code rules

@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T21 api programs + affiliates
+
+- **Creation**: `/api/v1` workspaces, members, programs (+sites, conversion-types, plans, secrets/rotate), affiliates (public register, approve/suspend/reactivate, payout), enrollments, referral codes (admin + `/me`). `bf_db::{workspaces,programs,affiliates}` repos, `bf_db::tracker::notify_config`, `api::{page,error::AppJson}`, `AppError::{NotFound,Conflict}` (unique/FK violations map to 409). Details: [Programs & Affiliates API](/architecture/api-routes.md).
+- **Update**: [Tasks](/tasks/index.md) T21 done on branch. `cargo test -p api programs` (8 tests, real PG16): role guards, workspace isolation, plan validation, NOTIFY on code create/delete/enroll/rotate, pagination, audit without secrets. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 16, [Time-Traps](/wisdom/time-traps.md).
+
 ## [2026-10-26] Wave 2 merged to staging
 
 - **Update**: T11 state machines, T14 tracker hot path, T20 api auth merged. [Tasks](/tasks/index.md) synced.

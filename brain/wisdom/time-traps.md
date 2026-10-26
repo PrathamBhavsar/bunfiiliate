@@ -19,3 +19,4 @@ timestamp: 2026-10-26
 - **Orca check loop**: ack each delivery (`check --ack <id> --wait`) or old messages replay.
 - **`brew services start postgresql@16` can fail silently** when PG18 holds 5432. Verify with `select version()`.
 - **Parallel branches** all edit root `Cargo.toml` + `brain/log.md`: expect trivial merge conflicts, keep both sides.
+- **`#[sqlx::test]` on the shared PG16 cluster**: a test binary start drops leftover `_sqlx_test_*` databases, killing other workers' live runs (`dropdb ... is being accessed by other users`, tracker/api tests fail). Not a code bug: rerun when no sibling worker is testing.

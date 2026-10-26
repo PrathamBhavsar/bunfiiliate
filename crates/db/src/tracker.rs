@@ -94,3 +94,13 @@ pub async fn insert_clicks(pool: &PgPool, clicks: &[Click]) -> Result<u64, sqlx:
     .await?;
     Ok(res.rows_affected())
 }
+
+/// Tell the tracker to reload its snapshot. Delivered on commit, so call it inside the
+/// transaction that changed codes, enrollments or program keys.
+pub async fn notify_config(db: impl sqlx::PgExecutor<'_>) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_notify($1, '')")
+        .bind(CONFIG_CHANNEL)
+        .execute(db)
+        .await?;
+    Ok(())
+}
