@@ -29,5 +29,6 @@ timestamp: 2026-10-26
 19. Proxying `/api` with Next `rewrites` in dev. They replace `Host`, so the api Origin check returns 403 on every mutation. Use `apps/web/scripts/dev.mjs` (keeps `Host`).
 20. `pnpm` run in a sub-package when the repo root also has an npm `package.json`: the root is always part of a pnpm workspace and gets installed too. Keep one root `pnpm-workspace.yaml`; pnpm 12 fails install on unreviewed build scripts, so list them under `allowBuilds` (`esbuild`, `unrs-resolver`: false).
 21. Importing the SDK by `link:` or a path alias from `apps/web`: Turbopack refuses files outside its root and the SDK cannot find its own `node_modules`. Use `workspace:*` + `transpilePackages` + `turbopack.root`.
+22. Letting one bad inbound event abort the claim transaction and retrying it forever. Run each event in a savepoint; on a business rejection or an integrity/data (SQLSTATE 22/23) error, roll the savepoint back and set `processed_at` + `error`. Only transient DB errors leave the event unprocessed.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

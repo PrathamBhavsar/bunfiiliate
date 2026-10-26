@@ -8,6 +8,7 @@ pub mod error;
 pub mod page;
 pub mod programs;
 pub mod routes;
+pub mod worker;
 pub mod workspaces;
 
 use std::sync::Arc;

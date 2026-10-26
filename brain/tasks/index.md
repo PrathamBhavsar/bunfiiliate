@@ -13,7 +13,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T14 | feat/tracker-hot-path | done, merged (Sonnet); tracker.js bf_click-as-code follow-up fixed in T16 |
 | T15 | feat/tracker-js | done, merged (Sonnet) |
 | T16 | feat/ingest-webhooks | done, merged (Sonnet) |
-| T17 | feat/worker-ingest | todo |
+| T17 | feat/worker-ingest | done on branch (Sonnet); `cargo test -p api flow_click_to_approved`, 7 worker tests |
 | T18 | feat/payouts-reversals | todo |
 | T20 | feat/api-auth | done, merged (Sonnet); JWT hand-rolled HS256 (rsa advisory), review in T60 |
 | T21 | feat/api-programs-affiliates | done, merged (Sonnet); `cargo test -p api programs` 8 tests |

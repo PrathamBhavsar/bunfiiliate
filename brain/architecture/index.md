@@ -6,3 +6,4 @@
 - [Auth & Tenancy](/architecture/auth.md) — cookies, refresh rotation, roles, workspace scope
 - [Programs & Affiliates API](/architecture/api-routes.md) — T21 routes, scoping, tracker NOTIFY, referral-code rules
 - [Web Shell & TS SDK](/architecture/web.md) — openapi pipeline, static-export app, dev proxy, ResourceView
+- [Worker & Ingest](/architecture/worker.md) — T17 event processor, attribution, plan resolution, auto-approve

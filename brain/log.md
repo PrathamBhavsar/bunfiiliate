@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T17 worker ingest
+
+- **Creation**: `api worker` and `api serve --with-worker` (`api::worker::{run, process_events, approve_due}`); `bf_core::{Attribution, FirstTouch, LastTouch, Touch}`; `bf_db::ledger::insert_entries` (txn-aware, `insert_txn` reuses it). Ingest claims events `FOR UPDATE SKIP LOCKED`, attributes by customer then touches, resolves plan (override, type, default) and duration window, writes conversion + pending ledger txn + outbox, marks the event; auto-approve tick moves pending to approved after `hold_days`. Details: [Worker & Ingest](/architecture/worker.md).
+- **Update**: [Tasks](/tasks/index.md) T17 done on branch. `cargo test -p api flow_click_to_approved` plus `--test worker` (7: click to approved, hold/flag, duplicate, recurring windows, first vs last touch, code + override, bad events). Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 22.
+
 ## [2026-10-26] T50 feat/oss-docs
 
 - **Creation**: `CONTRIBUTING.md` (clean-room rules, 3-tier git flow `prod` <- `staging` <- `feat/*`, short commit message style, `make ci`, local Postgres 16 on port 5433, `brain/` upkeep, doc linting); `SECURITY.md` (private vulnerability disclosure via GitHub Security Advisories, response SLA, version support table, threat model scope & exclusions); `docs/architecture.md` (system layout, crate dependency graph mermaid, tracker hot path sequence mermaid, double-entry ledger postings table & state transitions, background worker loops, auth & tenancy model derived strictly from `docs/PLAN.md` and `brain/architecture/*`); `.markdownlint.json` (MD013 disabled, MD024 siblings_only).
