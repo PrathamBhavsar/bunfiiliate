@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-26] T51 standalone release datasheet page
+
+- **Creation**: `site/index.html` standalone engineering release datasheet following the Plan Section 5 visual direction (warm paper `#F4F1EA`, ink `#111111`, hairline rules, safety-orange `#FF5A1F` exclusively for measured numbers, IBM Plex Mono tabular numbers, Space Grotesk headings, responsive inline SVG architecture schematic tracker -> spool -> batch writer -> PG -> worker -> outbox, benchmark metrics table matching JSON measurements, double-entry ledger posting matrix, quickstart runbook, repository links; zero JS runtime, zero gradients, zero emoji, dark-mode-agnostic paper aesthetic).
+- **Tooling**: `scripts/check-bench-numbers.sh` benchmark verification script checking every RPS, p50, and p99 metric in `site/index.html` against `bench/results/*.json`.
+- **Validation**: Acceptance passed: `npx html-validate site/index.html && ./scripts/check-bench-numbers.sh` exits 0 (0 HTML errors, all 6 benchmark rows verified). Verified in Google Chrome at desktop (1280px) and phone (375px) widths: rendered warm paper background, hairline grids, crisp SVG flow, safety orange on measured metrics only, horizontal scroll on tables/schematic without page blowout. `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` all pass. [Tasks](/tasks/index.md) T51 marked done on branch.
+
 ## [2026-10-26] T34 web affiliate portal
 
 - **Creation**: affiliate pages in `apps/web`: `/me` (30-day summary tiles from `analytics/summary` + clicks/commission bar charts from `analytics/timeseries`, no chart lib), `/me/links` (own codes: create, copy `origin/r/<code>`, deactivate), `/me/earnings` (status + program filters), `/me/payouts`, new `/me/profile` (payout email + minimum in integer cents via `me/affiliate`), public `/register` (`affiliates/register`, `?workspace=` prefill) linked from `/login`. Reuses `formatCents`/`formatBps` from `lib/admin.ts` (no new formatter) and `ResourceView`, `FormDialog`, `ConfirmDialog`, `StatCard`. No per-code stats: the API has none. Role guard already came from `NAV`; admins hitting `/me*` are sent to `/dashboard`. Details: [Web Shell](/architecture/web.md).
