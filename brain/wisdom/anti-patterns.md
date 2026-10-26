@@ -31,5 +31,6 @@ timestamp: 2026-10-26
 21. Importing the SDK by `link:` or a path alias from `apps/web`: Turbopack refuses files outside its root and the SDK cannot find its own `node_modules`. Use `workspace:*` + `transpilePackages` + `turbopack.root`.
 22. Vendoring a third-party mmdb as a test fixture (licence, size). Hand-build a one-node IPv4 tree in the test (24-bit records, `node_count=1`, left record `node_count+16+offset`, right record `node_count` = not found; all nine metadata keys are required); see `tracker::geo` tests. Test priority logic with a closure so the db path stays out of it.
 23. Letting one bad inbound event abort the claim transaction and retrying it forever. Run each event in a savepoint; on a business rejection or an integrity/data (SQLSTATE 22/23) error, roll the savepoint back and set `processed_at` + `error`. Only transient DB errors leave the event unprocessed.
+24. Writing client-controlled strings (referrer host) into a CSV unescaped. Quote per RFC 4180 and defuse leading `= + - @`, or the export becomes a spreadsheet formula injection.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

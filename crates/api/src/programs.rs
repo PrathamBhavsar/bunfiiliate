@@ -56,7 +56,11 @@ fn not_found() -> AppError {
     AppError::NotFound("program not found")
 }
 
-async fn require_program(db: &mut PgConnection, ws: Uuid, id: Uuid) -> Result<(), AppError> {
+pub(crate) async fn require_program(
+    db: &mut PgConnection,
+    ws: Uuid,
+    id: Uuid,
+) -> Result<(), AppError> {
     if program_exists(db, ws, id).await? {
         Ok(())
     } else {
@@ -65,7 +69,7 @@ async fn require_program(db: &mut PgConnection, ws: Uuid, id: Uuid) -> Result<()
 }
 
 /// The workspace to read in, and for affiliates the affiliate whose enrollments limit the view.
-async fn viewer(s: &AppState, p: &Principal) -> Result<(Uuid, Option<Uuid>), AppError> {
+pub(crate) async fn viewer(s: &AppState, p: &Principal) -> Result<(Uuid, Option<Uuid>), AppError> {
     let ws = p.workspace_scope(None)?;
     if p.role != UserRole::Affiliate {
         return Ok((ws, None));

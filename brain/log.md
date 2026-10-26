@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T23 analytics rollups
+
+- **Creation**: `api::analytics`: `rollup` tick (advisory-locked, per-program watermark = last rolled-up day minus 1, delete + upsert, folds clicks and conversions into `daily_rollups` for dims total|country|os|browser|device|referrer) run every 60s by `worker::run`; `GET /analytics/summary`, `/analytics/timeseries`, `/reports/analytics.csv`. `programs::{viewer,require_program}` now `pub(crate)`. Details: [Analytics](/architecture/analytics.md).
+- **Update**: [Tasks](/tasks/index.md) T23 done on branch. `cargo test -p api analytics` (5, real PG16): idempotent + incremental rollup, breakdown sums = totals for every dim, affiliate cannot read another affiliate, workspace isolation, exact CSV. `make openapi` regenerated `sdks/ts`. Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 24.
+
 ## [2026-10-26] T42 geoip
 
 - **Creation**: `tracker::geo::Geo` (optional DB-IP lite country mmdb via `maxminddb` 0.32, `country.iso_code`). Click country = `CF-IPCountry` (valid) first, then mmdb lookup of the same client ip used for `ip_hash`, else null. `BF_GEOIP_DB` env path in `tracker` main: unset = disabled, set but unreadable = startup error. `tracker::start` takes a `Geo`; `AppState.geo: Arc<Geo>`. `scripts/fetch-dbip.sh [YYYY-MM]` downloads the month's `dbip-country-lite` mmdb.gz into gitignored `data/`. CC BY 4.0 attribution in README License section; `.env.example` documents the var.

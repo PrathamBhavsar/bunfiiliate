@@ -20,7 +20,7 @@ use crate::auth::{
     hash_refresh_token, issue_access, new_refresh_token, verify_password,
 };
 use crate::error::{AppError, ErrorBody, ErrorDetail};
-use crate::{affiliates, programs, workspaces};
+use crate::{affiliates, analytics, programs, workspaces};
 
 const REFRESH_PATH: &str = "/api/v1/auth";
 
@@ -55,6 +55,7 @@ impl Modify for CookieAuth {
         affiliates::unenroll, affiliates::create_code, affiliates::list_codes,
         affiliates::delete_code, affiliates::me_affiliate, affiliates::me_update,
         affiliates::me_create_code, affiliates::me_list_codes, affiliates::me_delete_code,
+        analytics::summary, analytics::timeseries, analytics::report_csv,
     ),
     components(schemas(LoginRequest, UserView, ErrorBody, ErrorDetail)),
     modifiers(&CookieAuth),
@@ -72,6 +73,7 @@ pub fn routes() -> Router<AppState> {
         .merge(workspaces::routes())
         .merge(programs::routes())
         .merge(affiliates::routes())
+        .merge(analytics::routes())
 }
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {
