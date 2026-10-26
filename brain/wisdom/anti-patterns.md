@@ -29,5 +29,6 @@ timestamp: 2026-10-26
 19. Proxying `/api` with Next `rewrites` in dev. They replace `Host`, so the api Origin check returns 403 on every mutation. Use `apps/web/scripts/dev.mjs` (keeps `Host`).
 20. `pnpm` run in a sub-package when the repo root also has an npm `package.json`: the root is always part of a pnpm workspace and gets installed too. Keep one root `pnpm-workspace.yaml`; pnpm 12 fails install on unreviewed build scripts, so list them under `allowBuilds` (`esbuild`, `unrs-resolver`: false).
 21. Importing the SDK by `link:` or a path alias from `apps/web`: Turbopack refuses files outside its root and the SDK cannot find its own `node_modules`. Use `workspace:*` + `transpilePackages` + `turbopack.root`.
+22. Using the typed SDK for list query params as generated: utoipa `IntoParams` without `parameter_in = Query` emits `page`, `limit`, `status`, `program_id` as path params, so `params.query` is untyped and typed calls send no query string. Web code goes through `listParams()` (sends both). Real fix: `#[into_params(parameter_in = Query)]` in the api, then `make openapi`; drop the helper after.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

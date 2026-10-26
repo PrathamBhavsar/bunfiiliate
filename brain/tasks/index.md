@@ -19,7 +19,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T21 | feat/api-programs-affiliates | done, merged (Sonnet); `cargo test -p api programs` 8 tests |
 | T22-T25 | api routes, analytics, ops, SDK | todo (SDK pipeline already in T30) |
 | T30 | feat/web-shell | done, merged (Sonnet); SDK pipeline + apps/web shell. CI uses pnpm 9: bump to 12 for the workspace lockfile |
-| T31-T34 | web pages | todo |
+| T31 | feat/web-admin-core | done on branch (Sonnet); programs, sites, plans, affiliates, codes. Browser-verified |
+| T32-T34 | web pages | todo |
 | T40-T44 | fraud, observability, geoip, load test, deploy | todo |
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
 | T51 | feat/release-page | todo |

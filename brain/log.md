@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T31 web admin core
+
+- **Creation**: admin pages on the T30 blocks. `/programs` (list, create, detail sheet on `?id=`: edit settings, keys and secrets reveal + rotate, sites, commission plans, enrolled affiliates, delete), `/affiliates` (status filter, approve/suspend/reactivate, payout settings), new `/referral-codes` (program + affiliate filters, create, delete; added to `NAV`). Helpers in `src/lib/admin.ts` (`listParams`, `ok`, `refresh`, integer parsers, cents/bps formatters), `admin-ui.tsx`, `program-detail.tsx`. Cents and bps are parsed as whole numbers client-side and mirror the API ranges. No routes beyond the API's; conversion types and provider-secret edits have no UI.
+- **Update**: [Tasks](/tasks/index.md) T31 done on branch. Verified in Chrome against `api serve` on a fresh DB (bootstrap admin, two registered affiliates): login, approve, create program (client validation shown), add site, add plan (range error then ok), enroll, rotate (secret changed), create referral code. Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 22.
+
 ## [2026-10-26] T50 feat/oss-docs
 
 - **Creation**: `CONTRIBUTING.md` (clean-room rules, 3-tier git flow `prod` <- `staging` <- `feat/*`, short commit message style, `make ci`, local Postgres 16 on port 5433, `brain/` upkeep, doc linting); `SECURITY.md` (private vulnerability disclosure via GitHub Security Advisories, response SLA, version support table, threat model scope & exclusions); `docs/architecture.md` (system layout, crate dependency graph mermaid, tracker hot path sequence mermaid, double-entry ledger postings table & state transitions, background worker loops, auth & tenancy model derived strictly from `docs/PLAN.md` and `brain/architecture/*`); `.markdownlint.json` (MD013 disabled, MD024 siblings_only).
