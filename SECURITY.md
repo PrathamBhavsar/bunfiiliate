@@ -80,3 +80,14 @@ The following areas are explicitly excluded from our threat model for v1 (see [`
 - **Volumetric Denial of Service**: High-volume HTTP flood attacks against unauthenticated public endpoints (`/r/:code`, `/c`). Production instances are required to be deployed behind a reverse proxy (e.g., Caddy, Cloudflare) providing transport-level rate limiting and TLS termination.
 - **Compromised Host Environment**: Attacks requiring direct root or administrative shell access to the host server, or direct read/write access to the PostgreSQL database cluster port (`5433`).
 - **Insecure Development Flags**: Issues arising solely when `COOKIE_SECURE=0` or plain HTTP is deliberately configured by the operator.
+
+---
+
+## Built-in Hardening
+
+- **Secrets**: the API refuses to start with a `JWT_SECRET` shorter than 32 bytes or equal to a placeholder published in this repository. Generate one with `openssl rand -hex 32`.
+- **Webhook SSRF**: endpoint URLs may not resolve to loopback, private, link-local (cloud metadata), CGNAT or other internal addresses. The check runs at registration and again at connect time on the address actually dialled (defeating DNS rebinding). `BF_ALLOW_PRIVATE_WEBHOOKS=1` disables it for local development only.
+- **Webhook delivery**: deliveries are leased before the HTTP call, sent with bounded concurrency and a 2 s connect / 10 s total timeout, and never hold a database transaction open. A workspace may register at most 20 endpoints.
+- **Auth abuse limits**: login, register and contact-requests have an in-process per-IP and per-email sliding-window limiter (HTTP 429), and password hashing runs with bounded concurrency. This is best effort and per process: put real volumetric limits in Caddy or Cloudflare in front of the API.
+- **Refresh tokens**: re-presenting a token within 10 s of its rotation is a plain 401 and keeps the session; later reuse revokes the whole family and writes an `auth.refresh_reuse` audit entry. A session family cannot be refreshed past 90 days.
+- **Request size**: the API rejects request bodies over 64 KB.

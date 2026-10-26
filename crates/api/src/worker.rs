@@ -36,17 +36,35 @@ const APPROVE_BATCH: i64 = 100;
 /// Arbitrary key shared by every worker so only one runs the approve tick at a time.
 const APPROVE_LOCK: i64 = 0x6266_6170;
 
-/// Run the loops until the task is dropped.
+/// Run the loops until the task is dropped. Webhook delivery has its own loop, polled beside the
+/// others, so a slow endpoint never delays ingest, approval or the outbox.
 pub async fn run(pool: PgPool, mailer: Mailer) {
+    tokio::join!(main_loop(&pool, &mailer), deliver_loop(&pool));
+}
+
+async fn deliver_loop(pool: &PgPool) {
     let http = dispatch::http_client();
+    let mut deliver = tokio::time::interval(DELIVER_EVERY);
+    // A tick that overran (slow endpoints) is not made up for by a burst of back-to-back ticks.
+    deliver.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        deliver.tick().await;
+        match dispatch::deliver_due(pool, &http).await {
+            Ok(0) => {}
+            Ok(n) => tracing::info!(deliveries = n, "webhooks attempted"),
+            Err(e) => tracing::error!(error = %e, "delivery tick failed"),
+        }
+    }
+}
+
+async fn main_loop(pool: &PgPool, mailer: &Mailer) {
     let mut ingest = tokio::time::interval(INGEST_EVERY);
     let mut approve = tokio::time::interval(APPROVE_EVERY);
     let mut rollup = tokio::time::interval(ROLLUP_EVERY);
     let mut dispatch = tokio::time::interval(DISPATCH_EVERY);
-    let mut deliver = tokio::time::interval(DELIVER_EVERY);
     loop {
         tokio::select! {
-            _ = ingest.tick() => match process_events(&pool).await {
+            _ = ingest.tick() => match process_events(pool).await {
                 Ok(0) => {}
                 Ok(n) => {
                     metrics::EVENTS_PROCESSED.add(n);
@@ -54,16 +72,16 @@ pub async fn run(pool: PgPool, mailer: Mailer) {
                 }
                 Err(e) => tracing::error!(error = %e, "ingest tick failed"),
             },
-            _ = approve.tick() => match timed(&metrics::APPROVE_TICK, approve_due(&pool)).await {
+            _ = approve.tick() => match timed(&metrics::APPROVE_TICK, approve_due(pool)).await {
                 Ok(0) => {}
                 Ok(n) => tracing::info!(conversions = n, "auto-approved"),
                 Err(e) => tracing::error!(error = %e, "approve tick failed"),
             },
-            _ = rollup.tick() => if let Err(e) = timed(&metrics::ROLLUP_TICK, analytics::rollup(&pool)).await {
+            _ = rollup.tick() => if let Err(e) = timed(&metrics::ROLLUP_TICK, analytics::rollup(pool)).await {
                 tracing::error!(error = %e, "rollup tick failed");
             },
             _ = dispatch.tick() => {
-                match dispatch::dispatch_outbox(&pool, &mailer).await {
+                match dispatch::dispatch_outbox(pool, mailer).await {
                     Ok(0) => {}
                     Ok(n) => tracing::info!(rows = n, "outbox dispatched"),
                     Err(e) => tracing::error!(error = %e, "dispatch tick failed"),
@@ -71,18 +89,13 @@ pub async fn run(pool: PgPool, mailer: Mailer) {
                 match sqlx::query_scalar::<_, i64>(
                     "SELECT count(*) FROM outbox WHERE done_at IS NULL",
                 )
-                .fetch_one(&pool)
+                .fetch_one(pool)
                 .await
                 {
                     Ok(n) => metrics::OUTBOX_DEPTH.set(n as u64),
                     Err(e) => tracing::error!(error = %e, "outbox depth failed"),
                 }
             }
-            _ = deliver.tick() => match dispatch::deliver_due(&pool, &http).await {
-                Ok(0) => {}
-                Ok(n) => tracing::info!(deliveries = n, "webhooks attempted"),
-                Err(e) => tracing::error!(error = %e, "delivery tick failed"),
-            },
         }
     }
 }

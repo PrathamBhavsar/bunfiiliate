@@ -7,6 +7,7 @@ pub mod auth;
 pub mod bootstrap;
 pub mod dispatch;
 pub mod error;
+pub mod limit;
 pub mod mail;
 pub mod metrics;
 pub mod money;
@@ -15,6 +16,7 @@ pub mod page;
 pub mod payouts;
 pub mod programs;
 pub mod routes;
+pub mod ssrf;
 pub mod webhooks;
 pub mod worker;
 pub mod workspaces;
@@ -22,6 +24,7 @@ pub mod workspaces;
 use std::sync::Arc;
 
 use axum::Router;
+use axum::extract::DefaultBodyLimit;
 use axum::middleware::from_fn;
 use sqlx::PgPool;
 
@@ -31,11 +34,19 @@ pub struct AppState {
     pub jwt_secret: Arc<str>,
     /// Add `Secure` to cookies; turn off only for plain-http local dev.
     pub secure_cookies: bool,
+    /// Rate limits for the public routes; per process, shared by every clone of the state.
+    pub limiter: Arc<limit::Limiter>,
 }
 
-/// Wrap routes with the Origin check and state.
+/// Largest request body any API route accepts.
+const MAX_BODY_BYTES: usize = 64 * 1024;
+
+/// Wrap routes with the Origin check, the body limit and state.
 pub fn build(routes: Router<AppState>, state: AppState) -> Router {
-    routes.layer(from_fn(auth::check_origin)).with_state(state)
+    routes
+        .layer(from_fn(auth::check_origin))
+        .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
+        .with_state(state)
 }
 
 pub fn app(state: AppState) -> Router {

@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use crate::AppState;
 use crate::audit;
-use crate::auth::{Admin, Auth, Principal, SuperAdmin, hash_password};
+use crate::auth::{Admin, Auth, Principal, SuperAdmin, hash_password_bounded};
 use crate::bootstrap::{MIN_PASSWORD_LEN, slugify};
 use crate::error::{AppError, AppJson, ErrorBody};
 use crate::page::{PageQuery, Paged};
@@ -143,9 +143,7 @@ pub async fn invite_member(
         )));
     }
     let password = req.password;
-    let password_hash = tokio::task::spawn_blocking(move || hash_password(&password))
-        .await
-        .map_err(|_| AppError::Internal)??;
+    let password_hash = hash_password_bounded(password).await?;
     let user = User {
         id: Uuid::now_v7(),
         workspace_id: Some(ws),

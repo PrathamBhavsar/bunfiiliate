@@ -2,7 +2,7 @@
 //! audit log.
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use bf_db::auth::{AuditEntry, insert_audit};
@@ -16,6 +16,7 @@ use crate::AppState;
 use crate::audit;
 use crate::auth::{Admin, Any, Auth};
 use crate::error::{AppError, AppJson, ErrorBody};
+use crate::limit;
 use crate::page::{PageQuery, Paged};
 
 const MAX_NAME: usize = 200;
@@ -114,8 +115,10 @@ pub struct NewContact {
 )]
 pub async fn create_contact(
     State(s): State<AppState>,
+    headers: HeaderMap,
     AppJson(req): AppJson<NewContact>,
 ) -> Result<(StatusCode, Json<ContactRequest>), AppError> {
+    limit::check(&s.limiter, &limit::CONTACT, &headers, &req.email)?;
     let (name, email, message) = (req.name.trim(), req.email.trim(), req.message.trim());
     if name.is_empty() || name.len() > MAX_NAME {
         return Err(AppError::BadRequest("name must be 1-200 characters".into()));

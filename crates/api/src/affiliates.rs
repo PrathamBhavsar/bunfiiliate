@@ -1,7 +1,7 @@
 //! `/api/v1/affiliates`, enrollments, referral codes and the affiliate's own `/me/*` views.
 
 use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use bf_db::affiliates::{Affiliate, Enrollment, ReferralCode};
@@ -14,9 +14,12 @@ use uuid::Uuid;
 
 use crate::AppState;
 use crate::audit;
-use crate::auth::{Admin, Affiliate as AffiliateRole, Auth, Principal, hash_password, random_hex};
+use crate::auth::{
+    Admin, Affiliate as AffiliateRole, Auth, Principal, hash_password_bounded, random_hex,
+};
 use crate::bootstrap::MIN_PASSWORD_LEN;
 use crate::error::{AppError, AppJson, ErrorBody};
+use crate::limit;
 use crate::page::{PageQuery, Paged};
 
 pub fn routes() -> Router<AppState> {
@@ -86,8 +89,10 @@ pub struct Register {
 )]
 pub async fn register(
     State(s): State<AppState>,
+    headers: HeaderMap,
     AppJson(req): AppJson<Register>,
 ) -> Result<(StatusCode, Json<Affiliate>), AppError> {
+    limit::check(&s.limiter, &limit::REGISTER, &headers, &req.email)?;
     let email = req.email.trim();
     if !email_ok(email) || req.payout_email.as_deref().is_some_and(|e| !email_ok(e)) {
         return Err(AppError::BadRequest("invalid email".into()));
@@ -101,9 +106,7 @@ pub async fn register(
         .await?
         .ok_or(AppError::NotFound("workspace not found"))?;
     let password = req.password;
-    let password_hash = tokio::task::spawn_blocking(move || hash_password(&password))
-        .await
-        .map_err(|_| AppError::Internal)??;
+    let password_hash = hash_password_bounded(password).await?;
     let user = User {
         id: Uuid::now_v7(),
         workspace_id: Some(ws),
@@ -527,6 +530,11 @@ fn on_sites(host: &str, sites: &[String]) -> bool {
         .any(|d| host == *d || host.ends_with(&format!(".{d}")))
 }
 
+/// Longest landing URL stored; it is copied into the tracker's in-memory snapshot.
+const MAX_LANDING_URL: usize = 2048;
+/// Most codes one affiliate may hold; every code is also held in the tracker's memory.
+const MAX_CODES_PER_AFFILIATE: i64 = 100;
+
 struct CodeSpec<'a> {
     affiliate_id: Uuid,
     program_id: Uuid,
@@ -554,9 +562,16 @@ async fn insert_code(
         Some(_) => return Err(bad("code must be 3-32 characters of A-Z a-z 0-9 - _")),
         None => random_hex(5),
     };
+    if spec.landing_url.is_some_and(|u| u.len() > MAX_LANDING_URL) {
+        return Err(bad("landing_url must be at most 2048 characters"));
+    }
     let mut tx = s.pool.begin().await?;
     if !bf_db::programs::program_exists(&mut *tx, ws, spec.program_id).await? {
         return Err(AppError::NotFound("program not found"));
+    }
+    if bf_db::affiliates::count_codes(&mut *tx, spec.affiliate_id).await? >= MAX_CODES_PER_AFFILIATE
+    {
+        return Err(bad("an affiliate can hold at most 100 referral codes"));
     }
     let sites = bf_db::programs::site_domains(&mut *tx, ws, spec.program_id).await?;
     let landing_url = match spec.landing_url {

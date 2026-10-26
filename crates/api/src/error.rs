@@ -16,6 +16,8 @@ pub enum AppError {
     Forbidden(&'static str),
     NotFound(&'static str),
     Conflict(&'static str),
+    TooManyRequests,
+    PayloadTooLarge,
     Internal,
 }
 
@@ -38,6 +40,16 @@ impl IntoResponse for AppError {
             Self::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m.into()),
             Self::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.into()),
             Self::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.into()),
+            Self::PayloadTooLarge => (
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "payload_too_large",
+                "request body too large".into(),
+            ),
+            Self::TooManyRequests => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "too_many_requests",
+                "too many requests, try again later".into(),
+            ),
             Self::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "internal",
@@ -65,7 +77,11 @@ impl From<sqlx::Error> for AppError {
 
 impl From<JsonRejection> for AppError {
     fn from(e: JsonRejection) -> Self {
-        Self::BadRequest(e.body_text())
+        if e.status() == StatusCode::PAYLOAD_TOO_LARGE {
+            Self::PayloadTooLarge
+        } else {
+            Self::BadRequest(e.body_text())
+        }
     }
 }
 

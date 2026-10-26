@@ -31,6 +31,7 @@ impl Api {
             pool: pool.clone(),
             jwt_secret: SECRET.into(),
             secure_cookies: true,
+            limiter: Default::default(),
         };
         Self { app: app(state) }
     }
@@ -822,4 +823,70 @@ async fn ops_settings_and_audit_log(pool: PgPool) {
     );
     let (_, theirs) = api.get("/api/v1/audit-log", &other.admin).await;
     assert_eq!(theirs["total"], 0);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn ops_slow_endpoint_holds_no_lock_while_in_flight(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    // An endpoint that accepts the connection and never answers.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/hook", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        let mut held = Vec::new();
+        while let Ok((sock, _)) = listener.accept().await {
+            held.push(sock);
+        }
+    });
+    endpoint(&api, &t, &url, json!([])).await;
+    outbox(
+        &pool,
+        "conversion.approved",
+        conversion_payload(&t, Uuid::now_v7()),
+    )
+    .await;
+    dispatch_outbox(&pool, &Mailer::Log).await.unwrap();
+
+    let p = pool.clone();
+    let sending = tokio::spawn(async move { deliver_due(&p, &http_client()).await });
+    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+
+    // The request is still in flight, yet the row is leased (not due again for a while) and
+    // not locked: nothing holds a transaction open across the HTTP call.
+    let lease: i64 = sqlx::query_scalar(
+        "SELECT extract(epoch FROM next_attempt_at - now())::bigint FROM webhook_deliveries",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(lease > 30, "leased past the next tick, got {lease}s");
+    let mut tx = pool.begin().await.unwrap();
+    sqlx::query("SELECT 1 FROM webhook_deliveries FOR UPDATE NOWAIT")
+        .fetch_one(&mut *tx)
+        .await
+        .expect("row is not locked while the request is in flight");
+    drop(tx);
+    assert_eq!(
+        deliver_due(&pool, &http_client()).await.unwrap(),
+        0,
+        "a leased delivery is not sent twice"
+    );
+    sending.abort();
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn ops_webhook_endpoints_are_capped_per_workspace(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    for i in 0..20 {
+        endpoint(&api, &t, &format!("http://127.0.0.1:9/h{i}"), json!([])).await;
+    }
+    let (st, body) = api
+        .post(
+            "/api/v1/webhooks/endpoints",
+            &t.admin,
+            json!({ "url": "http://127.0.0.1:9/extra", "events": [] }),
+        )
+        .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "{body}");
 }

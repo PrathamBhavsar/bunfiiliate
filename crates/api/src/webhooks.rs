@@ -16,9 +16,12 @@ use crate::audit;
 use crate::auth::{Admin, Auth, random_hex};
 use crate::error::{AppError, AppJson, ErrorBody};
 use crate::page::{PageQuery, Paged};
+use crate::ssrf;
 
 const MAX_URL: usize = 2048;
 const MAX_EVENTS: usize = 20;
+/// Endpoints per workspace; each one gets a delivery row for every event.
+const MAX_ENDPOINTS: i64 = 20;
 const MAX_EVENT_LEN: usize = 64;
 
 pub fn routes() -> Router<AppState> {
@@ -44,17 +47,16 @@ fn endpoint_not_found() -> AppError {
     AppError::NotFound("webhook endpoint not found")
 }
 
-fn check_url(url: &str) -> Result<(), AppError> {
+async fn check_url(url: &str) -> Result<(), AppError> {
     let ok = url.len() <= MAX_URL
         && reqwest::Url::parse(url)
             .is_ok_and(|u| matches!(u.scheme(), "http" | "https") && u.host().is_some());
-    if ok {
-        Ok(())
-    } else {
-        Err(AppError::BadRequest(
+    if !ok {
+        return Err(AppError::BadRequest(
             "url must be an absolute http(s) url".into(),
-        ))
+        ));
     }
+    ssrf::check_url(url).await
 }
 
 fn check_events(events: &[String]) -> Result<(), AppError> {
@@ -92,7 +94,7 @@ pub async fn create_endpoint(
     AppJson(req): AppJson<NewEndpoint>,
 ) -> Result<(StatusCode, Json<WebhookEndpoint>), AppError> {
     let ws = auth.principal.workspace_scope(None)?;
-    check_url(&req.url)?;
+    check_url(&req.url).await?;
     check_events(&req.events)?;
     let e = WebhookEndpoint {
         id: Uuid::now_v7(),
@@ -103,6 +105,16 @@ pub async fn create_endpoint(
         active: true,
     };
     let mut tx = s.pool.begin().await?;
+    let have: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM webhook_endpoints WHERE workspace_id = $1")
+            .bind(ws)
+            .fetch_one(&mut *tx)
+            .await?;
+    if have >= MAX_ENDPOINTS {
+        return Err(AppError::BadRequest(
+            "a workspace can have at most 20 webhook endpoints".into(),
+        ));
+    }
     bf_db::ops::insert_endpoint(&mut *tx, &e).await?;
     let diff = json!({ "url": e.url, "events": e.events });
     let action = "webhook_endpoint.create";
@@ -183,7 +195,7 @@ pub async fn update_endpoint(
 ) -> Result<Json<WebhookEndpoint>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
     if let Some(url) = &req.url {
-        check_url(url)?;
+        check_url(url).await?;
     }
     if let Some(events) = &req.events {
         check_events(events)?;
