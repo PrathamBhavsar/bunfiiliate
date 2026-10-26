@@ -27,6 +27,8 @@ struct Api {
 
 impl Api {
     fn new(pool: &PgPool) -> Self {
+        // The receivers below listen on 127.0.0.1, which the SSRF guard refuses by default.
+        api::ssrf::allow_private_targets();
         let state = AppState {
             pool: pool.clone(),
             jwt_secret: SECRET.into(),

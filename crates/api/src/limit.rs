@@ -11,7 +11,8 @@ use axum::http::HeaderMap;
 use crate::error::AppError;
 
 const WINDOW: Duration = Duration::from_secs(60);
-/// Distinct keys tracked at once; when full (after dropping idle keys) new keys are refused.
+/// Distinct keys tracked at once; when full (after dropping idle keys) the longest-quiet key is
+/// evicted, so a flood of made-up emails cannot lock real users out.
 const MAX_KEYS: usize = 10_000;
 
 pub struct Limiter {
@@ -54,7 +55,13 @@ impl Limiter {
         if !hits.contains_key(key) && hits.len() >= self.max_keys {
             hits.retain(|_, q| live(q));
             if hits.len() >= self.max_keys {
-                return false;
+                let quietest = hits
+                    .iter()
+                    .min_by_key(|(_, q)| q.back().copied())
+                    .map(|(k, _)| k.clone());
+                if let Some(k) = quietest {
+                    hits.remove(&k);
+                }
             }
         }
         let q = hits.entry(key.to_string()).or_default();
@@ -136,11 +143,18 @@ mod tests {
         let l = Limiter::new(Duration::from_secs(60), 2);
         let t0 = Instant::now();
         assert!(l.allow_at("a", 5, t0));
-        assert!(l.allow_at("b", 5, t0));
-        assert!(!l.allow_at("c", 5, t0), "full: new key refused");
-        assert!(l.allow_at("a", 5, t0), "known key still counted");
+        assert!(l.allow_at("b", 5, t0 + Duration::from_secs(1)));
         assert!(
-            l.allow_at("c", 5, t0 + Duration::from_secs(61)),
+            l.allow_at("c", 5, t0 + Duration::from_secs(2)),
+            "full: the quietest key is evicted, the new one is not refused"
+        );
+        assert_eq!(l.hits.lock().unwrap().len(), 2);
+        assert!(
+            !l.hits.lock().unwrap().contains_key("a"),
+            "oldest went first"
+        );
+        assert!(
+            l.allow_at("d", 5, t0 + Duration::from_secs(61)),
             "idle keys evicted"
         );
         assert!(l.hits.lock().unwrap().len() <= 2);

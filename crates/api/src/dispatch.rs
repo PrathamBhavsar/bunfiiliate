@@ -195,12 +195,13 @@ async fn notify(
     }))
 }
 
-/// Deliveries leased per tick, and sent at once. The rest wait for the next tick.
-const DELIVER_PER_TICK: i64 = 200;
+/// Sends in flight at once.
 const DELIVER_CONCURRENCY: usize = 16;
-/// How long a leased delivery stays invisible to other ticks while its request is in flight.
-/// If the process dies mid-send the delivery is retried after this.
-const LEASE_SECS: i32 = 60;
+/// How long a leased delivery stays invisible to other ticks (and other API instances).
+const LEASE_SECS: i32 = 120;
+/// Deliveries leased per tick: a full tick of timeouts (`rounds * HTTP_TIMEOUT`) must finish
+/// well inside [`LEASE_SECS`], or a second instance could lease and send the same row again.
+const DELIVER_PER_TICK: i64 = (DELIVER_CONCURRENCY * 6) as i64;
 
 /// Send due deliveries once each; returns how many were attempted.
 ///
@@ -211,21 +212,19 @@ pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, s
     let due = lease_due(pool).await?;
     let attempted = due.len() as u64;
     let mut due = due.into_iter();
+    let mut sends = tokio::task::JoinSet::new();
     loop {
-        let mut sends = tokio::task::JoinSet::new();
-        for d in due.by_ref().take(DELIVER_CONCURRENCY) {
+        // Keep the window full: start the next send as soon as one finishes.
+        while sends.len() < DELIVER_CONCURRENCY {
+            let Some(d) = due.next() else { break };
             let (pool, http) = (pool.clone(), http.clone());
             sends.spawn(async move { send_one(&pool, &http, d).await });
         }
-        if sends.is_empty() {
-            return Ok(attempted);
-        }
-        while let Some(res) = sends.join_next().await {
-            match res {
-                Ok(Ok(())) => {}
-                Ok(Err(e)) => tracing::error!(error = %e, "recording delivery failed"),
-                Err(e) => tracing::error!(error = %e, "delivery task failed"),
-            }
+        match sends.join_next().await {
+            None => return Ok(attempted),
+            Some(Ok(Ok(()))) => {}
+            Some(Ok(Err(e))) => tracing::error!(error = %e, "recording delivery failed"),
+            Some(Err(e)) => tracing::error!(error = %e, "delivery task failed"),
         }
     }
 }
