@@ -16,5 +16,7 @@ bf-rt = { path = "crates/rt" }
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = "1"
+uuid = { version = "1", features = ["v7"] }
 proptest = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros", "uuid", "chrono"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
