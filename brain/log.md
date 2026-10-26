@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T34 web affiliate portal
+
+- **Creation**: affiliate pages in `apps/web`: `/me` (30-day summary tiles from `analytics/summary` + clicks/commission bar charts from `analytics/timeseries`, no chart lib), `/me/links` (own codes: create, copy `origin/r/<code>`, deactivate), `/me/earnings` (status + program filters), `/me/payouts`, new `/me/profile` (payout email + minimum in integer cents via `me/affiliate`), public `/register` (`affiliates/register`, `?workspace=` prefill) linked from `/login`. Reuses `formatCents`/`formatBps` from `lib/admin.ts` (no new formatter) and `ResourceView`, `FormDialog`, `ConfirmDialog`, `StatCard`. No per-code stats: the API has none. Role guard already came from `NAV`; admins hitting `/me*` are sent to `/dashboard`. Details: [Web Shell](/architecture/web.md).
+- **Update**: [Tasks](/tasks/index.md) T34 done on branch. Acceptance `pnpm -C apps/web build && typecheck && lint` passes. Browser-verified against `api serve` on a seeded PG16 db: register (and duplicate-email error), pending vs active affiliate, dashboard figures match seed, create/duplicate/copy/deactivate link, earnings pagination (36 rows), payouts, profile edit, admin redirect, API-down error state. Found and fixed one bug: see [Anti-Patterns](/wisdom/anti-patterns.md) 28.
+
 ## [2026-10-26] T41 observability
 
 - **Creation**: `bf_rt::metrics` (hand-rolled Prometheus text registry: static atomics `Counter`/`Gauge`/`Histogram`, `router`, `serve`; no new crates, only `axum` + `tokio/net` on `bf-rt`), `tracker::metrics`, `api::metrics`. Tracker: `bf_ingest_latency_seconds`, `bf_batch_size`, `bf_shed_total`, `bf_spool_bytes`, `bf_spool_lag`. API/worker: `bf_outbox_depth`, `bf_webhook_delivery_failures_total`, `bf_ingest_events_processed_total`, `bf_rollup_tick_seconds`, `bf_approve_tick_seconds`. Details: [Observability](/architecture/observability.md).

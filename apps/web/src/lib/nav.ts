@@ -13,6 +13,7 @@ import {
   ScrollText,
   Settings,
   Tag,
+  UserCog,
   UserRound,
   Users,
   Wallet,
@@ -43,6 +44,7 @@ export const NAV: NavItem[] = [
   { href: "/me/links", label: "Links", icon: Link2, group: "Portal", role: "affiliate" },
   { href: "/me/earnings", label: "Earnings", icon: Banknote, group: "Portal", role: "affiliate" },
   { href: "/me/payouts", label: "Payouts", icon: Wallet, group: "Portal", role: "affiliate" },
+  { href: "/me/profile", label: "Profile", icon: UserCog, group: "Portal", role: "affiliate" },
   { href: "/notifications", label: "Notifications", icon: Bell, group: "Account", role: "any" },
 ];
 
