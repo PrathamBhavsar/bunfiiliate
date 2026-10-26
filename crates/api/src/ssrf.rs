@@ -8,6 +8,7 @@
 //! for local development and tests against a receiver on localhost.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
 
@@ -16,8 +17,21 @@ use crate::error::AppError;
 /// Escape hatch: `1` or `true` lets webhooks target private addresses.
 pub const ALLOW_ENV: &str = "BF_ALLOW_PRIVATE_WEBHOOKS";
 
+static ALLOW_PRIVATE: AtomicBool = AtomicBool::new(false);
+
+/// Read [`ALLOW_ENV`] once, at process start. Nothing else turns the guard off.
+pub fn init_from_env() {
+    let on = std::env::var(ALLOW_ENV).is_ok_and(|v| matches!(v.trim(), "1" | "true"));
+    ALLOW_PRIVATE.store(on, Ordering::Relaxed);
+}
+
+/// Switch the guard off for this process. For tests that deliver to a receiver on localhost.
+pub fn allow_private_targets() {
+    ALLOW_PRIVATE.store(true, Ordering::Relaxed);
+}
+
 pub fn allow_private() -> bool {
-    std::env::var(ALLOW_ENV).is_ok_and(|v| matches!(v.trim(), "1" | "true"))
+    ALLOW_PRIVATE.load(Ordering::Relaxed)
 }
 
 fn v4_public(ip: Ipv4Addr) -> bool {

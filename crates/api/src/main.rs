@@ -39,6 +39,7 @@ enum Command {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    api::ssrf::init_from_env();
     bf_rt::init_tracing();
     match Cli::parse().command {
         Command::Serve { with_worker } => serve(with_worker).await?,
