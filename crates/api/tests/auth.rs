@@ -372,3 +372,17 @@ async fn auth_openapi_served(pool: PgPool) {
         assert!(doc["paths"][format!("/api/v1/auth/{p}")].is_object(), "{p}");
     }
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn auth_bootstrap_concurrent_creates_one(pool: PgPool) {
+    let (a, b) = tokio::join!(
+        bootstrap(&pool, "a@x.io", PASSWORD, "A"),
+        bootstrap(&pool, "b@x.io", PASSWORD, "B"),
+    );
+    assert_eq!(a.is_ok() as u8 + b.is_ok() as u8, 1);
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM users WHERE role = 'super_admin'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 1);
+}

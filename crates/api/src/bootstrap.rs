@@ -48,6 +48,7 @@ pub async fn bootstrap(
         role: UserRole::SuperAdmin,
     };
     let mut tx = pool.begin().await?;
+    bf_db::auth::lock_bootstrap(&mut *tx).await?;
     if bf_db::auth::super_admin_exists(&mut *tx).await? {
         return Err(AppError::BadRequest("a super_admin already exists".into()));
     }

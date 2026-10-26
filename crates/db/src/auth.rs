@@ -54,6 +54,14 @@ pub async fn create_user(db: impl PgExecutor<'_>, user: &User) -> Result<(), sql
     Ok(())
 }
 
+/// Serialize concurrent bootstraps: held until the transaction ends.
+pub async fn lock_bootstrap(db: impl PgExecutor<'_>) -> Result<(), sqlx::Error> {
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtext('bf_bootstrap'))")
+        .execute(db)
+        .await?;
+    Ok(())
+}
+
 pub async fn super_admin_exists(db: impl PgExecutor<'_>) -> Result<bool, sqlx::Error> {
     sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users WHERE role = 'super_admin')")
         .fetch_one(db)
