@@ -14,3 +14,4 @@ timestamp: 2026-10-26
 - **psql on PATH is PG18** but CI is PG16. Use `/opt/homebrew/opt/postgresql@16/bin`.
 - **`.mmdb` files**: GeoLite2 is not redistributable. Never commit it.
 - **Static export** has no dynamic routes: use `?id=` query routes.
+- **`node --test scripts/`** on Node 22 treats the dir as a module, not a glob: it needs `scripts/index.js` (tests live there).

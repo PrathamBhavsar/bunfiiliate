@@ -11,7 +11,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T12 | feat/db-schema | todo |
 | T13 | feat/spool | todo |
 | T14 | feat/tracker-hot-path | todo |
-| T15 | feat/tracker-js | todo |
+| T15 | feat/tracker-js | done (Sonnet; min 1133B < 2048, 14 node tests) |
 | T16 | feat/ingest-webhooks | todo |
 | T17 | feat/worker-ingest | todo |
 | T18 | feat/payouts-reversals | todo |
