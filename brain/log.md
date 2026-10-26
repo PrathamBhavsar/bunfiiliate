@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-10-26] T11 core state machines
+
+- **Creation**: `bf-core::state`: `ConversionStatus`/`ConversionEvent`, `PayoutStatus`/`PayoutEvent`, `InvalidTransition`, `conversion_created`. `transition` returns `Result<(Status, Option<LedgerTxn>), InvalidTransition>`; events that post carry the `Money` amount. Conversion `MarkPaid` posts nothing (cash moves on payout paid). Negative amounts are `InvalidTransition`.
+- **Update**: [Ledger](/architecture/ledger.md) signature synced. [Tasks](/tasks/index.md) T11 done. Proptest: random event sequences keep txns balanced and `payable + pending = live - paid`; exact transition tables tested. Lesson in [Anti-Patterns](/wisdom/anti-patterns.md).
 ## [2026-10-26] Wave 1 merged to staging
 
 - **Update**: T00, T01, T10, T12, T13, T15 merged. [Tasks](/tasks/index.md) synced.

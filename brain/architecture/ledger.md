@@ -20,7 +20,7 @@ Money = integer cents + currency. Bps math, round-half-up. Balances derived from
 | Payout paid | AffPayable | Cash |
 
 ## State machines
-Enum + transition table (`transition(self, ev) -> Result<(Status, LedgerTxn), InvalidTransition>`), not typestate generics: entities load from DB at runtime.
+Enum + transition table (`transition(self, ev) -> Result<(Status, Option<LedgerTxn>), InvalidTransition>` (events carry the amount; `None` when nothing posts)), not typestate generics: entities load from DB at runtime.
 Conversion: pending -> approved -> paid; pending -> rejected; approved -> reversed.
 Payout: draft -> approved -> paid; draft -> cancelled.
 
