@@ -5,7 +5,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | id | branch | status |
 | :--- | :--- | :--- |
 | T00 | feat/workspace-scaffold | done, merged to staging (Sonnet; cargo-deny ok) |
-| T01 | feat/ci | todo |
+| T01 | feat/ci | done (actionlint ok, make ci ok) |
 | T10 | feat/core-money-ledger | todo |
 | T11 | feat/core-state-machines | todo |
 | T12 | feat/db-schema | todo |

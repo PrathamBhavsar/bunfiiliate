@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-26] T01 ci and dependabot
+
+- **Creation**: `.github/workflows/ci.yml` (rust with postgres:16 and cargo-deny, web conditional, js size-check conditional), `.github/dependabot.yml` (cargo, npm, github-actions weekly).
+- **Update**: `Makefile` ci target mirrors Rust CI steps (fmt, clippy, test, deny).
+- **Validation**: actionlint passes with 0 errors, `make ci` passes.
+
 ## [2026-10-26] T00 workspace scaffold
 
 - **Creation**: Cargo workspace (bf-core, bf-db, bf-spool, bf-rt, tracker, api), Makefile, deny.toml. fmt/clippy/test/deny pass.
