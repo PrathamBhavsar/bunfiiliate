@@ -4,6 +4,10 @@
 
 - **Creation**: `tracker::geo::Geo` (optional DB-IP lite country mmdb via `maxminddb` 0.32, `country.iso_code`). Click country = `CF-IPCountry` (valid) first, then mmdb lookup of the same client ip used for `ip_hash`, else null. `BF_GEOIP_DB` env path in `tracker` main: unset = disabled, set but unreadable = startup error. `tracker::start` takes a `Geo`; `AppState.geo: Arc<Geo>`. `scripts/fetch-dbip.sh [YYYY-MM]` downloads the month's `dbip-country-lite` mmdb.gz into gitignored `data/`. CC BY 4.0 attribution in README License section; `.env.example` documents the var.
 - **Update**: [Tasks](/tasks/index.md) T42 done on branch. `cargo test -p tracker geo`: header-wins (db never asked), XX/T1/junk fall through, no ip = null, real mmdb lookup on a hand-built 1-node fixture, disabled, missing file. Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 22. Note: `crash_before_flush_replays_exactly_once` failed once in a full parallel run (passes alone and on rerun): timing-sensitive, not geo related.
+## [2026-10-26] T17 review fix
+
+- **Update**: [Worker & Ingest](/architecture/worker.md): attribution and the auto-approve tick now require an active affiliate enrolled in the program (security review: suspended/unenrolled affiliates could be credited or auto-approved). Test `suspended_or_unenrolled_affiliates_earn_nothing`.
+
 ## [2026-10-26] T17 worker ingest
 
 - **Creation**: `api worker` and `api serve --with-worker` (`api::worker::{run, process_events, approve_due}`); `bf_core::{Attribution, FirstTouch, LastTouch, Touch}`; `bf_db::ledger::insert_entries` (txn-aware, `insert_txn` reuses it). Ingest claims events `FOR UPDATE SKIP LOCKED`, attributes by customer then touches, resolves plan (override, type, default) and duration window, writes conversion + pending ledger txn + outbox, marks the event; auto-approve tick moves pending to approved after `hold_days`. Details: [Worker & Ingest](/architecture/worker.md).

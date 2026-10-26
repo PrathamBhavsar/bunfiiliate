@@ -19,6 +19,9 @@ use uuid::Uuid;
 
 const INGEST_EVERY: Duration = Duration::from_secs(1);
 const APPROVE_EVERY: Duration = Duration::from_secs(60);
+/// Predicate on an `affiliates a` row: active and enrolled in program `$2`.
+const ELIGIBLE: &str = "a.status = 'active' \
+     AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = $2)";
 const APPROVE_BATCH: i64 = 100;
 /// Arbitrary key shared by every worker so only one runs the approve tick at a time.
 const APPROVE_LOCK: i64 = 0x6266_6170;
@@ -310,11 +313,15 @@ async fn handle(c: &mut PgConnection, ev: &Event) -> Result<(), Fail> {
         }
     };
 
-    let active: bool = sqlx::query_scalar("SELECT status = 'active' FROM affiliates WHERE id = $1")
-        .bind(affiliate)
-        .fetch_one(&mut *c)
-        .await?;
-    if !active {
+    // Candidates are already eligible; this guards the recurring path (suspended or removed).
+    let eligible: bool = sqlx::query_scalar(&format!(
+        "SELECT EXISTS (SELECT 1 FROM affiliates a WHERE a.id = $1 AND {ELIGIBLE})"
+    ))
+    .bind(affiliate)
+    .bind(ev.program_id)
+    .fetch_one(&mut *c)
+    .await?;
+    if !eligible {
         return Ok(());
     }
 
@@ -440,11 +447,14 @@ async fn touches(
     f: &Fields,
 ) -> Result<Vec<Touch>, sqlx::Error> {
     let rows: Vec<(Uuid, Uuid, i64)> = sqlx::query_as(
-        "SELECT id, affiliate_id, (extract(epoch FROM ts) * 1000)::bigint FROM clicks \
-         WHERE program_id = $1 \
-           AND visitor_id = (SELECT visitor_id FROM clicks WHERE id = $2 AND program_id = $1) \
-           AND ts <= $3 AND ts > $3 - make_interval(days => $4) \
-         ORDER BY ts, id",
+        "SELECT k.id, k.affiliate_id, (extract(epoch FROM k.ts) * 1000)::bigint \
+         FROM clicks k JOIN affiliates a ON a.id = k.affiliate_id \
+         WHERE k.program_id = $1 \
+           AND k.visitor_id = (SELECT visitor_id FROM clicks WHERE id = $2 AND program_id = $1) \
+           AND k.ts <= $3 AND k.ts > $3 - make_interval(days => $4) \
+           AND a.status = 'active' \
+           AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = $1) \
+         ORDER BY k.ts, k.id",
     )
     .bind(program)
     .bind(f.click)
@@ -464,9 +474,10 @@ async fn touches(
     }
     let by_code: Option<Uuid> = match &f.code {
         Some(code) => {
-            sqlx::query_scalar(
-                "SELECT affiliate_id FROM referral_codes WHERE code = $1 AND program_id = $2",
-            )
+            sqlx::query_scalar(&format!(
+                "SELECT r.affiliate_id FROM referral_codes r JOIN affiliates a ON a.id = r.affiliate_id \
+                 WHERE r.code = $1 AND r.program_id = $2 AND {ELIGIBLE}"
+            ))
             .bind(code)
             .bind(program)
             .fetch_optional(&mut *c)
@@ -562,7 +573,10 @@ async fn approve_batch(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let due: Vec<Due> = sqlx::query_as(
         "SELECT c.id, c.program_id, c.affiliate_id, c.commission_cents, c.currency \
          FROM conversions c JOIN programs p ON p.id = c.program_id \
+           JOIN affiliates a ON a.id = c.affiliate_id \
          WHERE c.status = 'pending' AND p.auto_approve \
+           AND a.status = 'active' \
+           AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = c.program_id) \
            AND c.occurred_at <= now() - make_interval(days => p.hold_days) \
          ORDER BY c.occurred_at, c.id LIMIT $1 FOR UPDATE OF c SKIP LOCKED",
     )

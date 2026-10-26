@@ -600,3 +600,60 @@ async fn bad_events_are_marked_not_retried(pool: PgPool) {
         .unwrap();
     assert_eq!(customers, 0);
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn suspended_or_unenrolled_affiliates_earn_nothing(pool: PgPool) {
+    let s = seed(&pool, Opts::default()).await;
+    let now = Utc::now();
+    let ca = click(&pool, &s, s.a, "v1", now - Duration::days(2)).await;
+    let cb = click(&pool, &s, s.b, "v1", now - Duration::days(1)).await;
+
+    // B was unenrolled: A's click wins even under last touch.
+    sqlx::query("DELETE FROM enrollments WHERE affiliate_id = $1")
+        .bind(s.b)
+        .execute(&pool)
+        .await
+        .unwrap();
+    send(
+        &pool,
+        &s,
+        "generic",
+        "o1",
+        sale("cus_1", 10_000, Some(cb), now),
+    )
+    .await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(
+        conversions(&pool, &s).await,
+        [(s.a, 1_000, "pending".into())]
+    );
+
+    // A is suspended: no auto-approve, and its customer's next sale earns nothing.
+    sqlx::query("UPDATE affiliates SET status = 'suspended' WHERE id = $1")
+        .bind(s.a)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(approve_due(&pool).await.unwrap(), 0);
+    send(
+        &pool,
+        &s,
+        "generic",
+        "o2",
+        sale("cus_1", 10_000, Some(ca), now),
+    )
+    .await;
+    send(
+        &pool,
+        &s,
+        "generic",
+        "o3",
+        sale("cus_2", 10_000, Some(ca), now),
+    )
+    .await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(
+        conversions(&pool, &s).await,
+        [(s.a, 1_000, "pending".into())]
+    );
+}
