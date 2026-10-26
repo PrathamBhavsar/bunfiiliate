@@ -38,6 +38,6 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | F2 | feat/fix-api-hardening | done, merged (worker + coordinator); JWT secret check, limiter, bounded Argon2, body limit, refresh reuse grace, SSRF guard, webhook lease delivery |
 | F3 | feat/fix-money-worker | done, merged (coordinator-finished); migration 0050, Stripe/Paddle dedup + retry, payout email snapshot, rollup state |
 | F4 | feat/fix-tracker-spool | done, merged (coordinator); spool all-or-nothing + poison, dead-letter, trusted proxies, event queue lane, signed-timestamp generic webhook, tracker.js |
-| T60 | final gate (make ci, ocr, e2e) | `make ci` and `make e2e` green on staging; prod merge pending |
+| T60 | final gate (make ci, ocr, e2e) | done; `make ci` and `make e2e` green on staging, merged to local prod (not pushed); ocr not re-run on the full diff |
 
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).
