@@ -19,5 +19,7 @@ timestamp: 2026-10-26
 9. Committing `.env`, secrets, or the MaxMind DB. GeoIP = DB-IP lite or `CF-IPCountry`.
 10. PG18-only SQL (`uuidv7()`). CI pins PG16.
 11. Summing ledger legs with sequential i64 `checked_add`. Partial sums can overflow on a balanced set; sum in i128.
+12. Advancing the spool checkpoint to the highest flushed offset. Handlers finish spool writes out of order; move it only over a contiguous flushed prefix, else a crash loses the in-flight gap.
+13. Spool write + queue hand-off inside a cancellable handler future. A client disconnect strands a spooled record and stalls the checkpoint. Reserve the queue slot first (503 if full), then do both in a detached `tokio::spawn`.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

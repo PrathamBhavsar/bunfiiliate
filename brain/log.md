@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-10-26] T14 tracker hot path
+
+- **Creation**: `tracker` crate (lib + bin): `Snapshot` in `ArcSwap` (LISTEN `bf_config` reload), `GET /t.js` `/r/{code}` `/healthz` `/readyz`, `POST /c` (JSON any Content-Type, CORS + OPTIONS), click pipeline spool ack -> bounded mpsc -> `INSERT .. UNNEST .. ON CONFLICT DO NOTHING` -> checkpoint + GC, startup replay. `bf_db::tracker` (`Click`, `insert_clicks`, snapshot row loaders, `CONFIG_CHANNEL`). Env `BF_FSYNC=off|always` (default always).
+- **Update**: [Tasks](/tasks/index.md) T14 done on branch. `cargo test -p tracker`: 1000 clicks = 1000 rows; crash before flush then replay = 1000; replay from checkpoint 0 again = still 1000; unknown code 404; full queue 503. Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 12-13.
+- **Follow-up**: ip hash salt reuses `JWT_SECRET` (no new config). Snapshot ignores affiliate status (fraud, T40). `tracker.src.js` posts the `bf_click` query value as `code` to `/c`; after `/r` that is a click id, so it 404s harmlessly. Revisit in T15/T40.
+
 ## [2026-10-26] Wave 1 merged to staging
 
 - **Update**: T00, T01, T10, T12, T13, T15 merged. [Tasks](/tasks/index.md) synced.
