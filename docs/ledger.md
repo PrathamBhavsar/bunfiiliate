@@ -36,3 +36,29 @@ Examples at 10% (1000 bps): 5c -> 0.5 -> 1c; 4c -> 0.4 -> 0c; 10c at 15% -> 1.5 
 | `one_month` | months == 0 |
 | `x_months(n)` | months < n |
 | `lifetime` | always |
+
+## Provider events: dedup, reversals, limits
+
+- **One payment, one commission.** A conversion also carries the provider's business object
+  (`provider_ref`, e.g. the Stripe invoice). Stripe sends both `invoice.paid` and
+  `checkout.session.completed` for a subscription payment; the second finds the same
+  `provider_ref` and creates nothing. Unpaid checkout sessions earn nothing until
+  `checkout.session.async_payment_succeeded` arrives.
+- **Zero-amount payments** (trial invoices, 100%-off checkouts) create no conversion, so a flat
+  plan cannot pay out on a $0 invoice.
+- **A refund can overtake its sale.** A reversal that matches no conversion is retried with
+  backoff (30 s, 1 m, 2 m, 4 m, 8 m); after that it is dropped as unmatched, which is what an
+  organic (non-affiliate) refund looks like. Every conversion that matches is reversed.
+- **Partial refunds do not claw back.** The ledger reverses a whole commission or none of it, so
+  Stripe `charge.refunded` with `refunded: false` and Paddle adjustments of type `partial` are
+  ignored. Prorated reversals are a known gap. Chargebacks and full refunds reverse everything.
+- **Payout shrink is clamped at zero.** A payout can be smaller than the conversions it claimed
+  (a clawback was netted into it). A later reversal cannot push it below zero; the shortfall
+  stays in the affiliate's payable and nets against the next batch. A payout shrunk to zero is
+  closed out without moving money and is left out of the CSV.
+- **Payout destination is snapshotted** into the payout when the batch is drafted, and the CSV
+  reads that copy. `PATCH` accepts `payout_email: null` to clear it, and the address can only
+  change while the affiliate is active.
+- **Currencies** are limited to ISO 4217 codes with two decimal places (see
+  `crates/api/src/programs.rs`), because amounts and the CSV count in hundredths. `cookie_days`
+  and `hold_days` are at most 365.

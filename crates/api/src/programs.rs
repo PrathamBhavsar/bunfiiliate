@@ -149,8 +149,24 @@ fn check_program_numbers(cookie_days: Option<i32>, hold_days: Option<i32>) -> Re
             "hold_days must not be negative".into(),
         ));
     }
+    if cookie_days.is_some_and(|d| d > MAX_DAYS) || hold_days.is_some_and(|d| d > MAX_DAYS) {
+        return Err(AppError::BadRequest(format!(
+            "cookie_days and hold_days must be at most {MAX_DAYS}"
+        )));
+    }
     Ok(())
 }
+
+/// Longest cookie window or hold period, in days (also a database CHECK).
+const MAX_DAYS: i32 = 365;
+
+/// Currencies a program may pay in: ISO 4217 codes with two decimal places, because payouts
+/// and the CSV export count in hundredths. Zero-decimal (JPY) and three-decimal (KWD)
+/// currencies would be exported off by 100x and 10x.
+const CURRENCIES: [&str; 22] = [
+    "USD", "EUR", "GBP", "CAD", "AUD", "NZD", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "SGD",
+    "HKD", "MXN", "BRL", "ZAR", "INR", "AED", "ILS", "TRY", "THB",
+];
 
 /// Create a program with fresh public key and webhook secret.
 #[utoipa::path(
@@ -169,7 +185,13 @@ pub async fn create_program(
     let ws = auth.principal.workspace_scope(None)?;
     let name = check_name(&req.name)?;
     let currency = Currency::new(&req.currency.to_ascii_uppercase())
-        .ok_or_else(|| AppError::BadRequest("currency must be a 3-letter code".into()))?;
+        .filter(|c| CURRENCIES.contains(&c.as_str()))
+        .ok_or_else(|| {
+            AppError::BadRequest(format!(
+                "currency must be one of the supported two-decimal codes: {}",
+                CURRENCIES.join(", ")
+            ))
+        })?;
     check_program_numbers(req.cookie_days, req.hold_days)?;
     let (public_key, webhook_secret) = (
         format!("pk_{}", random_hex(16)),

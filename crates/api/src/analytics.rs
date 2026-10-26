@@ -42,15 +42,26 @@ pub async fn rollup(pool: &PgPool) -> Result<u64, sqlx::Error> {
     if !locked {
         return Ok(0);
     }
-    let programs: Vec<(Uuid, Option<NaiveDate>)> = sqlx::query_as(
-        "SELECT p.id, (SELECT max(r.day) FROM daily_rollups r WHERE r.program_id = p.id) \
+    // `changed`: the oldest day of any conversion created, approved or reversed since this
+    // program's last rebuild, so a late chargeback or a back-dated sale is not left behind.
+    let programs: Vec<(Uuid, Option<NaiveDate>, Option<NaiveDate>)> = sqlx::query_as(
+        "SELECT p.id, (SELECT max(r.day) FROM daily_rollups r WHERE r.program_id = p.id), \
+                (SELECT min((c.occurred_at AT TIME ZONE 'UTC')::date) FROM conversions c \
+                 WHERE c.program_id = p.id AND GREATEST(c.created_at, c.approved_at, c.reversed_at) \
+                       > COALESCE((SELECT s.ran_at FROM rollup_state s WHERE s.program_id = p.id), \
+                                   '-infinity') - interval '5 minutes') \
          FROM programs p",
     )
     .fetch_all(&mut *tx)
     .await?;
     let mut written = 0;
-    for (program, last) in programs {
+    for (program, last, changed) in programs {
         let from = last.map(|d| d - Duration::days(LOOKBACK_DAYS));
+        // A program with no rollups yet rebuilds all history (`None`).
+        let from = match (from, changed) {
+            (Some(f), Some(c)) => Some(f.min(c)),
+            (f, _) => f,
+        };
         sqlx::query(
             "DELETE FROM daily_rollups WHERE program_id = $1 AND ($2::date IS NULL OR day >= $2)",
         )
@@ -64,6 +75,13 @@ pub async fn rollup(pool: &PgPool) -> Result<u64, sqlx::Error> {
             .execute(&mut *tx)
             .await?
             .rows_affected();
+        sqlx::query(
+            "INSERT INTO rollup_state (program_id, ran_at) VALUES ($1, now()) \
+             ON CONFLICT (program_id) DO UPDATE SET ran_at = EXCLUDED.ran_at",
+        )
+        .bind(program)
+        .execute(&mut *tx)
+        .await?;
     }
     tx.commit().await?;
     Ok(written)

@@ -1239,3 +1239,77 @@ async fn programs_code_landing_url_and_count_are_capped(pool: PgPool) {
         .await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "{body}");
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn programs_currency_and_day_bounds(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "a").await;
+    for body in [
+        json!({ "name": "Yen", "currency": "JPY" }),
+        json!({ "name": "Dinar", "currency": "KWD" }),
+        json!({ "name": "Long hold", "currency": "USD", "hold_days": 366 }),
+        json!({ "name": "Forever", "currency": "USD", "hold_days": 2_000_000_000 }),
+        json!({ "name": "Long cookie", "currency": "USD", "cookie_days": 366 }),
+    ] {
+        let (st, b) = api.post("/api/v1/programs", &t.admin, body.clone()).await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "{body}: {b}");
+    }
+    let (st, b) = api
+        .post(
+            "/api/v1/programs",
+            &t.admin,
+            json!({ "name": "Ok", "currency": "eur", "hold_days": 365, "cookie_days": 365 }),
+        )
+        .await;
+    assert_eq!(st, StatusCode::CREATED, "{b}");
+    let p = b["id"].as_str().unwrap();
+    let (st, _) = api
+        .patch(
+            &format!("/api/v1/programs/{p}"),
+            &t.admin,
+            json!({ "hold_days": 400 }),
+        )
+        .await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn programs_payout_email_is_tri_state_and_frozen_when_inactive(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "a").await;
+    let (aff, _) = affiliate(&pool, t.ws).await;
+    let uri = format!("/api/v1/affiliates/{aff}");
+
+    let (st, a) = api
+        .patch(&uri, &t.admin, json!({ "payout_email": "pay@x.io" }))
+        .await;
+    assert_eq!(st, StatusCode::OK, "{a}");
+    assert_eq!(a["payout_email"], "pay@x.io");
+
+    // Absent leaves it alone.
+    let (_, a) = api
+        .patch(&uri, &t.admin, json!({ "payout_min_cents": 100 }))
+        .await;
+    assert_eq!(a["payout_email"], "pay@x.io");
+    assert_eq!(a["payout_min_cents"], 100);
+
+    // An explicit null clears it.
+    let (st, a) = api
+        .patch(&uri, &t.admin, json!({ "payout_email": null }))
+        .await;
+    assert_eq!(st, StatusCode::OK, "{a}");
+    assert_eq!(a["payout_email"], Value::Null);
+
+    // A suspended affiliate cannot be pointed somewhere else.
+    bf_db::affiliates::set_affiliate_status(&pool, t.ws, aff, &["active"], "suspended")
+        .await
+        .unwrap();
+    let (st, b) = api
+        .patch(&uri, &t.admin, json!({ "payout_email": "elsewhere@x.io" }))
+        .await;
+    assert_eq!(st, StatusCode::CONFLICT, "{b}");
+    let (st, _) = api
+        .patch(&uri, &t.admin, json!({ "payout_min_cents": 5 }))
+        .await;
+    assert_eq!(st, StatusCode::OK, "other settings still change");
+}

@@ -515,3 +515,274 @@ async fn payouts_csv_export_is_exact(pool: PgPool) {
         Err(AppError::NotFound(_))
     ));
 }
+
+// ---- review fixes
+
+/// A Stripe invoice/checkout pair for one payment: same invoice, different events.
+fn stripe_invoice(evt: &str, invoice: &str, code: &str) -> Value {
+    json!({"id": evt, "type": "invoice.paid", "created": Utc::now().timestamp() - 60,
+           "data": {"object": {"id": invoice, "customer": "cus_9", "payment_intent": "pi_9",
+                               "amount_paid": 4_900, "currency": "usd",
+                               "metadata": {"bf_ref": code}}}})
+}
+
+fn stripe_checkout(evt: &str, invoice: &str, code: &str, payment_status: &str) -> Value {
+    json!({"id": evt, "type": "checkout.session.completed", "created": Utc::now().timestamp() - 60,
+           "data": {"object": {"id": "cs_9", "customer": "cus_9", "invoice": invoice,
+                               "payment_status": payment_status, "amount_total": 4_900,
+                               "currency": "usd", "metadata": {"bf_ref": code}}}})
+}
+
+async fn conversions(pool: &PgPool) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM conversions")
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_clawback_then_refund_in_open_batch_stays_payable(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    sale(&pool, &s, "o1", 10_000, s.a).await;
+    approve_due(&pool).await.unwrap();
+    pay(&pool, &s).await;
+    reverse(&pool, &s, "chargeback", "o1").await; // payable -1000
+    sale(&pool, &s, "o2", 15_000, s.a).await; // +1500 -> 500
+    approve_due(&pool).await.unwrap();
+    let batch = create_batch(&pool, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    approve_batch(&pool, batch, s.admin).await.unwrap();
+
+    // The 500 payout claimed a 1500 commission; refunding it must not go below zero.
+    reverse(&pool, &s, "refund", "o2").await;
+    let amount: i64 = sqlx::query_scalar("SELECT amount_cents FROM payouts WHERE batch_id = $1")
+        .bind(batch)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(amount, 0, "clamped, not -1000");
+    mark_paid(&pool, batch)
+        .await
+        .expect("batch is still payable");
+    assert_eq!(status_of(&pool, "o2").await, "reversed");
+    assert_eq!(
+        batch_csv(&pool, batch).await.unwrap(),
+        "email,amount,currency\n"
+    );
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_stripe_invoice_and_checkout_pay_one_commission(pool: PgPool) {
+    let s = seed(&pool, false).await;
+    let code = format!("A{}", s.program);
+    send(
+        &pool,
+        &s,
+        "stripe",
+        "evt_a",
+        stripe_checkout("evt_a", "in_9", &code, "paid"),
+    )
+    .await;
+    send(
+        &pool,
+        &s,
+        "stripe",
+        "evt_b",
+        stripe_invoice("evt_b", "in_9", &code),
+    )
+    .await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(conversions(&pool).await, 1, "one payment, one conversion");
+    assert_eq!(balance(&pool, &s, s.a).await, (490, 0));
+
+    // The refund names the invoice and reverses it entirely.
+    send(
+        &pool,
+        &s,
+        "stripe",
+        "evt_r",
+        json!({"id": "evt_r", "type": "charge.refunded",
+               "data": {"object": {"id": "ch_9", "invoice": "in_9", "refunded": true}}}),
+    )
+    .await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_unpaid_checkout_pays_nothing_until_async_payment_succeeds(pool: PgPool) {
+    let s = seed(&pool, false).await;
+    let code = format!("A{}", s.program);
+    send(
+        &pool,
+        &s,
+        "stripe",
+        "evt_1",
+        stripe_checkout("evt_1", "in_8", &code, "unpaid"),
+    )
+    .await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(conversions(&pool).await, 0, "no money yet");
+
+    let mut ok = stripe_checkout("evt_2", "in_8", &code, "paid");
+    ok["type"] = json!("checkout.session.async_payment_succeeded");
+    send(&pool, &s, "stripe", "evt_2", ok).await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(conversions(&pool).await, 1);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_refund_before_its_sale_waits_then_reverses(pool: PgPool) {
+    let s = seed(&pool, false).await;
+    let code = format!("A{}", s.program);
+    let refund = json!({"id": "evt_r", "type": "charge.refunded",
+                        "data": {"object": {"id": "ch_9", "invoice": "in_7", "refunded": true}}});
+    send(&pool, &s, "stripe", "evt_r", refund).await;
+    process_events(&pool).await.unwrap();
+    let (processed, attempts): (bool, i32) = sqlx::query_as(
+        "SELECT processed_at IS NOT NULL, attempts FROM inbound_events WHERE external_id = 'evt_r'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(!processed, "kept for a retry, not silently dropped");
+    assert_eq!(attempts, 1);
+
+    // The sale arrives late; the retry (once due) finds it.
+    send(
+        &pool,
+        &s,
+        "stripe",
+        "evt_s",
+        stripe_invoice("evt_s", "in_7", &code),
+    )
+    .await;
+    sqlx::query("UPDATE inbound_events SET retry_at = now() WHERE external_id = 'evt_r'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    process_events(&pool).await.unwrap(); // refund still has no sale, backs off again
+    sqlx::query("UPDATE inbound_events SET retry_at = now() WHERE external_id = 'evt_r'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    process_events(&pool).await.unwrap();
+    assert_eq!(status_of(&pool, "evt_s").await, "rejected");
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_unmatched_refund_gives_up_after_a_few_tries(pool: PgPool) {
+    let s = seed(&pool, false).await;
+    let refund = json!({"id": "evt_r", "type": "charge.refunded",
+                        "data": {"object": {"id": "ch_x", "invoice": "in_none", "refunded": true}}});
+    send(&pool, &s, "stripe", "evt_r", refund).await;
+    for _ in 0..8 {
+        sqlx::query("UPDATE inbound_events SET retry_at = now() WHERE processed_at IS NULL")
+            .execute(&pool)
+            .await
+            .unwrap();
+        process_events(&pool).await.unwrap();
+    }
+    let (processed, error): (bool, Option<String>) = sqlx::query_as(
+        "SELECT processed_at IS NOT NULL, error FROM inbound_events WHERE external_id = 'evt_r'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(processed, "the queue is not blocked by an organic refund");
+    assert_eq!(error, None);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_partial_refunds_do_not_claw_back(pool: PgPool) {
+    let s = seed(&pool, false).await;
+    let code = format!("A{}", s.program);
+    send(
+        &pool,
+        &s,
+        "stripe",
+        "evt_s",
+        stripe_invoice("evt_s", "in_6", &code),
+    )
+    .await;
+    send(
+        &pool,
+        &s,
+        "paddle",
+        "evt_p",
+        json!({"event_id": "evt_p", "event_type": "transaction.completed",
+               "occurred_at": (Utc::now() - Duration::minutes(5)).to_rfc3339(),
+               "data": {"id": "txn_6", "customer_id": "ctm_6", "currency_code": "USD",
+                        "details": {"totals": {"total": "20000"}},
+                        "custom_data": {"bf_ref": code}}}),
+    )
+    .await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(balance(&pool, &s, s.a).await, (2_490, 0));
+
+    send(
+        &pool,
+        &s,
+        "stripe",
+        "evt_r",
+        json!({"id": "evt_r", "type": "charge.refunded",
+               "data": {"object": {"id": "ch_6", "invoice": "in_6", "refunded": false,
+                                   "amount_refunded": 100}}}),
+    )
+    .await;
+    send(
+        &pool,
+        &s,
+        "paddle",
+        "evt_a",
+        json!({"event_id": "evt_a", "event_type": "adjustment.created",
+               "data": {"action": "refund", "type": "partial", "transaction_id": "txn_6"}}),
+    )
+    .await;
+    process_events(&pool).await.unwrap();
+    assert_eq!(
+        balance(&pool, &s, s.a).await,
+        (2_490, 0),
+        "commissions intact"
+    );
+    assert_eq!(status_of(&pool, "evt_s").await, "pending");
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_zero_amount_sale_earns_no_commission(pool: PgPool) {
+    let s = seed(&pool, false).await;
+    sqlx::query("UPDATE commission_plans SET kind = 'flat', rate_bps = NULL, amount_cents = 500")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sale(&pool, &s, "trial", 0, s.a).await;
+    assert_eq!(conversions(&pool).await, 0, "a $0 invoice is not a sale");
+    sale(&pool, &s, "real", 1_000, s.a).await;
+    assert_eq!(conversions(&pool).await, 1);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_email_is_snapshotted_when_the_batch_is_drafted(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    sale(&pool, &s, "o1", 10_000, s.a).await;
+    approve_due(&pool).await.unwrap();
+    let batch = create_batch(&pool, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    approve_batch(&pool, batch, s.admin).await.unwrap();
+
+    sqlx::query("UPDATE affiliates SET payout_email = 'attacker@evil.io' WHERE id = $1")
+        .bind(s.a)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let csv = batch_csv(&pool, batch).await.unwrap();
+    assert!(csv.contains("a@x.io,10.00,USD"), "{csv}");
+    assert!(!csv.contains("evil"), "{csv}");
+}

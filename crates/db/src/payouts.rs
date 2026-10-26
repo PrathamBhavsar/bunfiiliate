@@ -38,18 +38,20 @@ pub async fn owed(conn: &mut PgConnection, program_id: Uuid) -> Result<Vec<Owed>
     .await
 }
 
-/// Payout lines of a batch: payout email (account email as fallback), amount, program currency.
+/// Payout lines of a batch: the email snapshotted when it was drafted (the live payout email,
+/// then the account email, for payouts that predate the snapshot), amount, program currency.
+/// Payouts shrunk to nothing by reversals are left out: there is nothing to send.
 pub async fn batch_rows(
     conn: &mut PgConnection,
     batch_id: Uuid,
 ) -> Result<Vec<CsvRow>, sqlx::Error> {
     sqlx::query_as(
-        "SELECT COALESCE(a.payout_email, u.email)::text AS email, p.amount_cents, \
+        "SELECT COALESCE(p.payout_email, a.payout_email, u.email)::text AS email, p.amount_cents, \
                 pr.currency::text AS currency \
          FROM payouts p JOIN payout_batches b ON b.id = p.batch_id \
            JOIN programs pr ON pr.id = b.program_id \
            JOIN affiliates a ON a.id = p.affiliate_id JOIN users u ON u.id = a.user_id \
-         WHERE p.batch_id = $1 ORDER BY 1, p.id",
+         WHERE p.batch_id = $1 AND p.amount_cents > 0 ORDER BY 1, p.id",
     )
     .bind(batch_id)
     .fetch_all(conn)

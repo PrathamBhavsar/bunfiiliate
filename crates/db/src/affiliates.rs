@@ -119,18 +119,20 @@ pub async fn update_payout(
     db: impl PgExecutor<'_>,
     workspace_id: Uuid,
     id: Uuid,
-    payout_email: Option<&str>,
+    payout_email: Option<Option<&str>>,
     payout_min_cents: Option<i64>,
 ) -> Result<bool, sqlx::Error> {
+    // `payout_email`: None leaves it, Some(None) clears it, Some(Some(e)) sets it.
     let res = sqlx::query(
-        "UPDATE affiliates SET payout_email = COALESCE($3, payout_email), \
+        "UPDATE affiliates SET payout_email = CASE WHEN $5 THEN $3 ELSE payout_email END, \
                 payout_min_cents = COALESCE($4, payout_min_cents) \
          WHERE id = $1 AND workspace_id = $2",
     )
     .bind(id)
     .bind(workspace_id)
-    .bind(payout_email)
+    .bind(payout_email.flatten())
     .bind(payout_min_cents)
+    .bind(payout_email.is_some())
     .execute(db)
     .await?;
     Ok(res.rows_affected() > 0)
