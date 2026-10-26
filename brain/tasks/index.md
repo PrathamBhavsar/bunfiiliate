@@ -33,6 +33,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T42 | feat/geoip | done, merged (Sonnet); `cargo test -p tracker geo` 6 tests |
 | T50 | feat/oss-docs | done, merged (agy/antigravity) |
 | T51 | feat/release-page | todo |
+| T60a | feat/e2e-suite | done on branch (Sonnet); `make e2e` exits 0, repeatable; 6 serial browser tests, deterministic, no LLM |
 | T60 | final gate (make ci, ocr, e2e) | todo |
 
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).

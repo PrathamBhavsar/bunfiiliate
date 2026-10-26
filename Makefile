@@ -1,4 +1,4 @@
-.PHONY: ci fmt clippy test deny web openapi openapi-check
+.PHONY: ci fmt clippy test deny web openapi openapi-check e2e
 
 ci:
 	cargo fmt --check
@@ -37,3 +37,6 @@ openapi-check:
 	diff -u sdks/ts/openapi.json $$tmp/openapi.json && \
 	diff -u sdks/ts/src/schema.d.ts $$tmp/schema.d.ts || \
 	{ echo "openapi drift: run 'make openapi' and commit"; exit 1; }
+
+e2e:
+	scripts/e2e.sh

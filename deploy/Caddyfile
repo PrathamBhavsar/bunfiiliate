@@ -25,7 +25,7 @@
 
 	# Static web app export (Next.js static export)
 	handle {
-		root * /srv/web
+		root * {$WEB_ROOT:/srv/web}
 		try_files {path} {path}.html {path}/ /index.html
 		file_server
 	}
