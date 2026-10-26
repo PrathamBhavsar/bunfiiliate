@@ -23,5 +23,6 @@ timestamp: 2026-10-26
 13. Advancing the spool checkpoint to the highest flushed offset. Handlers finish spool writes out of order; move it only over a contiguous flushed prefix, else a crash loses the in-flight gap.
 14. Spool write + queue hand-off inside a cancellable handler future. A client disconnect strands a spooled record and stalls the checkpoint. Reserve the queue slot first (503 if full), then do both in a detached `tokio::spawn`.
 15. `jsonwebtoken` with `rust_crypto` (or any RSA-capable JWT crate): `cargo deny` fails on RUSTSEC-2023-0071 (`rsa`, no fix). Access JWT is hand-rolled HS256 over `hmac` in `api::auth`.
+16. Feeding unvalidated payloads to the retry-forever batch writer. One row Postgres rejects (e.g. a `\u0000` escape in jsonb) wedges the whole pipeline; reject at the handler (400) before spooling.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

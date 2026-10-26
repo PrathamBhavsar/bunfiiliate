@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T16 ingest webhooks
+
+- **Creation**: `tracker::webhook::Source{Generic,Stripe,Paddle}::verify` (hmac, constant-time via `verify_slice`, no SDKs, no `subtle` crate needed): generic `X-Bf-Signature` + required `Idempotency-Key`; Stripe `t=,v1=` over `<ts>.<body>`; Paddle `ts=;h1=` over `<ts>:<body>`; 5-minute tolerance on both timestamped sources; several `v1`/`h1` accepted (secret rotation). `POST /v1/events/{key}` (202), `/v1/webhooks/{stripe,paddle}/{key}` (200 after spool fsync), 256KB body limit. Spool record is now untagged `Record{Click,Event}`; writer batches events via `bf_db::tracker::insert_events` (`ON CONFLICT (program_id, source, external_id) DO NOTHING`). external_id = Idempotency-Key / Stripe `id` / Paddle `event_id`. Secrets already in `Snapshot`.
+- **Update**: T14 follow-up fixed: `tracker.js` posts `{code, click, vid, url, ref}` (`?ref=` -> code, `bf_click` -> click; cookies `bf_ref`, `bf_click`); `POST /c` takes optional `click`, a click-only beacon is acked 204 and not recorded (`/r` already did), no code and no click is 400. [Tasks](/tasks/index.md) T16 done on branch. `cargo test -p tracker webhook`: valid sig, bad sig 400, replay 400, duplicates and crash/replay = 1 row. Fixtures computed independently (Python hmac). Lesson: [Anti-Patterns](/wisdom/anti-patterns.md) 16.
+
 ## [2026-10-26] Wave 2 merged to staging
 
 - **Update**: T11 state machines, T14 tracker hot path, T20 api auth merged. [Tasks](/tasks/index.md) synced.
