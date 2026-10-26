@@ -2,6 +2,7 @@
 
 import { type components } from "@bunfiiliate/sdk";
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { api, errorMessage, meKey } from "./api";
 import { queryClient } from "./query";
 import type { Page } from "./use-resource";
@@ -10,6 +11,14 @@ export type Program = components["schemas"]["Program"];
 export type Plan = components["schemas"]["Plan"];
 export type Affiliate = components["schemas"]["Affiliate"];
 export type ReferralCode = components["schemas"]["ReferralCode"];
+export type Conversion = components["schemas"]["Conversion"];
+export type ConversionStatus = components["schemas"]["ConversionStatus"];
+export type Customer = components["schemas"]["Customer"];
+export type Account = components["schemas"]["Account"];
+export type Entry = components["schemas"]["Entry"];
+export type Balance = components["schemas"]["Balance"];
+export type Batch = components["schemas"]["BatchView"];
+export type BatchDetail = components["schemas"]["BatchDetail"];
 
 /** Largest page the API serves. Dropdowns read one page of it. */
 export const MAX_LIMIT = 200;
@@ -51,12 +60,33 @@ export function useAffiliates() {
   });
 }
 
+/** Program and affiliate names for filters and id columns. Falls back to the raw id while loading. */
+export function useLookups() {
+  const programs = usePrograms().data;
+  const affiliates = useAffiliates().data;
+  return useMemo(
+    () => ({
+      programOptions: (programs ?? []).map((p) => ({ value: p.id, label: p.name })),
+      affiliateOptions: (affiliates ?? []).map((a) => ({ value: a.id, label: a.email })),
+      programName: (id: string) => programs?.find((p) => p.id === id)?.name ?? id,
+      affiliateEmail: (id: string) => affiliates?.find((a) => a.id === id)?.email ?? id,
+    }),
+    [programs, affiliates],
+  );
+}
+
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 /** Integer cents as `12.34 USD`. Display only; all math stays in integers. */
 export function formatCents(cents: number, currency: string) {
   const abs = Math.abs(cents);
   return `${cents < 0 ? "-" : ""}${Math.floor(abs / 100)}.${pad2(abs % 100)} ${currency}`.trimEnd();
+}
+
+/** An API timestamp in the viewer's locale; the raw string if it does not parse. */
+export function formatTime(iso: string) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
 /** Basis points as a percent: 1250 -> `12.50%`. */
