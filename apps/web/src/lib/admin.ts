@@ -90,3 +90,6 @@ export function required(raw: string, label: string) {
   if (!v) throw new Error(`${label} is required`);
   return v;
 }
+
+/** RFC 3339 timestamp as `2026-03-07 14:05 UTC`. */
+export const formatTime = (iso: string) => `${iso.slice(0, 16).replace("T", " ")} UTC`;

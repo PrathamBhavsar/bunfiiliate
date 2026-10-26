@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-10-26] T33 web analytics + ops
+
+- **Creation**: `/analytics` (range/program/affiliate filters, stat cards, clicks/conversions/commission line charts as small multiples, dimension breakdown table with bars, daily data table), `/reports` (CSV download of `reports/analytics.csv`), `/webhooks` (endpoints CRUD, signing secret reveal, deliveries with redeliver), `/email-templates`, `/contact-requests` (status actions), `/audit-log` (entity filter, action search, diff view), `/settings` (JSON editor), `/notifications` (any role, mark read), `/dashboard` now live (30d). Hand-rolled SVG `LineChart` (`components/charts.tsx`, no new dependency; series colors `--series-1..3` blue/orange/aqua from the dataviz palette, one measure per chart, hover readout), `lib/analytics.ts`, `MetricCards`. Money is shown only for one currency: a program, or all programs when they share it; mixed shows an em dash and asks to pick a program. No routes beyond the API's.
+- **Update**: [Tasks](/tasks/index.md) T33 done on branch. [Web Shell](/architecture/web.md) synced. Verified in Chrome against `api serve --with-worker` on a fresh DB (two programs USD/EUR, 960 clicks, 45 conversions, 2 webhook endpoints, contact requests): charts + hover, mixed-currency state, program filter, webhook detail + redeliver (dead -> pending), contact status change, audit rows, settings validation, affiliate guard (`/analytics` -> `/me`), affiliate notifications + mark read. The CSV endpoint was fetched from the page; the Download button was not clicked (no file saved). Lessons: [Anti-Patterns](/wisdom/anti-patterns.md) 27, [Time-Traps](/wisdom/time-traps.md).
+
 ## [2026-10-26] T23 analytics rollups
 
 - **Creation**: `api::analytics`: `rollup` tick (advisory-locked, per-program watermark = last rolled-up day minus 1, delete + upsert, folds clicks and conversions into `daily_rollups` for dims total|country|os|browser|device|referrer) run every 60s by `worker::run`; `GET /analytics/summary`, `/analytics/timeseries`, `/reports/analytics.csv`. `programs::{viewer,require_program}` now `pub(crate)`. Details: [Analytics](/architecture/analytics.md).
