@@ -78,13 +78,29 @@ fn post(path: &str, headers: &[(&str, String)], body: &str) -> Request<Body> {
     req.body(Body::from(body.to_owned())).unwrap()
 }
 
-fn generic(key: &str, body: &str) -> Request<Body> {
-    let sig = hex_hmac(GENERIC, &[body.as_bytes()]);
+fn generic_at(ts: i64, key: &str, body: &str) -> Request<Body> {
+    let ts_text = ts.to_string();
+    let parts: [&[u8]; 5] = [
+        ts_text.as_bytes(),
+        b".",
+        key.as_bytes(),
+        b".",
+        body.as_bytes(),
+    ];
+    let sig = hex_hmac(GENERIC, &parts);
     post(
         "/v1/events/pk",
-        &[("x-bf-signature", sig), ("idempotency-key", key.to_owned())],
+        &[
+            ("x-bf-signature", sig),
+            ("idempotency-key", key.to_owned()),
+            ("x-bf-timestamp", ts_text),
+        ],
         body,
     )
+}
+
+fn generic(key: &str, body: &str) -> Request<Body> {
+    generic_at(now(), key, body)
 }
 
 fn stripe_at(ts: i64, id: &str) -> Request<Body> {
@@ -153,6 +169,7 @@ async fn undrained(
         spool: SpoolWriter::open(SpoolConfig::new(dir)).await.unwrap(),
         queue,
         ip_salt: SALT.into(),
+        trust: Default::default(),
         geo: Arc::new(Geo::disabled()),
         fraud: bf_core::default_rules().into(),
     };
@@ -230,7 +247,8 @@ async fn webhook_bad_requests_are_400_and_spool_nothing(pool: PgPool) {
                 "/v1/events/pk",
                 &[
                     ("x-bf-signature", wrong.clone()),
-                    ("idempotency-key", "k".into())
+                    ("idempotency-key", "k".into()),
+                    ("x-bf-timestamp", now().to_string())
                 ],
                 "{}"
             )
@@ -265,6 +283,31 @@ async fn webhook_bad_requests_are_400_and_spool_nothing(pool: PgPool) {
         .await,
         bad
     );
+    // The old scheme (signature over the body alone, no timestamp) is refused.
+    let old = hex_hmac(GENERIC, &[b"{}"]);
+    assert_eq!(
+        status(
+            &app,
+            post(
+                "/v1/events/pk",
+                &[("x-bf-signature", old), ("idempotency-key", "k".into())],
+                "{}"
+            )
+        )
+        .await,
+        bad
+    );
+    // Stale timestamp.
+    assert_eq!(
+        status(&app, generic_at(now() - 301, "k-stale", "{}")).await,
+        bad
+    );
+    // A captured request replayed under a fresh Idempotency-Key does not verify.
+    let mut replay = generic("k-real", r#"{"a":1}"#);
+    replay
+        .headers_mut()
+        .insert("idempotency-key", "k-fresh".parse().unwrap());
+    assert_eq!(status(&app, replay).await, bad);
     // Signed but not usable: not JSON, NUL escape, no event id.
     for body in ["not json", r#"{"a":"\u0000"}"#, r#"{"a":1}"#] {
         let sig = hex_hmac(STRIPE, &[ts.to_string().as_bytes(), b".", body.as_bytes()]);

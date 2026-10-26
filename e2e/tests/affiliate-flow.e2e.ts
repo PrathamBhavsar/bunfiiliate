@@ -75,12 +75,17 @@ async function confirm(fx: Fx, trigger: string, dialogTitle: string | RegExp, co
   await expect(dialog(fx, dialogTitle)).toBeHidden();
 }
 
-const sign = (secret: string, body: string) => createHmac('sha256', secret).update(body).digest('hex');
+// Signs `<timestamp>.<idempotency key>.<body>`; the tracker also checks the timestamp is fresh.
+function signedHeaders(secret: string, idempotencyKey: string, body: string) {
+  const ts = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', secret).update(`${ts}.${idempotencyKey}.${body}`).digest('hex');
+  return { 'content-type': 'application/json', 'idempotency-key': idempotencyKey, 'x-bf-timestamp': ts, 'x-bf-signature': signature };
+}
 
 function postEvent(key: string, secret: string, idempotencyKey: string, body: string) {
   return fetch(`${APP}/v1/events/${key}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', 'idempotency-key': idempotencyKey, 'x-bf-signature': sign(secret, body) },
+    headers: signedHeaders(secret, idempotencyKey, body),
     body,
   });
 }
@@ -172,7 +177,7 @@ describe('affiliate click to cash', { serial: true }, () => {
     const forged = JSON.stringify({ customer: 'cust-bad', amount_cents: SALE_CENTS, currency: 'USD', click: state.clickId });
     const bad = await fetch(`${APP}/v1/events/${state.publicKey}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'idempotency-key': BAD_SALE_ID, 'x-bf-signature': sign('not-the-secret', forged) },
+      headers: signedHeaders('not-the-secret', BAD_SALE_ID, forged),
       body: forged,
     });
     expect(bad.status).toBe(400);

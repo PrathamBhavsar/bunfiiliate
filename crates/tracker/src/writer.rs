@@ -60,6 +60,52 @@ impl Batch {
         }
         Ok(())
     }
+
+    /// [`insert`](Self::insert), but one record Postgres rejects for good cannot wedge the
+    /// rest: after a data error the batch goes in row by row and the offending rows are
+    /// dead-lettered (logged, counted, skipped). A transient error is returned for the
+    /// caller to retry; rows already inserted are no-ops the second time.
+    async fn insert_or_dead_letter(&self, pool: &PgPool) -> Result<(), sqlx::Error> {
+        match self.insert(pool).await {
+            Err(e) if is_data_error(&e) => {
+                tracing::warn!(error = %e, "batch rejected, inserting row by row");
+            }
+            other => return other,
+        }
+        for c in &self.clicks {
+            let one = insert_clicks(pool, std::slice::from_ref(c)).await;
+            skip_if_data_error(one, "click", c.id)?;
+        }
+        for ev in &self.events {
+            let one = insert_events(pool, std::slice::from_ref(ev)).await;
+            skip_if_data_error(one, "event", ev.id)?;
+        }
+        Ok(())
+    }
+}
+
+/// Integrity (23xxx) and data (22xxx) errors come from the record itself: retrying cannot
+/// help. Everything else (connection, timeout, shutdown) is transient.
+fn is_data_error(e: &sqlx::Error) -> bool {
+    e.as_database_error()
+        .and_then(|d| d.code())
+        .is_some_and(|c| c.starts_with("22") || c.starts_with("23"))
+}
+
+fn skip_if_data_error(
+    res: Result<u64, sqlx::Error>,
+    kind: &str,
+    id: uuid::Uuid,
+) -> Result<(), sqlx::Error> {
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) if is_data_error(&e) => {
+            metrics::DEAD_LETTERED.inc();
+            tracing::error!(%kind, %id, error = %e, "dead-lettered record Postgres rejects");
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
 }
 
 /// Insert everything past the checkpoint (idempotent), advance it, return it.
@@ -76,11 +122,11 @@ pub async fn replay(pool: &PgPool, spool: &SpoolWriter) -> Result<u64, Error> {
             }
         }
         if batch.len() >= MAX_BATCH {
-            batch.insert(pool).await?;
+            batch.insert_or_dead_letter(pool).await?;
             batch = Batch::default();
         }
     }
-    batch.insert(pool).await?;
+    batch.insert_or_dead_letter(pool).await?;
     if end > from {
         spool.checkpoint(end)?;
         spool.gc(end)?;
@@ -108,7 +154,7 @@ pub fn spawn(
                 batch.push(q.record);
             }
             metrics::BATCH.observe(batch.len() as u64);
-            while let Err(e) = batch.insert(&pool).await {
+            while let Err(e) = batch.insert_or_dead_letter(&pool).await {
                 tracing::error!(error = %e, "batch insert failed, retrying");
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }

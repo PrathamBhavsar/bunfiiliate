@@ -11,6 +11,8 @@ pub static INGEST: Histogram<9> = Histogram::new(
 pub static BATCH: Histogram<7> = Histogram::new([1, 5, 10, 50, 100, 500, 1000], 1.0);
 /// Requests answered 503 because the writer queue was full.
 pub static SHED: Counter = Counter::new();
+/// Records skipped because Postgres rejected them for good (bad data, not an outage).
+pub static DEAD_LETTERED: Counter = Counter::new();
 /// Spool end offset: total bytes appended.
 pub static SPOOL_BYTES: Gauge = Gauge::new();
 /// Spool offset already in Postgres; `bf_spool_lag` is the bytes between the two.
@@ -30,6 +32,12 @@ pub fn render() -> String {
         "bf_shed_total",
         "Requests shed with 503, writer queue full.",
         &SHED,
+    );
+    counter(
+        &mut out,
+        "bf_dead_lettered_total",
+        "Spool records skipped after Postgres rejected them permanently.",
+        &DEAD_LETTERED,
     );
     gauge(
         &mut out,

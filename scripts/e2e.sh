@@ -26,6 +26,7 @@ ADMIN_PASSWORD="e2e-admin-password"
 WORKSPACE_NAME="E2E Workspace"
 WORKSPACE_SLUG="e2e-workspace"
 JWT_SECRET="e2e-secret-e2e-secret-e2e-secret-e2e"
+BF_IP_SALT="e2e-ip-salt-e2e-ip-salt"
 
 SPOOL_DIR="$(mktemp -d /tmp/bf_e2e_spool_XXXXXX)"
 WORK_DIR="$(mktemp -d /tmp/bf_e2e_work_XXXXXX)"
@@ -74,7 +75,7 @@ psql "$BASE_URL" -c "DROP DATABASE IF EXISTS $DB_NAME WITH (FORCE);" >/dev/null
 psql "$BASE_URL" -c "CREATE DATABASE $DB_NAME;" >/dev/null
 
 export DATABASE_URL="$SCRATCH_URL"
-export API_PORT TRACKER_PORT JWT_SECRET SPOOL_DIR
+export API_PORT TRACKER_PORT JWT_SECRET BF_IP_SALT SPOOL_DIR
 export COOKIE_SECURE=0
 
 echo "=== Bootstrapping admin ==="

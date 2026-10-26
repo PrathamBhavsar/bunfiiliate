@@ -58,12 +58,43 @@ pub enum FsyncMode {
     Off,
 }
 
+/// Makes the next writes, syncs or truncations fail, to exercise the error paths in tests.
+/// Each counter is the number of upcoming operations to fail.
+#[derive(Debug, Default)]
+pub struct Fault {
+    /// Fail after writing half the record, like a disk filling up mid-write.
+    pub fail_writes: AtomicU64,
+    /// Fail the group fsync after the bytes were written.
+    pub fail_syncs: AtomicU64,
+    /// Fail the truncation that rolls a failed batch back.
+    pub fail_truncates: AtomicU64,
+}
+
+impl Fault {
+    fn take(counter: &AtomicU64) -> bool {
+        loop {
+            let n = counter.load(Ordering::SeqCst);
+            if n == 0 {
+                return false;
+            }
+            if counter
+                .compare_exchange(n, n - 1, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                return true;
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SpoolConfig {
     pub dir: PathBuf,
     pub max_segment_size: u64,
     pub fsync_mode: FsyncMode,
     pub channel_capacity: usize,
+    /// Test hook; `None` in production.
+    pub fault: Option<Arc<Fault>>,
 }
 
 impl Default for SpoolConfig {
@@ -73,6 +104,7 @@ impl Default for SpoolConfig {
             max_segment_size: 16 * 1024 * 1024,
             fsync_mode: FsyncMode::Always,
             channel_capacity: 10_000,
+            fault: None,
         }
     }
 }
@@ -92,6 +124,11 @@ impl SpoolConfig {
 
     pub fn with_fsync_mode(mut self, mode: FsyncMode) -> Self {
         self.fsync_mode = mode;
+        self
+    }
+
+    pub fn with_fault(mut self, fault: Arc<Fault>) -> Self {
+        self.fault = Some(fault);
         self
     }
 }
@@ -409,6 +446,22 @@ enum Command {
     },
 }
 
+fn copy_err(e: &io::Error) -> io::Error {
+    io::Error::new(e.kind(), e.to_string())
+}
+
+/// Answer a command with an error.
+fn fail(cmd: Command, e: &io::Error) {
+    match cmd {
+        Command::Write { ack, .. } => {
+            let _ = ack.send(Err(SpoolError::Io(copy_err(e))));
+        }
+        Command::Flush { ack } => {
+            let _ = ack.send(Err(SpoolError::Io(copy_err(e))));
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct SpoolWriter {
     tx: tokio::sync::mpsc::Sender<Command>,
@@ -472,6 +525,10 @@ impl SpoolWriter {
 
         tokio::spawn(async move {
             let mut batch = Vec::new();
+            // Set when the file can no longer be trusted: every later command fails until the
+            // process restarts and `open` truncates the torn tail.
+            let mut poisoned: Option<io::Error> = None;
+            let fault = config.fault.clone();
             loop {
                 batch.clear();
                 let first = match rx.recv().await {
@@ -483,102 +540,129 @@ impl SpoolWriter {
                     batch.push(cmd);
                 }
 
-                let mut write_err: Option<io::Error> = None;
-                let mut pending_acks = Vec::with_capacity(batch.len());
-                let mut pending_flushes = Vec::new();
+                if let Some(e) = &poisoned {
+                    for cmd in batch.drain(..) {
+                        fail(cmd, e);
+                    }
+                    continue;
+                }
 
-                for cmd in batch.drain(..) {
-                    match cmd {
-                        Command::Write { payload, ack } => {
-                            if let Some(ref e) = write_err {
-                                let _ = ack.send(Err(SpoolError::Io(io::Error::new(
-                                    e.kind(),
-                                    e.to_string(),
-                                ))));
-                                continue;
-                            }
+                // The batch is all or nothing: on any error the file goes back to this length
+                // and the offsets are not advanced, so no later record is acked at an offset
+                // that no longer matches its place in the file.
+                let (start_offset, start_size) = (current_global_offset, current_size);
+                let mut rotated = false;
+                let mut failure: Option<io::Error> = None;
+                let mut acks = Vec::with_capacity(batch.len());
+                let mut flushes = Vec::new();
+                let mut rest = batch.drain(..);
 
-                            let encoded = encode_record(&payload);
-                            let record_len = encoded.len() as u64;
-
-                            if current_size > 0
-                                && current_size + record_len > config.max_segment_size
-                            {
-                                if config.fsync_mode == FsyncMode::Always {
-                                    if let Err(e) = active_file.sync_all().await {
-                                        let err_copy = io::Error::new(e.kind(), e.to_string());
-                                        write_err = Some(e);
-                                        let _ = ack.send(Err(SpoolError::Io(err_copy)));
-                                        continue;
-                                    }
-                                    fsync_count_worker.fetch_add(1, Ordering::SeqCst);
-                                }
-
-                                let new_offset = current_global_offset;
-                                let new_path = config.dir.join(segment_filename(new_offset));
-                                match tokio::fs::OpenOptions::new()
-                                    .create(true)
-                                    .append(true)
-                                    .open(&new_path)
-                                    .await
-                                {
-                                    Ok(f) => {
-                                        active_file = f;
-                                        current_size = 0;
-                                    }
-                                    Err(e) => {
-                                        let err_copy = io::Error::new(e.kind(), e.to_string());
-                                        write_err = Some(e);
-                                        let _ = ack.send(Err(SpoolError::Io(err_copy)));
-                                        continue;
-                                    }
-                                }
-                            }
-
-                            match active_file.write_all(&encoded).await {
-                                Ok(()) => {
-                                    current_size += record_len;
-                                    current_global_offset += record_len;
-                                    pending_acks.push((ack, current_global_offset));
-                                }
-                                Err(e) => {
-                                    let err_copy = io::Error::new(e.kind(), e.to_string());
-                                    write_err = Some(e);
-                                    let _ = ack.send(Err(SpoolError::Io(err_copy)));
-                                }
-                            }
-                        }
+                for cmd in rest.by_ref() {
+                    let (payload, ack) = match cmd {
+                        Command::Write { payload, ack } => (payload, ack),
                         Command::Flush { ack } => {
-                            pending_flushes.push(ack);
+                            flushes.push(ack);
+                            continue;
+                        }
+                    };
+                    let encoded = encode_record(&payload);
+                    let record_len = encoded.len() as u64;
+                    let step: io::Result<()> = async {
+                        if current_size > 0 && current_size + record_len > config.max_segment_size {
+                            if config.fsync_mode == FsyncMode::Always {
+                                active_file.sync_all().await?;
+                                fsync_count_worker.fetch_add(1, Ordering::SeqCst);
+                            }
+                            let new_path = config.dir.join(segment_filename(current_global_offset));
+                            active_file = tokio::fs::OpenOptions::new()
+                                .create(true)
+                                .append(true)
+                                .open(&new_path)
+                                .await?;
+                            current_size = 0;
+                            rotated = true;
+                        }
+                        if fault
+                            .as_deref()
+                            .is_some_and(|f| Fault::take(&f.fail_writes))
+                        {
+                            active_file.write_all(&encoded[..encoded.len() / 2]).await?;
+                            return Err(io::Error::other("injected write failure"));
+                        }
+                        active_file.write_all(&encoded).await
+                    }
+                    .await;
+                    match step {
+                        Ok(()) => {
+                            current_size += record_len;
+                            current_global_offset += record_len;
+                            acks.push((ack, current_global_offset));
+                        }
+                        Err(e) => {
+                            // Answered with the rest of the group, after the rollback.
+                            acks.push((ack, 0));
+                            failure = Some(e);
+                            break;
                         }
                     }
                 }
 
-                if write_err.is_none()
-                    && (!pending_acks.is_empty() || !pending_flushes.is_empty())
+                if failure.is_none()
+                    && (!acks.is_empty() || !flushes.is_empty())
                     && config.fsync_mode == FsyncMode::Always
                 {
-                    if let Err(e) = active_file.sync_all().await {
-                        let err_msg = e.to_string();
-                        let kind = e.kind();
-                        for (ack, _) in pending_acks {
-                            let _ = ack
-                                .send(Err(SpoolError::Io(io::Error::new(kind, err_msg.clone()))));
+                    let synced = if fault.as_deref().is_some_and(|f| Fault::take(&f.fail_syncs)) {
+                        Err(io::Error::other("injected fsync failure"))
+                    } else {
+                        active_file.sync_all().await
+                    };
+                    match synced {
+                        Ok(()) => {
+                            fsync_count_worker.fetch_add(1, Ordering::SeqCst);
                         }
-                        for ack in pending_flushes {
-                            let _ = ack
-                                .send(Err(SpoolError::Io(io::Error::new(kind, err_msg.clone()))));
-                        }
-                        continue;
+                        Err(e) => failure = Some(e),
                     }
-                    fsync_count_worker.fetch_add(1, Ordering::SeqCst);
                 }
 
-                for (ack, offset) in pending_acks {
-                    let _ = ack.send(Ok(offset));
+                let Some(err) = failure else {
+                    for (ack, offset) in acks {
+                        let _ = ack.send(Ok(offset));
+                    }
+                    for ack in flushes {
+                        let _ = ack.send(Ok(()));
+                    }
+                    continue;
+                };
+
+                // Undo the batch. Across a segment rotation, or if the truncate itself fails,
+                // the file is in an unknown state: stop writing.
+                let rolled_back = if rotated {
+                    false
+                } else {
+                    let injected = fault
+                        .as_deref()
+                        .is_some_and(|f| Fault::take(&f.fail_truncates));
+                    // A buffered write error surfaces on the next flush; drain it first.
+                    let _ = active_file.flush().await;
+                    !injected && active_file.set_len(start_size).await.is_ok()
+                };
+
+                if rolled_back {
+                    current_size = start_size;
+                    current_global_offset = start_offset;
+                } else {
+                    poisoned = Some(copy_err(&err));
                 }
-                for ack in pending_flushes {
-                    let _ = ack.send(Ok(()));
+                // Only now tell the writers: by the time one sees its error the file is back to its
+                // last good length, so a retry (or a reader of the file) never sees the torn group.
+                for (ack, _) in acks {
+                    let _ = ack.send(Err(SpoolError::Io(copy_err(&err))));
+                }
+                for ack in flushes {
+                    let _ = ack.send(Err(SpoolError::Io(copy_err(&err))));
+                }
+                for cmd in rest {
+                    fail(cmd, &err);
                 }
             }
 

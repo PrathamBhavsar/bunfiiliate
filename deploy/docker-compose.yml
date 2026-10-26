@@ -60,6 +60,9 @@ services:
       BF_GEOIP_DB: ${BF_GEOIP_DB:-}
       BF_IP_SALT: ${BF_IP_SALT:?set BF_IP_SALT in .env (openssl rand -hex 32)}
       BF_TRUST_CF: ${BF_TRUST_CF:-0}
+      # Caddy reaches the tracker over the compose network; believe its X-Forwarded-For, or
+      # every click would be attributed to Caddy's own address.
+      BF_TRUSTED_PROXIES: ${BF_TRUSTED_PROXIES:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - spool_data:/var/spool/bunfiiliate

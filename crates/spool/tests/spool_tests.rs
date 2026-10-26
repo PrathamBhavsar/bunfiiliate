@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::Barrier;
 
 use bf_spool::{
-    FsyncMode, SpoolConfig, SpoolWriter, delete_segments_below, list_segments, read_checkpoint,
-    replay, replay_from_checkpoint, write_checkpoint,
+    Fault, FsyncMode, SpoolConfig, SpoolWriter, delete_segments_below, list_segments,
+    read_checkpoint, replay, replay_from_checkpoint, write_checkpoint,
 };
 
 struct TestDir {
@@ -330,4 +330,126 @@ async fn test_open_recovers_torn_tail() {
     assert_eq!(records[1].payload(), b"recovery-record-1");
     assert_eq!(records[2].payload(), b"recovery-record-2");
     assert_eq!(records[3].payload(), b"new-clean-record-after-crash");
+}
+
+// ---- write and fsync failures
+
+fn payloads(dir: &PathBuf) -> Vec<(u64, Vec<u8>)> {
+    replay(dir, 0)
+        .expect("replay")
+        .map(|r| (r.end_offset(), r.payload().to_vec()))
+        .collect()
+}
+
+#[tokio::test]
+async fn failed_write_is_rolled_back_and_offsets_stay_contiguous() {
+    let dir = TestDir::new("fail-write");
+    let fault = Arc::new(Fault::default());
+    let config = SpoolConfig::new(&dir.path).with_fault(fault.clone());
+    let writer = SpoolWriter::open(config).await.unwrap();
+
+    let a = writer.write(b"aaaa").await.unwrap();
+    fault.fail_writes.store(1, Ordering::SeqCst);
+    assert!(
+        writer.write(b"bbbb").await.is_err(),
+        "the torn write is reported"
+    );
+    let c = writer.write(b"cccc").await.unwrap();
+
+    // C sits right after A: nothing was acked at an offset the file does not match.
+    assert_eq!(c, a + (bf_spool::HEADER_LEN + 4) as u64);
+    assert_eq!(
+        payloads(&dir.path),
+        [(a, b"aaaa".to_vec()), (c, b"cccc".to_vec())]
+    );
+    drop(writer);
+
+    // And a restart sees the same thing (no torn bytes in the middle).
+    let writer = SpoolWriter::open(SpoolConfig::new(&dir.path))
+        .await
+        .unwrap();
+    let d = writer.write(b"dddd").await.unwrap();
+    assert_eq!(d, c + (bf_spool::HEADER_LEN + 4) as u64);
+    assert_eq!(payloads(&dir.path).len(), 3);
+}
+
+#[tokio::test]
+async fn failed_fsync_drops_the_whole_group_and_later_writes_work() {
+    let dir = TestDir::new("fail-fsync");
+    let fault = Arc::new(Fault::default());
+    let config = SpoolConfig::new(&dir.path).with_fault(fault.clone());
+    let writer = SpoolWriter::open(config).await.unwrap();
+
+    let a = writer.write(b"aaaa").await.unwrap();
+    fault.fail_syncs.store(1, Ordering::SeqCst);
+    assert!(writer.write(b"bbbb").await.is_err());
+    let c = writer.write(b"cccc").await.unwrap();
+
+    assert_eq!(c, a + (bf_spool::HEADER_LEN + 4) as u64);
+    assert_eq!(
+        payloads(&dir.path),
+        [(a, b"aaaa".to_vec()), (c, b"cccc".to_vec())]
+    );
+}
+
+#[tokio::test]
+async fn writer_is_poisoned_when_the_rollback_fails() {
+    let dir = TestDir::new("poison");
+    let fault = Arc::new(Fault::default());
+    let config = SpoolConfig::new(&dir.path).with_fault(fault.clone());
+    let writer = SpoolWriter::open(config).await.unwrap();
+
+    let a = writer.write(b"aaaa").await.unwrap();
+    fault.fail_writes.store(1, Ordering::SeqCst);
+    fault.fail_truncates.store(1, Ordering::SeqCst);
+    assert!(writer.write(b"bbbb").await.is_err());
+    // The file may hold torn bytes the writer could not remove: nothing more is acked.
+    assert!(writer.write(b"cccc").await.is_err());
+    assert!(writer.flush().await.is_err());
+    drop(writer);
+
+    // After a restart the torn tail is truncated away and writing resumes after A.
+    let writer = SpoolWriter::open(SpoolConfig::new(&dir.path))
+        .await
+        .unwrap();
+    let c = writer.write(b"cccc").await.unwrap();
+    assert_eq!(c, a + (bf_spool::HEADER_LEN + 4) as u64);
+    assert_eq!(
+        payloads(&dir.path),
+        [(a, b"aaaa".to_vec()), (c, b"cccc".to_vec())]
+    );
+}
+
+#[tokio::test]
+async fn failure_in_a_group_fails_every_record_in_it() {
+    let dir = TestDir::new("fail-group");
+    let fault = Arc::new(Fault::default());
+    let config = SpoolConfig::new(&dir.path).with_fault(fault.clone());
+    let writer = SpoolWriter::open(config).await.unwrap();
+    let a = writer.write(b"aaaa").await.unwrap();
+
+    // Several writers race into one group; the fsync fails, so none of them is acked.
+    fault.fail_syncs.store(1, Ordering::SeqCst);
+    let barrier = Arc::new(Barrier::new(8));
+    let mut tasks = Vec::new();
+    for i in 0..8 {
+        let (w, b) = (writer.clone(), barrier.clone());
+        tasks.push(tokio::spawn(async move {
+            b.wait().await;
+            w.write(format!("g{i}").as_bytes()).await
+        }));
+    }
+    let mut acked = Vec::new();
+    for t in tasks {
+        if let Ok(off) = t.await.unwrap() {
+            acked.push(off);
+        }
+    }
+    // Whatever was acked is exactly what the file holds, back to back after A.
+    let on_disk = payloads(&dir.path);
+    assert_eq!(on_disk[0].0, a);
+    let ends: Vec<u64> = on_disk[1..].iter().map(|(e, _)| *e).collect();
+    let mut sorted = acked.clone();
+    sorted.sort_unstable();
+    assert_eq!(ends, sorted);
 }

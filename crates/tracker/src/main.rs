@@ -18,7 +18,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Some(path) => tracker::geo::Geo::open(path.as_ref())?,
         None => tracker::geo::Geo::disabled(),
     };
-    let tracker = tracker::start(pool, spool, &cfg.jwt_secret, geo).await?;
+    // The visitor-IP hash salt is its own secret: sharing the JWT secret would tie the two together.
+    let ip_salt = std::env::var("BF_IP_SALT").unwrap_or_default();
+    if ip_salt.len() < 16 {
+        return Err(
+            "BF_IP_SALT must be set to a random string of at least 16 bytes (openssl rand -hex 32)"
+                .into(),
+        );
+    }
+    let trust = tracker::proxy::Trust::from_lookup(|k| std::env::var(k).ok())?;
+    let mut tracker = tracker::start(pool, spool, &ip_salt, geo).await?;
+    tracker.state.trust = std::sync::Arc::new(trust);
 
     let metrics = tokio::spawn(bf_rt::metrics::serve(
         "127.0.0.1:9100",
