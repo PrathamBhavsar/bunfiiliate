@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-10-26] T17 review fix
+
+- **Update**: [Worker & Ingest](/architecture/worker.md): attribution and the auto-approve tick now require an active affiliate enrolled in the program (security review: suspended/unenrolled affiliates could be credited or auto-approved). Test `suspended_or_unenrolled_affiliates_earn_nothing`.
+
 ## [2026-10-26] T17 worker ingest
 
 - **Creation**: `api worker` and `api serve --with-worker` (`api::worker::{run, process_events, approve_due}`); `bf_core::{Attribution, FirstTouch, LastTouch, Touch}`; `bf_db::ledger::insert_entries` (txn-aware, `insert_txn` reuses it). Ingest claims events `FOR UPDATE SKIP LOCKED`, attributes by customer then touches, resolves plan (override, type, default) and duration window, writes conversion + pending ledger txn + outbox, marks the event; auto-approve tick moves pending to approved after `hold_days`. Details: [Worker & Ingest](/architecture/worker.md).
