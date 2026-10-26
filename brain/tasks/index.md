@@ -10,7 +10,7 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T11 | feat/core-state-machines | done on branch (Sonnet); `cargo test -p bf-core state` ok |
 | T12 | feat/db-schema | done, merged (Sonnet) |
 | T13 | feat/spool | done, merged (agy/antigravity) |
-| T14 | feat/tracker-hot-path | todo |
+| T14 | feat/tracker-hot-path | done on branch, awaiting merge (Sonnet; `cargo test -p tracker` ok) |
 | T15 | feat/tracker-js | done, merged (Sonnet) |
 | T16 | feat/ingest-webhooks | todo |
 | T17 | feat/worker-ingest | todo |
