@@ -18,7 +18,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1", features = ["v7", "serde"] }
 proptest = "1"
-sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros", "uuid", "chrono"] }
+sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros", "uuid", "chrono"] }
 crc32fast = "1.4"
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "fs", "io-util", "rt", "time"] }
 serde = { version = "1", features = ["derive"] }
