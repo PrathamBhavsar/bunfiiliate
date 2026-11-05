@@ -11,7 +11,7 @@ serde_json.workspace = true
 sqlx = { workspace = true, features = ["json"] }
 uuid = { workspace = true }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
-utoipa = { version = "5", features = ["uuid", "chrono"] }
+utoipa = { version = "6", features = ["uuid", "chrono"] }
 
 [dev-dependencies]
 tokio = { workspace = true }
