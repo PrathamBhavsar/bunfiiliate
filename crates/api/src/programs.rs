@@ -231,6 +231,7 @@ pub async fn create_program(
     notify_config(&mut *tx).await?;
     tx.commit().await?;
     // The only time the secret is shown: the response carries the plaintext, never the stored value.
+    let mut program = program.redact();
     program.webhook_secret = Some(webhook_secret);
     Ok((StatusCode::CREATED, Json(program)))
 }
@@ -415,6 +416,7 @@ pub async fn rotate_secrets(
     .await?;
     notify_config(&mut *tx).await?;
     tx.commit().await?;
+    let mut program = program.redact();
     program.webhook_secret = Some(secret);
     Ok(Json(program))
 }
