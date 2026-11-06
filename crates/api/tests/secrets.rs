@@ -133,6 +133,16 @@ async fn rotate_and_provider_secrets_are_sealed(pool: PgPool) {
     let c = admin(&pool).await;
     let p = new_program(&api, &c, "P").await;
     let id = p["id"].as_str().unwrap();
+    // Provider secrets set first, so the rotate response has stored ciphertext it could leak.
+    let (st, _) = api
+        .call(
+            Method::PATCH,
+            &format!("/api/v1/programs/{id}"),
+            &c,
+            Some(json!({ "stripe_secret": "sk_live_pre" })),
+        )
+        .await;
+    assert_eq!(st, StatusCode::OK);
     let (st, r) = api
         .call(
             Method::POST,
@@ -142,6 +152,10 @@ async fn rotate_and_provider_secrets_are_sealed(pool: PgPool) {
         )
         .await;
     assert_eq!(st, StatusCode::OK);
+    assert!(
+        !r.to_string().contains("bfenc1") && r.get("stripe_secret").is_none(),
+        "{r}"
+    );
     let plain = r["webhook_secret"].as_str().unwrap();
     assert_ne!(plain, p["webhook_secret"].as_str().unwrap());
     assert!(
