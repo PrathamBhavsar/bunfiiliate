@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-11-07] Plan v2 specs A/B/C
+
+- **Creation**: `docs/plan/` holds three design specs (A auth/security/tracker, B product parity/billing/payouts, C ops/tenant/UI/bench). Specs only, nothing implemented; their reviews are still open.
+- **Validation**: `make ci` and `make e2e` pass on staging code (needs PG16 on 5433 and `DATABASE_URL`). Coordination files `.coord/` and `BOARD.md` are gitignored.
+
 ## [2026-10-27] Review fixes F1-F4
 
 - **Update**: three review reports (auth/api, money/tracker, web/deploy) fixed on four branches, see [Tasks](/tasks/index.md) F1-F4. Workers hit a usage limit part-way; the coordinator finished and merged them.
