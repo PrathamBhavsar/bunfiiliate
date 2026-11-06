@@ -12,3 +12,5 @@ data/
 bench/results/*.json
 !bench/results/.gitkeep
 .reports/
+.coord/
+BOARD.md
