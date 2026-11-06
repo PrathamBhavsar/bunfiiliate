@@ -3101,7 +3101,7 @@
         "tags": [
           "programs"
         ],
-        "summary": "One program. Secrets are included for admins only.",
+        "summary": "One program. Secrets are never returned; they are shown once, on create and rotate.",
         "operationId": "get_program",
         "parameters": [
           {

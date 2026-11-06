@@ -183,6 +183,7 @@ impl Api {
         Self(app(AppState {
             pool: pool.clone(),
             jwt_secret: SECRET.into(),
+            vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
             secure_cookies: true,
             limiter: Default::default(),
         }))

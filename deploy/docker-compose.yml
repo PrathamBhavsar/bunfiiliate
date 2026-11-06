@@ -31,6 +31,7 @@ services:
       API_PORT: 8080
       TRACKER_PORT: 8081
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
+      BF_MASTER_KEYS: ${BF_MASTER_KEYS:?set BF_MASTER_KEYS in .env (see docs/self-hosting.md)}
       SPOOL_DIR: /var/spool/bunfiiliate
       SMTP_URL: ${SMTP_URL:-}
       SMTP_FROM: ${SMTP_FROM:-bunfiiliate <noreply@example.com>}
@@ -55,6 +56,7 @@ services:
       API_PORT: 8080
       TRACKER_PORT: 8081
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
+      BF_MASTER_KEYS: ${BF_MASTER_KEYS:?set BF_MASTER_KEYS in .env (see docs/self-hosting.md)}
       SPOOL_DIR: /var/spool/bunfiiliate
       BF_FSYNC: ${BF_FSYNC:-always}
       BF_GEOIP_DB: ${BF_GEOIP_DB:-}

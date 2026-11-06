@@ -27,7 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         );
     }
     let trust = tracker::proxy::Trust::from_lookup(|k| std::env::var(k).ok())?;
-    let mut tracker = tracker::start(pool, spool, &ip_salt, geo).await?;
+    let vault = std::sync::Arc::new(load_vault()?);
+    let mut tracker = tracker::start(pool, spool, &ip_salt, geo, vault).await?;
     tracker.state.trust = std::sync::Arc::new(trust);
 
     let metrics = tokio::spawn(bf_rt::metrics::serve(
@@ -47,4 +48,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracker.watcher.abort();
     metrics.abort();
     Ok(())
+}
+
+/// Master keys from `BF_MASTER_KEYS` / `BF_MASTER_KEY_FILE`; plaintext only with
+/// `BF_ALLOW_PLAINTEXT_SECRETS=1`.
+fn load_vault() -> Result<bf_core::secrets::Vault, bf_core::secrets::SecretsError> {
+    let allow = matches!(
+        std::env::var("BF_ALLOW_PLAINTEXT_SECRETS").as_deref(),
+        Ok("1" | "true")
+    );
+    bf_core::secrets::Vault::from_env(allow)
 }

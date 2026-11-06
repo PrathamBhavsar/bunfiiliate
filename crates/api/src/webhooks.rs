@@ -59,6 +59,12 @@ async fn check_url(url: &str) -> Result<(), AppError> {
     ssrf::check_url(url).await
 }
 
+/// The stored secret is a ciphertext; it is never returned after creation.
+fn redact(mut e: WebhookEndpoint) -> WebhookEndpoint {
+    e.secret.clear();
+    e
+}
+
 fn check_events(events: &[String]) -> Result<(), AppError> {
     if events.len() > MAX_EVENTS
         || events
@@ -96,11 +102,15 @@ pub async fn create_endpoint(
     let ws = auth.principal.workspace_scope(None)?;
     check_url(&req.url).await?;
     check_events(&req.events)?;
-    let e = WebhookEndpoint {
-        id: Uuid::now_v7(),
+    let id = Uuid::now_v7();
+    let plain_secret = format!("whsec_{}", random_hex(24));
+    let mut e = WebhookEndpoint {
+        id,
         workspace_id: ws,
         url: req.url,
-        secret: format!("whsec_{}", random_hex(24)),
+        secret: s
+            .vault
+            .seal_col("webhook_endpoints", "secret", id, &plain_secret),
         events: req.events,
         active: true,
     };
@@ -128,6 +138,8 @@ pub async fn create_endpoint(
     )
     .await?;
     tx.commit().await?;
+    // Shown once: the response carries the plaintext, never the stored value.
+    e.secret = plain_secret;
     Ok((StatusCode::CREATED, Json(e)))
 }
 
@@ -147,7 +159,10 @@ pub async fn list_endpoints(
 ) -> Result<Json<Paged<WebhookEndpoint>>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
     let rows = bf_db::ops::list_endpoints(&s.pool, ws, page.limit(), page.offset()).await?;
-    Ok(Json(page.wrap(rows)))
+    let (items, total) = rows;
+    Ok(Json(
+        page.wrap((items.into_iter().map(redact).collect(), total)),
+    ))
 }
 
 /// One endpoint.
@@ -166,7 +181,7 @@ pub async fn get_endpoint(
 ) -> Result<Json<WebhookEndpoint>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
     let e = bf_db::ops::get_endpoint(&s.pool, ws, id).await?;
-    Ok(Json(e.ok_or_else(endpoint_not_found)?))
+    Ok(Json(redact(e.ok_or_else(endpoint_not_found)?)))
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -223,7 +238,7 @@ pub async fn update_endpoint(
     )
     .await?;
     tx.commit().await?;
-    Ok(Json(e))
+    Ok(Json(redact(e)))
 }
 
 /// Delete an endpoint and its delivery log.

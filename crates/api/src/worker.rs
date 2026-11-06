@@ -4,8 +4,10 @@
 //! its ledger txn and the outbox row commit together with the event's `processed_at`.
 //! Ticks (approve, rollup) are guarded by a transaction-scoped advisory lock.
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bf_core::secrets::Vault;
 use bf_core::{
     Account, AffiliateId, Attribution, Bps, CommissionKind, CommissionPlan, ConversionEvent,
     ConversionStatus, Currency, Duration as Window, FirstTouch, LastTouch, LedgerTxn, Money, Touch,
@@ -38,18 +40,18 @@ const APPROVE_LOCK: i64 = 0x6266_6170;
 
 /// Run the loops until the task is dropped. Webhook delivery has its own loop, polled beside the
 /// others, so a slow endpoint never delays ingest, approval or the outbox.
-pub async fn run(pool: PgPool, mailer: Mailer) {
-    tokio::join!(main_loop(&pool, &mailer), deliver_loop(&pool));
+pub async fn run(pool: PgPool, mailer: Mailer, vault: Arc<Vault>) {
+    tokio::join!(main_loop(&pool, &mailer), deliver_loop(&pool, &vault));
 }
 
-async fn deliver_loop(pool: &PgPool) {
+async fn deliver_loop(pool: &PgPool, vault: &Arc<Vault>) {
     let http = dispatch::http_client();
     let mut deliver = tokio::time::interval(DELIVER_EVERY);
     // A tick that overran (slow endpoints) is not made up for by a burst of back-to-back ticks.
     deliver.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         deliver.tick().await;
-        match dispatch::deliver_due(pool, &http).await {
+        match dispatch::deliver_due(pool, &http, vault).await {
             Ok(0) => {}
             Ok(n) => tracing::info!(deliveries = n, "webhooks attempted"),
             Err(e) => tracing::error!(error = %e, "delivery tick failed"),

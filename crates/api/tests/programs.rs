@@ -25,6 +25,7 @@ impl Api {
         let state = AppState {
             pool: pool.clone(),
             jwt_secret: SECRET.into(),
+            vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
             secure_cookies: true,
             limiter: Default::default(),
         };
@@ -245,10 +246,8 @@ async fn programs_role_guards(pool: PgPool) {
     assert!(listed["items"][0].get("webhook_secret").is_none());
     let (_, full) = api.get(&format!("/api/v1/programs/{p}"), &a.admin).await;
     assert!(
-        full["webhook_secret"]
-            .as_str()
-            .unwrap()
-            .starts_with("whsec_")
+        full.get("webhook_secret").is_none(),
+        "admin reads never return the secret; it is shown once on create"
     );
 }
 

@@ -287,14 +287,105 @@ impl KeyRing {
     }
 }
 
+/// Column-level helpers over an optional [`KeyRing`].
+///
+/// With no ring (only when plaintext secrets were explicitly allowed) values
+/// pass through unchanged. Reading accepts legacy plaintext so rows written
+/// before encryption was turned on keep working until re-encrypted.
+pub struct Vault {
+    ring: Option<KeyRing>,
+}
+
+impl fmt::Debug for Vault {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Vault").field("ring", &self.ring).finish()
+    }
+}
+
+impl Vault {
+    pub fn new(ring: KeyRing) -> Self {
+        Self { ring: Some(ring) }
+    }
+
+    /// Pass-through vault. Only for `BF_ALLOW_PLAINTEXT_SECRETS=1` and tests.
+    pub fn plaintext() -> Self {
+        Self { ring: None }
+    }
+
+    /// Keys from the environment. Missing keys are an error unless
+    /// `allow_plaintext` is set, in which case the vault stores plaintext.
+    pub fn from_env(allow_plaintext: bool) -> Result<Self, SecretsError> {
+        match KeyRing::from_env() {
+            Ok(r) => Ok(Self::new(r)),
+            Err(SecretsError::Config(m)) if allow_plaintext && m.contains("is required") => {
+                Ok(Self::plaintext())
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    pub fn ring(&self) -> Option<&KeyRing> {
+        self.ring.as_ref()
+    }
+
+    pub fn aad(table: &str, column: &str, row: uuid::Uuid) -> String {
+        format!("{table}.{column}.{row}")
+    }
+
+    pub fn seal_col(&self, table: &str, column: &str, row: uuid::Uuid, plain: &str) -> String {
+        match &self.ring {
+            Some(r) => r.seal(plain.as_bytes(), Self::aad(table, column, row).as_bytes()),
+            None => plain.to_string(),
+        }
+    }
+
+    pub fn open_col(
+        &self,
+        table: &str,
+        column: &str,
+        row: uuid::Uuid,
+        stored: &str,
+    ) -> Result<String, SecretsError> {
+        if !KeyRing::is_sealed(stored) {
+            return Ok(stored.to_string());
+        }
+        let ring = self
+            .ring
+            .as_ref()
+            .ok_or_else(|| SecretsError::Config("sealed secret but no master key".into()))?;
+        let raw = ring.open(stored, Self::aad(table, column, row).as_bytes())?;
+        String::from_utf8(raw).map_err(|_| SecretsError::Decrypt)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use proptest::prelude::*;
 
+    #[test]
+    fn vault_columns_bind_to_row_and_accept_legacy() {
+        let v = Vault::new(ring("k1", &["k1"]));
+        let (a, b) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+        let s = v.seal_col("programs", "webhook_secret", a, "whsec_x");
+        assert!(KeyRing::is_sealed(&s));
+        assert_eq!(
+            v.open_col("programs", "webhook_secret", a, &s).unwrap(),
+            "whsec_x"
+        );
+        assert!(v.open_col("programs", "webhook_secret", b, &s).is_err());
+        assert!(v.open_col("programs", "stripe_secret", a, &s).is_err());
+        assert_eq!(v.open_col("t", "c", a, "legacy").unwrap(), "legacy");
+        let p = Vault::plaintext();
+        assert_eq!(p.seal_col("t", "c", a, "x"), "x");
+        assert!(p.open_col("t", "c", a, &s).is_err());
+    }
+
     fn ring(active: &str, ids: &[&str]) -> KeyRing {
-        let pairs: Vec<(&str, [u8; 32])> =
-            ids.iter().map(|i| (*i, [i.as_bytes()[i.len() - 1]; 32])).collect();
+        let pairs: Vec<(&str, [u8; 32])> = ids
+            .iter()
+            .map(|i| (*i, [i.as_bytes()[i.len() - 1]; 32]))
+            .collect();
         KeyRing::from_pairs(active, &pairs).unwrap()
     }
 

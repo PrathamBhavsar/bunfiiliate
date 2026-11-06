@@ -246,7 +246,6 @@ dependencies = [
  "proptest",
  "rand 0.8.8",
  "sha1",
- "sha2",
  "subtle",
  "uuid",
  "zeroize",

@@ -139,6 +139,7 @@ for FSYNC_MODE in always off; do
   TRACKER_PORT=8081 \
   JWT_SECRET="bench-secret-bench-secret-bench-secret" \
   BF_IP_SALT="bench-ip-salt-bench-ip-salt" \
+  BF_MASTER_KEYS="bench1:YmVuY2gtbWFzdGVyLWtleS1iZW5jaC1tYXN0ZXItayE=" \
   SPOOL_DIR="$SPOOL_DIR" \
   BF_FSYNC="$FSYNC_MODE" \
   "$TRACKER_BIN" &

@@ -41,3 +41,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | T60 | final gate (make ci, ocr, e2e) | done; `make ci` and `make e2e` green on staging, merged to local prod (not pushed); ocr not re-run on the full diff |
 
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).
+| A01 | feat/plan-a | done (envelope crypto, bf-core::secrets + Vault) |
+| A02 | feat/plan-a | done (sealed columns, shown once on create/rotate, web one-time reveal) |
+| A03 | feat/plan-a | done (tracker decrypt at load, `api secrets reencrypt/check`, runbook) |
+| A04 | feat/plan-a | done (TOTP RFC 6238 + recovery codes; recovery hashing is salted argon2 in A05, not SHA-256) |
+

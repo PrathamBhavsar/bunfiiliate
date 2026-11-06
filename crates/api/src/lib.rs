@@ -16,6 +16,7 @@ pub mod page;
 pub mod payouts;
 pub mod programs;
 pub mod routes;
+pub mod secrets;
 pub mod ssrf;
 pub mod webhooks;
 pub mod worker;
@@ -32,6 +33,8 @@ use sqlx::PgPool;
 pub struct AppState {
     pub pool: PgPool,
     pub jwt_secret: Arc<str>,
+    /// Master keys for secrets at rest.
+    pub vault: Arc<bf_core::secrets::Vault>,
     /// Add `Secure` to cookies; turn off only for plain-http local dev.
     pub secure_cookies: bool,
     /// Rate limits for the public routes; per process, shared by every clone of the state.

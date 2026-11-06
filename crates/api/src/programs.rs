@@ -197,8 +197,12 @@ pub async fn create_program(
         format!("pk_{}", random_hex(16)),
         format!("whsec_{}", random_hex(32)),
     );
+    let id = Uuid::now_v7();
+    let sealed_secret = s
+        .vault
+        .seal_col("programs", "webhook_secret", id, &webhook_secret);
     let new = NewProgram {
-        id: Uuid::now_v7(),
+        id,
         workspace_id: ws,
         name,
         currency: currency.as_str(),
@@ -210,10 +214,10 @@ pub async fn create_program(
         auto_approve: req.auto_approve.unwrap_or(false),
         hold_days: req.hold_days.unwrap_or(0),
         public_key: &public_key,
-        webhook_secret: &webhook_secret,
+        webhook_secret: &sealed_secret,
     };
     let mut tx = s.pool.begin().await?;
-    let program = bf_db::programs::insert_program(&mut *tx, &new).await?;
+    let mut program = bf_db::programs::insert_program(&mut *tx, &new).await?;
     let diff = json!({ "name": program.name, "currency": program.currency });
     audit::record(
         &mut *tx,
@@ -226,6 +230,8 @@ pub async fn create_program(
     .await?;
     notify_config(&mut *tx).await?;
     tx.commit().await?;
+    // The only time the secret is shown: the response carries the plaintext, never the stored value.
+    program.webhook_secret = Some(webhook_secret);
     Ok((StatusCode::CREATED, Json(program)))
 }
 
@@ -246,15 +252,11 @@ pub async fn list_programs(
     let (ws, only_for) = viewer(&s, &auth.principal).await?;
     let (items, total) =
         bf_db::programs::list_programs(&s.pool, ws, only_for, page.limit(), page.offset()).await?;
-    let items = if only_for.is_some() {
-        items.into_iter().map(Program::redact).collect()
-    } else {
-        items
-    };
+    let items = items.into_iter().map(Program::redact).collect();
     Ok(Json(page.wrap((items, total))))
 }
 
-/// One program. Secrets are included for admins only.
+/// One program. Secrets are never returned; they are shown once, on create and rotate.
 #[utoipa::path(
     get,
     path = "/api/v1/programs/{id}",
@@ -272,11 +274,7 @@ pub async fn get_program(
     let program = bf_db::programs::get_program(&s.pool, ws, id, only_for)
         .await?
         .ok_or_else(not_found)?;
-    Ok(Json(if only_for.is_some() {
-        program.redact()
-    } else {
-        program
-    }))
+    Ok(Json(program.redact()))
 }
 
 /// Update program settings. Provider secrets can be set here; the webhook secret is rotated.
@@ -306,6 +304,14 @@ pub async fn update_program(
             "default_plan_id is not a plan of this program".into(),
         ));
     }
+    let stripe = req
+        .stripe_secret
+        .as_deref()
+        .map(|v| seal_optional(&s, id, "stripe_secret", v));
+    let paddle = req
+        .paddle_secret
+        .as_deref()
+        .map(|v| seal_optional(&s, id, "paddle_secret", v));
     let patch = ProgramPatch {
         name,
         attribution_model: req.attribution_model.as_ref().map(|m| m.as_str()),
@@ -313,8 +319,8 @@ pub async fn update_program(
         auto_approve: req.auto_approve,
         hold_days: req.hold_days,
         default_plan_id: req.default_plan_id,
-        stripe_secret: req.stripe_secret.as_deref(),
-        paddle_secret: req.paddle_secret.as_deref(),
+        stripe_secret: stripe.as_deref(),
+        paddle_secret: paddle.as_deref(),
     };
     let program = bf_db::programs::update_program(&mut *tx, ws, id, &patch)
         .await?
@@ -332,7 +338,16 @@ pub async fn update_program(
     .await?;
     notify_config(&mut *tx).await?;
     tx.commit().await?;
-    Ok(Json(program))
+    Ok(Json(program.redact()))
+}
+
+/// Seal a provider secret for storage; the empty string means "clear" and stays empty.
+fn seal_optional(s: &AppState, id: Uuid, column: &str, plain: &str) -> String {
+    if plain.is_empty() {
+        String::new()
+    } else {
+        s.vault.seal_col("programs", column, id, plain)
+    }
 }
 
 /// Delete a program and its sites, types, plans, enrollments and codes. 409 once it has clicks or conversions.
@@ -385,7 +400,8 @@ pub async fn rotate_secrets(
     let ws = auth.principal.workspace_scope(None)?;
     let secret = format!("whsec_{}", random_hex(32));
     let mut tx = s.pool.begin().await?;
-    let program = bf_db::programs::set_webhook_secret(&mut *tx, ws, id, &secret)
+    let sealed = s.vault.seal_col("programs", "webhook_secret", id, &secret);
+    let mut program = bf_db::programs::set_webhook_secret(&mut *tx, ws, id, &sealed)
         .await?
         .ok_or_else(not_found)?;
     audit::record(
@@ -399,6 +415,7 @@ pub async fn rotate_secrets(
     .await?;
     notify_config(&mut *tx).await?;
     tx.commit().await?;
+    program.webhook_secret = Some(secret);
     Ok(Json(program))
 }
 

@@ -76,6 +76,11 @@ POSTGRES_PASSWORD=your-strong-db-password
 # Secret salt for IP hashing in the tracker (required): openssl rand -hex 32
 BF_IP_SALT=your-random-ip-salt
 
+# Master key(s) that encrypt webhook/Stripe/Paddle secrets in the database (required).
+# Format kid:base64(32 bytes); the first entry is the active key.
+# Generate: echo "k1:$(head -c32 /dev/urandom | base64)"
+BF_MASTER_KEYS=k1:replace-with-generated-value
+
 # Domain for Caddy automatic TLS (required, an https hostname)
 SITE_ADDRESS=affiliates.example.com
 
@@ -92,7 +97,7 @@ Run the stack in the background:
 docker compose --env-file .env -f deploy/docker-compose.yml up -d
 ```
 
-Run it from the repo root. Compose looks for `.env` next to the compose file (`deploy/`), not in your shell's directory, so `--env-file .env` is required for the root `.env` to be read. `JWT_SECRET`, `POSTGRES_PASSWORD`, `BF_IP_SALT` and `SITE_ADDRESS` have no defaults: Compose refuses to start if any is unset. `deploy/docker-compose.yml` is the one canonical file; `deploy/compose.yml` is a symlink to it. Check your configuration with `docker compose --env-file .env -f deploy/docker-compose.yml config`.
+Run it from the repo root. Compose looks for `.env` next to the compose file (`deploy/`), not in your shell's directory, so `--env-file .env` is required for the root `.env` to be read. `JWT_SECRET`, `POSTGRES_PASSWORD`, `BF_IP_SALT`, `BF_MASTER_KEYS` and `SITE_ADDRESS` have no defaults: Compose refuses to start if any is unset. `deploy/docker-compose.yml` is the one canonical file; `deploy/compose.yml` is a symlink to it. Check your configuration with `docker compose --env-file .env -f deploy/docker-compose.yml config`.
 
 Compose launches four services:
 
@@ -274,6 +279,23 @@ Restore with:
 gunzip -c /backups/bunfiiliate-2026-10-26.sql.gz | \
   docker compose --env-file .env -f deploy/docker-compose.yml exec -T postgres psql -U postgres -d bunfiiliate
 ```
+
+### Secrets at rest and master keys
+
+Webhook signing secrets, Stripe/Paddle secrets and endpoint secrets are stored encrypted (`bfenc1:` values: XChaCha20-Poly1305, a random data key per value wrapped by a master key). The API, worker and tracker all need `BF_MASTER_KEYS` (or `BF_MASTER_KEY_FILE`, same format, one key per line; set only one). Without it they refuse to start, unless `BF_ALLOW_PLAINTEXT_SECRETS=1`, which stores secrets in plaintext and logs a warning.
+
+**Back the keys up separately from the database dump.** A dump restored without its keys cannot be decrypted.
+
+Existing plaintext rows keep working and are encrypted by the re-encrypt command below.
+
+**Rotating the master key**
+
+1. Generate a new key and put it first, keeping the old one: `BF_MASTER_KEYS="k2:<new>,k1:<old>"` on the api, worker and tracker. Restart them.
+2. `api secrets reencrypt` seals any plaintext and re-wraps every value under `k2`. Use `--dry-run` to count first. It is idempotent and tells the tracker to reload.
+3. `api secrets check` exits 1 while any plaintext or old-key value remains. Run it until it exits 0.
+4. Remove `k1` from `BF_MASTER_KEYS` and restart.
+
+The tracker skips a program whose secrets will not decrypt (`bf_snapshot_decrypt_fail_total` counts them) and answers 503 for that program's key until the keys are fixed; other programs are unaffected.
 
 ### WAL Spool Directory
 

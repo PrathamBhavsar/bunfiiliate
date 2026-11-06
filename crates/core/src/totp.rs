@@ -1,14 +1,14 @@
 //! RFC 6238 TOTP (SHA-1, 30 s, 6 digits) and single-use recovery codes.
 //!
-//! Recovery codes are stored as plain SHA-256 of the normalised code. That is
-//! acceptable only because each code carries ~50 random bits, is single use,
-//! and the reset endpoint is rate limited and locks out per user.
+//! Recovery codes carry only ~50 random bits, so they must never be stored
+//! under a fast unsalted hash: a leaked table would fall to offline guessing.
+//! The API stores them with salted argon2 (see `api::totp`); this module only
+//! generates and normalises them.
 
 use hmac::{Hmac, Mac};
 use rand::RngCore;
 use rand::rngs::OsRng;
 use sha1::Sha1;
-use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 const PERIOD: i64 = 30;
@@ -117,11 +117,6 @@ pub fn normalize_recovery(s: &str) -> String {
     s.trim().to_lowercase().replace(' ', "")
 }
 
-/// SHA-256 of the normalised code, as stored.
-pub fn recovery_hash(code: &str) -> [u8; 32] {
-    Sha256::digest(normalize_recovery(code).as_bytes()).into()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,10 +209,9 @@ mod tests {
     }
 
     #[test]
-    fn recovery_normalisation_and_hash() {
+    fn recovery_normalisation() {
         assert_eq!(normalize_recovery("  ABCDE-Fghjk "), "abcde-fghjk");
-        assert_eq!(recovery_hash("ABCDE FGHJK"), recovery_hash("abcdefghjk"));
-        assert_ne!(recovery_hash("aaaaa-aaaaa"), recovery_hash("aaaaa-aaaab"));
+        assert_eq!(normalize_recovery("ABCDE FGHJK"), "abcdefghjk");
     }
 
     proptest! {
