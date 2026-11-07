@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-07] Plan v2 waves 4-5 (tribe)
+
+- **Merged**: A10, A13, A15, web auth pages, B09, B03, C03, C04, C14, C15, C16. Migrations 0072, 0077. New gates in `make ci`: `sql-lint`, `migrations-check`, `tracker-openapi-check`, `js-test`.
+- **Lessons**: when two branches both add to `tenant-annotations.toml`, keep-both conflict resolution can glue entries together (a lost `[[route]]` header): re-run the inventory test after every merge. New migrations need `UPDATE_CHECKSUMS=1 cargo test -p bf-db --test upgrade`. The SQL lint catches unscoped queries in code written before the lint existed; scope by `workspace_id` rather than allowlisting. Workers share `CARGO_TARGET_DIR` to save disk.
+- **Validation**: `make ci` and `make e2e` pass before merge.
+
 ## [2026-11-07] Plan v2 waves 1-3 (tribe)
 
 - **Process**: three goldfish reviews returned revise; `docs/plan/REVISIONS.md` is the binding addendum (migration numbers, sealed credentials, payout idempotency, C20 safety). Workers run in their own worktrees and delete them after merge: four worktrees held about 15 GB and filled the disk once.
