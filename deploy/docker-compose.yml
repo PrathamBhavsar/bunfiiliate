@@ -41,6 +41,12 @@ services:
     volumes:
       - spool_data:/var/spool/bunfiiliate
       - web_static:/var/www/html
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
 
   tracker:
     build:
@@ -68,6 +74,12 @@ services:
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - spool_data:/var/spool/bunfiiliate
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
 
   caddy:
     image: caddy:2-alpine

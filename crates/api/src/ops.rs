@@ -26,6 +26,8 @@ const CONTACT_STATUSES: [&str; 3] = ["new", "read", "closed"];
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/healthz", get(healthz))
+        .route("/readyz", get(readyz))
         .route("/api/v1/notifications", get(list_notifications))
         .route("/api/v1/notifications/{id}/read", post(mark_read))
         .route(
@@ -38,6 +40,40 @@ pub fn routes() -> Router<AppState> {
         )
         .route("/api/v1/settings", get(get_settings).put(put_settings))
         .route("/api/v1/audit-log", get(list_audit))
+}
+
+// ---- health
+
+/// Liveness: the process is up. No auth, no DB.
+#[utoipa::path(get, path = "/healthz", tag = "ops", responses((status = 200, description = "alive")))]
+pub async fn healthz() -> &'static str {
+    "ok"
+}
+
+/// Readiness: Postgres answers and the schema is at (or past) the migration head
+/// this binary embeds. No auth.
+#[utoipa::path(
+    get,
+    path = "/readyz",
+    tag = "ops",
+    responses((status = 200, description = "ready"), (status = 503, description = "not ready"))
+)]
+pub async fn readyz(State(s): State<AppState>) -> (StatusCode, Json<Value>) {
+    let want = bf_db::embedded_head();
+    match bf_db::applied_head(&s.pool).await {
+        Ok(have) if have >= want => (
+            StatusCode::OK,
+            Json(json!({"status": "ok", "migration_head": have})),
+        ),
+        Ok(have) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"status": "migrating", "migration_head": have, "expected": want})),
+        ),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({"status": "db_unavailable"})),
+        ),
+    }
 }
 
 // ---- notifications

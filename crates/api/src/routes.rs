@@ -69,6 +69,7 @@ impl Modify for CookieAuth {
         webhooks::redeliver,
         mail::create_template, mail::list_templates, mail::get_template,
         mail::update_template, mail::delete_template,
+        ops::healthz, ops::readyz,
         ops::list_notifications, ops::mark_read,
         ops::create_contact, ops::list_contacts, ops::update_contact,
         ops::get_settings, ops::put_settings, ops::list_audit,
