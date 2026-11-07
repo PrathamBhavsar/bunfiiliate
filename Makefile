@@ -1,4 +1,4 @@
-.PHONY: pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test
+.PHONY: migrations-check pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test
 
 ci:
 	cargo fmt --check
@@ -51,3 +51,9 @@ js-test:
 
 pentest:
 	scripts/pentest.sh
+
+migrations-check:
+	scripts/tests/ci_shape.sh
+	scripts/tests/check_migrations_test.sh
+	scripts/check-migrations.sh
+	cargo test -p bf-db --test upgrade

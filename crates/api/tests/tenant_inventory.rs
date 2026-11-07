@@ -234,6 +234,8 @@ fn public_routes_allowlist() {
         .collect();
     let want: BTreeSet<String> = [
         "api get /api/openapi.json",
+        "api get /healthz",
+        "api get /readyz",
         "api post /api/v1/affiliates/register",
         "api post /api/v1/auth/login",
         "api post /api/v1/auth/refresh",

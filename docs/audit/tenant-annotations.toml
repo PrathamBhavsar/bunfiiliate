@@ -835,3 +835,19 @@ source = "tracker"
 kind = "webhook"
 role = "none"
 reason = "Paddle inbound, program key in path"
+
+[[route]]
+method = "get"
+path = "/healthz"
+source = "api"
+kind = "public"
+role = "none"
+reason = "liveness probe"
+
+[[route]]
+method = "get"
+path = "/readyz"
+source = "api"
+kind = "public"
+role = "none"
+reason = "readiness probe (db ping + migration head)"

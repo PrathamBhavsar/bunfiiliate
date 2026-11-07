@@ -43,6 +43,39 @@ jobs:
       - name: Cargo deny
         uses: EmbarkStudios/cargo-deny-action@v2
 
+  migrations:
+    name: migrations
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:password@localhost:5432/postgres
+      BASE_REF: origin/staging
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: Swatinem/rust-cache@v2
+      - name: Fixture tests
+        run: scripts/tests/check_migrations_test.sh
+      - name: Migration policy
+        run: scripts/check-migrations.sh
+      - name: Upgrade from snapshots
+        run: cargo test -p bf-db --test upgrade
+
   web:
     name: web
     runs-on: ubuntu-latest
