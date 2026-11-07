@@ -106,6 +106,41 @@ pub fn routes() -> Router<AppState> {
         .merge(payouts::routes())
 }
 
+/// One OpenAPI operation, for the tenant audit inventory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteInfo {
+    pub method: String,
+    pub path: String,
+    /// Operation declares a security requirement (cookie session).
+    pub secured: bool,
+    pub path_params: Vec<String>,
+}
+
+/// Every operation in the OpenAPI doc, sorted by path then method.
+pub fn route_table() -> Vec<RouteInfo> {
+    let doc = serde_json::to_value(ApiDoc::openapi()).expect("openapi serialises");
+    let mut out = Vec::new();
+    for (path, item) in doc["paths"].as_object().into_iter().flatten() {
+        for (method, op) in item.as_object().into_iter().flatten() {
+            let path_params = op["parameters"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|p| p["in"] == "path")
+                .filter_map(|p| p["name"].as_str().map(str::to_owned))
+                .collect();
+            out.push(RouteInfo {
+                method: method.clone(),
+                path: path.clone(),
+                secured: op["security"].as_array().is_some_and(|a| !a.is_empty()),
+                path_params,
+            });
+        }
+    }
+    out.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
+    out
+}
+
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {
     Json(ApiDoc::openapi())
 }
