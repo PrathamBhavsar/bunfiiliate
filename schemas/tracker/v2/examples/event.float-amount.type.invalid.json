@@ -1,0 +1,19 @@
+{
+  "schema": "bf.event.v2",
+  "type": "sale",
+  "external_id": "ord_123",
+  "occurred_at": "2026-01-01T12:00:00Z",
+  "click_id": "01JABC",
+  "code": "AFF123",
+  "customer": {
+    "external_id": "cus_9",
+    "email_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "amount_cents": 49.5,
+  "currency": "USD",
+  "meta": {
+    "plan": "pro",
+    "seats": 3,
+    "trial": false
+  }
+}

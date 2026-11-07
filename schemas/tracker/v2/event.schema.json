@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bunfiiliate.dev/schemas/tracker/v2/event.schema.json",
+  "title": "Event v2 (POST /v2/events/{key})",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "type", "external_id", "occurred_at"],
+  "properties": {
+    "schema": { "const": "bf.event.v2" },
+    "type": { "type": "string", "pattern": "^(sale|signup|lead|refund|chargeback|custom:[a-z0-9_]{1,32})$" },
+    "external_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000]*$" },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "click_id": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+    "code": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+    "customer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "external_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000]*$" },
+        "email_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "amount_cents": { "type": "integer", "minimum": 0 },
+    "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "ref_external_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[^\\u0000]*$" },
+    "meta": {
+      "type": "object",
+      "maxProperties": 20,
+      "propertyNames": { "maxLength": 64, "pattern": "^[^\\u0000]*$" },
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string", "maxLength": 512, "pattern": "^[^\\u0000]*$" },
+          { "type": "number" },
+          { "type": "boolean" }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "enum": ["sale", "refund", "chargeback"] } }, "required": ["type"] },
+      "then": { "required": ["amount_cents", "currency"] }
+    },
+    {
+      "if": { "properties": { "type": { "enum": ["refund", "chargeback"] } }, "required": ["type"] },
+      "then": { "required": ["ref_external_id"] }
+    }
+  ]
+}

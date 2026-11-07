@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bunfiiliate.dev/schemas/tracker/v2/stripe-note.schema.json",
+  "title": "Stripe webhook: the minimal envelope bunfiiliate reads (POST /v2/webhooks/stripe/{key})",
+  "description": "Payload is Stripe-native and otherwise unvalidated. Only these fields are relied on; unknown fields are allowed.",
+  "type": "object",
+  "required": ["id", "type"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^evt_[A-Za-z0-9]+$", "maxLength": 255 },
+    "object": { "const": "event" },
+    "type": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "data": { "type": "object", "properties": { "object": { "type": "object" } } }
+  }
+}

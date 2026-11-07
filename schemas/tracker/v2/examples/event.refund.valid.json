@@ -1,0 +1,9 @@
+{
+  "schema": "bf.event.v2",
+  "type": "refund",
+  "external_id": "ref_1",
+  "occurred_at": "2026-01-02T12:00:00Z",
+  "amount_cents": 4900,
+  "currency": "USD",
+  "ref_external_id": "ord_123"
+}

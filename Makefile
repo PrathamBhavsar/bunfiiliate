@@ -1,4 +1,4 @@
-.PHONY: ci fmt clippy test deny web openapi openapi-check e2e
+.PHONY: ci fmt clippy test deny web openapi openapi-check e2e schemas-check
 
 ci:
 	cargo fmt --check
@@ -40,3 +40,7 @@ openapi-check:
 
 e2e:
 	scripts/e2e.sh
+
+schemas-check:
+	npm --prefix scripts/schemas install --silent --no-audit --no-fund
+	node scripts/validate-schemas.mjs
