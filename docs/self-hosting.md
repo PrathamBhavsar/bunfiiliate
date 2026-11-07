@@ -57,7 +57,7 @@ bunfiiliate is designed to run efficiently on a single modest VPS (e.g. 1–2 vC
 ### Step 1: Clone Repository & Prepare Environment
 
 ```bash
-git clone https://github.com/bunfiiliate/bunfiiliate.git /opt/bunfiiliate
+git clone https://github.com/PrathamBhavsar/bunfiiliate.git /opt/bunfiiliate
 cd /opt/bunfiiliate
 
 # Copy example environment configuration
