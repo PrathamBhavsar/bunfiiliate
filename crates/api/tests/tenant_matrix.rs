@@ -99,6 +99,7 @@ struct Ws {
     customer: Uuid,
     conversion: Uuid,
     batch: Uuid,
+    request: Uuid,
     endpoint: Uuid,
     delivery: Uuid,
     template: Uuid,
@@ -233,6 +234,17 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
         &[batch, program, admin_user],
     )
     .await;
+    let request = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO payout_requests (id, affiliate_id, program_id, requested_cents, currency) \
+         VALUES ($1, $2, $3, 100, 'USD')",
+    )
+    .bind(request)
+    .bind(affiliate)
+    .bind(program)
+    .execute(pool)
+    .await
+    .unwrap();
     let (endpoint, delivery, template, notification, contact) = (
         Uuid::now_v7(),
         Uuid::now_v7(),
@@ -284,6 +296,7 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
         customer,
         conversion,
         batch,
+        request,
         endpoint,
         delivery,
         template,
@@ -399,6 +412,7 @@ fn resource_for(prefix: &str, ids: &Ws) -> String {
         ("/api/v1/customers", ids.customer),
         ("/api/v1/email-templates", ids.template),
         ("/api/v1/notifications", ids.notification),
+        ("/api/v1/payout-requests", ids.request),
         ("/api/v1/payouts/batches", ids.batch),
         ("/api/v1/programs", ids.program),
         ("/api/v1/users", ids.aff_user),
@@ -428,6 +442,10 @@ fn body(m: &str, path: &str, f: &Ws) -> Option<Value> {
         }
         ("post", "/api/v1/members") => {
             json!({"email": "intruder@x.io", "password": "correct horse battery"})
+        }
+        ("post", "/api/v1/payout-requests/{id}/reject") => json!({"reason": "x"}),
+        ("post", "/api/v1/me/payout-requests") => {
+            json!({"program_id": f.program, "requested_cents": 100, "currency": "USD"})
         }
         ("post", "/api/v1/payouts/batches") => json!({"program_id": f.program}),
         ("patch", "/api/v1/programs/{id}") => json!({"name": "hijacked"}),
@@ -480,7 +498,7 @@ fn query(m: &str, path: &str, f: &Ws) -> String {
 
 // ---- B snapshot ----
 
-const SNAP: [(&str, &str); 17] = [
+const SNAP: [(&str, &str); 18] = [
     (
         "workspaces",
         "SELECT id::text, name, slug FROM workspaces WHERE id = $1",
@@ -525,6 +543,10 @@ const SNAP: [(&str, &str); 17] = [
     (
         "batches",
         "SELECT c.* FROM payout_batches c JOIN programs p ON p.id = c.program_id WHERE p.workspace_id = $1",
+    ),
+    (
+        "payout_requests",
+        "SELECT c.* FROM payout_requests c JOIN programs p ON p.id = c.program_id WHERE p.workspace_id = $1",
     ),
     (
         "endpoints",
@@ -642,6 +664,7 @@ async fn run_matrix(pool: &PgPool, check_snapshot: bool) -> Run {
             b.delivery,
             b.conversion,
             b.batch,
+            b.request,
             b.customer,
             b.affiliate,
             b.template,
@@ -735,6 +758,7 @@ async fn lists_never_contain_foreign_rows(pool: PgPool) {
             b.affiliate,
             b.conversion,
             b.batch,
+            b.request,
             b.endpoint,
             b.template,
             b.contact,

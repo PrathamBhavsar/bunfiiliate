@@ -5405,6 +5405,37 @@
           }
         ]
       }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Liveness: the process is up. No auth, no DB.",
+        "operationId": "healthz",
+        "responses": {
+          "200": {
+            "description": "alive"
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Readiness: Postgres answers and the schema is at (or past) the migration head\nthis binary embeds. No auth.",
+        "operationId": "readyz",
+        "responses": {
+          "200": {
+            "description": "ready"
+          },
+          "503": {
+            "description": "not ready"
+          }
+        }
+      }
     }
   },
   "components": {
