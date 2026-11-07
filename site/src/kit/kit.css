@@ -99,9 +99,11 @@ x-live { display: block; padding-block: clamp(56px, 9vw, 112px); border-bottom: 
 .receipt li { display: flex; align-items: baseline; gap: 12px; padding: 14px 0; border-bottom: 1px dashed var(--line-2); }
 .receipt .k { color: var(--fg-dim); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.8125rem; }
 .receipt .dots { flex: 1; border-bottom: 1px dotted var(--line-2); transform: translateY(-4px); min-width: 24px; }
-.receipt .v { color: var(--fg); text-align: right; }
+.receipt .v { color: var(--fg); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.live > * { min-width: 0; }
 .receipt .v a { color: var(--accent); }
 @media (max-width: 860px) { .live { grid-template-columns: 1fr; } }
+@media (max-width: 520px) { .receipt li { flex-wrap: wrap; row-gap: 2px; } .receipt .dots { display: none; } .receipt .v { flex-basis: 100%; text-align: left; } }
 
 /* features */
 x-features { display: block; padding-block: clamp(64px, 10vw, 128px); }
