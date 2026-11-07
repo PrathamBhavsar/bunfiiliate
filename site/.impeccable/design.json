@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-07T00:00:00Z",
+  "title": "Design System: bunfiiliate site",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "Acid Green", "canonical": "#b8ff3c", "tonalRamp": ["#2b4010", "#44651a", "#5e8c22", "#7bb52c", "#98e035", "#b8ff3c", "#d3ff82", "#ebffc4"] },
+      "accent-ink": { "role": "primary", "displayName": "Ink on Acid", "canonical": "#07090a", "tonalRamp": ["#07090a", "#0c1110", "#131a17", "#1d2622", "#2d3a34", "#556059", "#98a396", "#e8eee4"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#07090a", "tonalRamp": ["#07090a", "#0c1110", "#131a17", "#1d2622", "#2d3a34", "#556059", "#98a396", "#e8eee4"] },
+      "ink-raised": { "role": "neutral", "displayName": "Raised Ink", "canonical": "#0c1110", "tonalRamp": ["#07090a", "#0c1110", "#131a17", "#1d2622", "#2d3a34", "#556059", "#98a396", "#e8eee4"] },
+      "ink-sunken": { "role": "neutral", "displayName": "Sunken Ink", "canonical": "#131a17", "tonalRamp": ["#07090a", "#0c1110", "#131a17", "#1d2622", "#2d3a34", "#556059", "#98a396", "#e8eee4"] },
+      "bone": { "role": "neutral", "displayName": "Bone", "canonical": "#e8eee4", "tonalRamp": ["#2d3a34", "#556059", "#7a867a", "#98a396", "#b4bfb1", "#cfd8cb", "#e8eee4", "#f5f8f3"] },
+      "bone-dim": { "role": "neutral", "displayName": "Dim Bone", "canonical": "#98a396", "tonalRamp": ["#2d3a34", "#445049", "#5d6a62", "#788579", "#98a396", "#b4bfb1", "#cfd8cb", "#e8eee4"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#1d2622", "tonalRamp": ["#07090a", "#0c1110", "#131a17", "#1d2622", "#2d3a34", "#445049", "#5d6a62", "#98a396"] },
+      "hairline-strong": { "role": "neutral", "displayName": "Strong Hairline", "canonical": "#2d3a34", "tonalRamp": ["#07090a", "#131a17", "#1d2622", "#2d3a34", "#445049", "#5d6a62", "#788579", "#98a396"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Hero h1 only, Geist Pixel Square, max 11ch." },
+      "headline": { "displayName": "Headline", "purpose": "Section h2, pixel face." },
+      "title": { "displayName": "Title", "purpose": "Group heads, flow steps, doc headings." },
+      "body": { "displayName": "Body", "purpose": "Satoshi prose and ledes." },
+      "label": { "displayName": "Label", "purpose": "Mono facts, receipt keys, meta lines." },
+      "code": { "displayName": "Code", "purpose": "Commands and code blocks in Geist Mono." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "ease", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Button and marker transitions (0.2s to 0.25s)." },
+      { "name": "hero-rise", "value": "0.9s var(--ease) both, translateY(14px) fade, staggered 0.08s to 0.3s", "purpose": "The single authored entrance on hero copy; disabled under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "nav-collapse", "value": "760px" },
+      { "name": "grid-collapse", "value": "860px" },
+      { "name": "docs-toc-hide", "value": "1100px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acid fill, ink text; the main call to action.",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">Get started</a>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; height: 48px; padding-inline: 20px; background: var(--accent, #b8ff3c); color: var(--accent-ink, #07090a); border: 1px solid var(--accent, #b8ff3c); font-weight: 700; font-size: 0.9375rem; text-decoration: none; transition: background 0.2s, border-color 0.2s, transform 0.2s; } .ds-btn-primary:hover { background: var(--fg, #e8eee4); border-color: var(--fg, #e8eee4); } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: 2px solid var(--accent, #b8ff3c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Default Button",
+      "kind": "button",
+      "refersTo": "button-default",
+      "description": "Hairline outline button for secondary actions.",
+      "html": "<a class=\"ds-btn\" href=\"#\">Star on GitHub</a>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; height: 48px; padding-inline: 20px; border: 1px solid var(--line-2, #2d3a34); color: var(--fg, #e8eee4); font-weight: 700; font-size: 0.9375rem; text-decoration: none; transition: background 0.2s, border-color 0.2s, transform 0.2s; } .ds-btn:hover { border-color: var(--fg, #e8eee4); background: var(--bg-3, #131a17); } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: 2px solid var(--accent, #b8ff3c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Ink Button",
+      "kind": "button",
+      "refersTo": "button-ink",
+      "description": "Ink fill with acid text; used only on the acid install band.",
+      "html": "<div class=\"ds-band\"><a class=\"ds-btn-ink\" href=\"#\">Full install guide</a></div>",
+      "css": ".ds-band { background: var(--accent, #b8ff3c); padding: 24px; } .ds-btn-ink { display: inline-flex; align-items: center; height: 48px; padding-inline: 20px; background: var(--accent-ink, #07090a); color: var(--accent, #b8ff3c); border: 1px solid var(--accent-ink, #07090a); font-weight: 700; font-size: 0.9375rem; text-decoration: none; transition: background 0.2s, color 0.2s; } .ds-btn-ink:hover { background: transparent; color: var(--accent-ink, #07090a); } .ds-btn-ink:focus-visible { outline: 2px solid var(--accent-ink, #07090a); outline-offset: 3px; }"
+    },
+    {
+      "name": "Copy Line",
+      "kind": "input",
+      "refersTo": "copy-line",
+      "description": "One-line install command with square copy button.",
+      "html": "<div class=\"ds-copy\"><code>curl -fsSL example.sh | sh</code><button type=\"button\" aria-label=\"Copy\">⧉</button></div>",
+      "css": ".ds-copy { display: flex; align-items: center; max-width: 560px; background: var(--bg-2, #0c1110); border: 1px solid var(--line-2, #2d3a34); } .ds-copy code { flex: 1; padding: 14px 16px; font-family: var(--font-mono, 'Geist Mono', monospace); font-size: 0.8125rem; color: var(--fg, #e8eee4); } .ds-copy code::before { content: '$ '; color: var(--accent, #b8ff3c); } .ds-copy button { width: 48px; align-self: stretch; border: 0; border-left: 1px solid var(--line-2, #2d3a34); background: none; color: var(--fg-dim, #98a396); cursor: pointer; transition: color 0.15s, background 0.15s; } .ds-copy button:hover { color: var(--accent-ink, #07090a); background: var(--accent, #b8ff3c); } .ds-copy button:focus-visible { outline: 2px solid var(--accent, #b8ff3c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Install Tabs",
+      "kind": "nav",
+      "refersTo": "code-panel",
+      "description": "Segmented tablist with hairline dividers and an ink code panel, on the acid band.",
+      "html": "<div class=\"ds-band\"><div class=\"ds-tabs\" role=\"tablist\"><button role=\"tab\" aria-selected=\"true\">Docker</button><button role=\"tab\" aria-selected=\"false\">Binary</button></div><div class=\"ds-code\"><pre><span class=\"p\">$ </span>docker compose up -d</pre></div></div>",
+      "css": ".ds-band { background: var(--accent, #b8ff3c); padding: 24px; } .ds-tabs { display: flex; width: max-content; border: 1px solid var(--accent-ink, #07090a); } .ds-tabs button { padding: 10px 18px; border: 0; background: none; color: var(--accent-ink, #07090a); font-weight: 700; font-size: 0.9063rem; cursor: pointer; transition: background 0.15s, color 0.15s; } .ds-tabs button + button { border-left: 1px solid var(--accent-ink, #07090a); } .ds-tabs button[aria-selected='true'] { background: var(--accent-ink, #07090a); color: var(--accent, #b8ff3c); } .ds-tabs button:focus-visible { outline: 2px solid var(--accent-ink, #07090a); outline-offset: 3px; } .ds-code { margin-top: 14px; background: var(--accent-ink, #07090a); color: var(--fg, #e8eee4); } .ds-code pre { margin: 0; padding: 20px; font-family: var(--font-mono, 'Geist Mono', monospace); font-size: 0.8125rem; line-height: 1.75; } .ds-code .p { color: var(--accent, #b8ff3c); }"
+    },
+    {
+      "name": "Receipt Row",
+      "kind": "custom",
+      "refersTo": "label",
+      "description": "Dashed mono fact row with dotted leader, used for real project numbers.",
+      "html": "<ul class=\"ds-receipt\"><li><span class=\"k\">License</span><span class=\"dots\"></span><span class=\"v\">AGPL-3.0</span></li><li><span class=\"k\">Ledger sum</span><span class=\"dots\"></span><span class=\"v\">0.00</span></li></ul>",
+      "css": ".ds-receipt { list-style: none; margin: 0; padding: 0; font-family: var(--font-mono, 'Geist Mono', monospace); font-size: 0.9375rem; border-top: 1px dashed var(--line-2, #2d3a34); } .ds-receipt li { display: flex; align-items: baseline; gap: 12px; padding: 14px 0; border-bottom: 1px dashed var(--line-2, #2d3a34); } .ds-receipt .k { color: var(--fg-dim, #98a396); text-transform: uppercase; letter-spacing: 0.04em; font-size: 0.8125rem; } .ds-receipt .dots { flex: 1; min-width: 24px; border-bottom: 1px dotted var(--line-2, #2d3a34); transform: translateY(-4px); } .ds-receipt .v { color: var(--fg, #e8eee4); text-align: right; }"
+    },
+    {
+      "name": "Nav Bar",
+      "kind": "nav",
+      "refersTo": "button-primary",
+      "description": "Sticky ink nav with pixel wordmark, dim links, and primary action.",
+      "html": "<nav class=\"ds-nav\"><a class=\"mark\" href=\"#\">bun<b>f</b>iiliate</a><span class=\"links\"><a href=\"#\" aria-current=\"page\">Docs</a><a href=\"#\">GitHub</a></span></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 32px; height: 64px; padding-inline: 24px; background: var(--bg, #07090a); border-bottom: 1px solid var(--line, #1d2622); } .ds-nav .mark { font-family: var(--font-display, 'Geist Pixel Square', monospace); font-size: 1.375rem; color: var(--fg, #e8eee4); text-decoration: none; } .ds-nav .mark b { color: var(--accent, #b8ff3c); font-weight: 400; } .ds-nav .links { display: flex; gap: 28px; font-weight: 500; font-size: 0.9375rem; } .ds-nav .links a { color: var(--fg-dim, #98a396); text-decoration: none; transition: color 0.15s; } .ds-nav .links a:hover, .ds-nav .links a[aria-current] { color: var(--fg, #e8eee4); } .ds-nav a:focus-visible { outline: 2px solid var(--accent, #b8ff3c); outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Balanced Ledger",
+    "overview": "The site is a dark sheet of ledger paper: green-tinted ink ground, bone text, 1px hairlines, square corners, pixel-grid display type. Everything is exact and unhurried. The hero proves the product by showing ASCII click-rain landing in a ledger whose SUM stays pinned at 0.00; the rest of the page is receipts, rows, and rules rather than cards and tiles.\n\nOne saturated field per page carries the brand color at scale: the install band, drenched in acid green with ink-black type. Elsewhere the accent is a sparse mark (a link, an icon, a focus ring, a node). Dark only; there is no light theme.\n\nThe UI kit (site/src/kit/) is shared by two sibling sites, Deskpost (amber) and LearnPuppy (pink). Each overrides only the --accent, --bg*, and --fg* custom properties in site/src/brand.css. This document records the bunfiiliate skin; the structure, type, hairlines, and components belong to the kit and must not be forked per brand.",
+    "keyCharacteristics": [
+      "Pixel display type over a quiet humanist body; mono only for code, figures, and facts.",
+      "Square corners everywhere; separation by 1px hairlines and tonal steps, never shadows.",
+      "One drenched accent band; sparse accent marks elsewhere.",
+      "Receipt and ledger forms (dashed rows, dotted leaders, DR/CR, running sum) instead of icon-card grids.",
+      "Canvas is decoration only: aria-hidden, reduced-motion renders a still frame, all copy is real text."
+    ],
+    "rules": [
+      { "name": "The One Field Rule", "body": "Exactly one saturated acid-green field per page, the install band. Everything else uses the accent as a mark, never as a second block of color.", "section": "colors" },
+      { "name": "The Skin Seam Rule", "body": "A brand skin changes only --accent, --accent-ink, --bg*, --fg*. Never hardcode a hex in component CSS; read the token (the canvas reads tones from the computed custom properties).", "section": "colors" },
+      { "name": "The Mono Is Literal Rule", "body": "Geist Mono appears only for code, commands, figures, and facts; never for decorative headings or labels that are not data.", "section": "typography" },
+      { "name": "The Pixel Is Display Rule", "body": "The pixel face is used for headings, wordmark, and the faq \"+\" only, always weight 400 and letter-spacing 0; body text is never pixel.", "section": "typography" },
+      { "name": "The Hairline Depth Rule", "body": "Separate surfaces with a 1px line or a tonal step. No shadows, blur, or glass.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep every corner square and every divider a 1px hairline.",
+      "Do use Hugeicons through the kit icon set for all icons.",
+      "Do keep real numbers only (live stars, benchmarks) and hide a figure rather than invent it.",
+      "Do keep text in real DOM; the canvas is decorative and aria-hidden.",
+      "Do keep a 2px accent focus ring with 3px offset (ink on the acid band).",
+      "Do let sibling brands re-skin through brand.css tokens only."
+    ],
+    "donts": [
+      "Don't add shadows, glass, gradients as decoration, or rounded corners; the only gradient is the hero legibility scrim.",
+      "Don't introduce a second saturated field or a light theme.",
+      "Don't build icon-card grids, hero metric tiles, fake logos, or invented customer counts.",
+      "Don't use Geist Mono or the pixel face for body copy.",
+      "Don't hardcode brand colors in kit CSS or JS."
+    ]
+  }
+}
