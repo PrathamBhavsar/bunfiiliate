@@ -61,3 +61,7 @@ export function canAccess(role: Role, pathname: string) {
   const path = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
   return navFor(role).some((item) => item.href === path);
 }
+
+/** Detail pages are query-string routes (ADR-0006): the static export has no runtime path segments. */
+export const codeStatsHref = (code: string, admin: boolean) =>
+  `${admin ? "/referral-codes/detail" : "/me/links/detail"}?code=${encodeURIComponent(code)}`;
