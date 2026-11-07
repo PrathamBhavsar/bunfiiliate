@@ -40,6 +40,8 @@ jobs:
         run: cargo clippy --workspace -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - name: SQL scope lint
+        run: make sql-lint
       - name: Cargo deny
         uses: EmbarkStudios/cargo-deny-action@v2
 

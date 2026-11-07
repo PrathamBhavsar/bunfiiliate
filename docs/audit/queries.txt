@@ -12,8 +12,8 @@ crates/api/src/dispatch.rs:131: let endpoints: Vec<Uuid> = sqlx::query_scalar(
 crates/api/src/dispatch.rs:140: sqlx::query(
 crates/api/src/dispatch.rs:165: let Some((workspace, user, email)) = sqlx::query_as::<_, (Uuid, Uuid, String)>(
 crates/api/src/dispatch.rs:186: sqlx::query("INSERT INTO notifications (id, user_id, kind, body) VALUES ($1, $2, $3, $4)")
-crates/api/src/dispatch.rs:253: sqlx::query_as::<_, Due>(
-crates/api/src/dispatch.rs:311: sqlx::query(
+crates/api/src/dispatch.rs:255: sqlx::query_as::<_, Due>(
+crates/api/src/dispatch.rs:348: sqlx::query(
 crates/api/src/dispatch.rs:94: let Some((id, topic, payload)) = sqlx::query_as::<_, (i64, String, Value)>(
 crates/api/src/money.rs:132: sqlx::query_as(&format!("{}{CUSTOMERS} AND cu.id = $4", customer_select()))
 crates/api/src/money.rs:274: let items = sqlx::query_as(&format!(
@@ -23,29 +23,29 @@ crates/api/src/money.rs:45: Ok(args(sqlx::query_scalar(&sql)).fetch_one(&s.pool)
 crates/api/src/money.rs:580: let items = sqlx::query_as(&format!(
 crates/api/src/money.rs:657: let items = sqlx::query_as(&format!(
 crates/api/src/money.rs:99: let items = sqlx::query_as(&format!(
-crates/api/src/payouts.rs:103: sqlx::query(
-crates/api/src/payouts.rs:121: sqlx::query("UPDATE payout_batches SET status = 'approved', approved_by = $2 WHERE id = $1")
-crates/api/src/payouts.rs:126: sqlx::query("UPDATE payouts SET status = 'approved' WHERE batch_id = $1")
-crates/api/src/payouts.rs:138: sqlx::query("UPDATE payout_batches SET status = 'cancelled' WHERE id = $1")
-crates/api/src/payouts.rs:142: sqlx::query("UPDATE payouts SET status = 'cancelled' WHERE batch_id = $1")
-crates/api/src/payouts.rs:146: sqlx::query(
-crates/api/src/payouts.rs:165: let rows: Vec<(Uuid, Uuid, i64, String)> = sqlx::query_as(
-crates/api/src/payouts.rs:172: let program: Uuid = sqlx::query_scalar("SELECT program_id FROM payout_batches WHERE id = $1")
-crates/api/src/payouts.rs:188: sqlx::query("UPDATE payouts SET status = 'paid', ledger_txn_id = $2 WHERE id = $1")
-crates/api/src/payouts.rs:194: sqlx::query(
-crates/api/src/payouts.rs:201: sqlx::query("UPDATE payout_batches SET status = 'paid', paid_at = now() WHERE id = $1")
-crates/api/src/payouts.rs:211: sqlx::query_scalar::<_, i32>("SELECT 1 FROM payout_batches WHERE id = $1")
-crates/api/src/payouts.rs:341: let batch = sqlx::query_as(&format!("{}{BATCHES} AND b.id = $4", batch_select()))
-crates/api/src/payouts.rs:349: let payouts = sqlx::query_as(
-crates/api/src/payouts.rs:363: sqlx::query_scalar::<_, i32>(
-crates/api/src/payouts.rs:430: let items = sqlx::query_as(&format!(
-crates/api/src/payouts.rs:441: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM {BATCHES}"))
+crates/api/src/payouts.rs:113: sqlx::query(
+crates/api/src/payouts.rs:137: sqlx::query("UPDATE payout_batches SET status = 'approved', approved_by = $2 WHERE id = $1")
+crates/api/src/payouts.rs:143: sqlx::query("UPDATE payouts SET status = 'approved' WHERE batch_id = $1")
+crates/api/src/payouts.rs:156: sqlx::query("UPDATE payout_batches SET status = 'cancelled' WHERE id = $1")
+crates/api/src/payouts.rs:161: sqlx::query("UPDATE payouts SET status = 'cancelled' WHERE batch_id = $1")
+crates/api/src/payouts.rs:166: sqlx::query(
+crates/api/src/payouts.rs:186: let rows: Vec<(Uuid, Uuid, i64, String)> = sqlx::query_as(
+crates/api/src/payouts.rs:194: let program: Uuid = sqlx::query_scalar("SELECT program_id FROM payout_batches WHERE id = $1")
+crates/api/src/payouts.rs:211: sqlx::query("UPDATE payouts SET status = 'paid', ledger_txn_id = $2 WHERE id = $1")
+crates/api/src/payouts.rs:218: sqlx::query(
+crates/api/src/payouts.rs:226: sqlx::query("UPDATE payout_batches SET status = 'paid', paid_at = now() WHERE id = $1")
+crates/api/src/payouts.rs:236: sqlx::query_scalar::<_, i32>(
+crates/api/src/payouts.rs:372: let batch = sqlx::query_as(&format!("{}{BATCHES} AND b.id = $4", batch_select()))
+crates/api/src/payouts.rs:381: let payouts = sqlx::query_as(
+crates/api/src/payouts.rs:395: sqlx::query_scalar::<_, i32>(
+crates/api/src/payouts.rs:462: let items = sqlx::query_as(&format!(
+crates/api/src/payouts.rs:473: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM {BATCHES}"))
 crates/api/src/payouts.rs:49: let row: Option<(String, String)> = sqlx::query_as(
-crates/api/src/payouts.rs:631: let items = sqlx::query_as(&format!(
-crates/api/src/payouts.rs:643: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM {MY_PAYOUTS}"))
-crates/api/src/payouts.rs:73: sqlx::query_scalar::<_, i32>("SELECT 1 FROM programs WHERE id = $1 FOR NO KEY UPDATE")
-crates/api/src/payouts.rs:83: sqlx::query("INSERT INTO payout_batches (id, program_id, created_by) VALUES ($1, $2, $3)")
-crates/api/src/payouts.rs:92: sqlx::query(
+crates/api/src/payouts.rs:663: let items = sqlx::query_as(&format!(
+crates/api/src/payouts.rs:675: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM {MY_PAYOUTS}"))
+crates/api/src/payouts.rs:76: sqlx::query_scalar::<_, i32>(
+crates/api/src/payouts.rs:90: sqlx::query("INSERT INTO payout_batches (id, program_id, created_by) VALUES ($1, $2, $3)")
+crates/api/src/payouts.rs:99: sqlx::query(
 crates/api/src/secrets.rs:120: sqlx::query(&format!(
 crates/api/src/secrets.rs:138: sqlx::query(
 crates/api/src/secrets.rs:162: sqlx::query_as(&format!(
@@ -80,64 +80,69 @@ crates/db/src/affiliates.rs:159: sqlx::query_as(
 crates/db/src/affiliates.rs:186: let items = sqlx::query_as(&format!(
 crates/db/src/affiliates.rs:196: let total = sqlx::query_scalar(&format!("SELECT count(*) {FROM}"))
 crates/db/src/affiliates.rs:212: let res = sqlx::query(
-crates/db/src/affiliates.rs:225: sqlx::query("DELETE FROM referral_codes WHERE program_id = $1 AND affiliate_id = $2")
-crates/db/src/affiliates.rs:250: let res = sqlx::query(
-crates/db/src/affiliates.rs:269: sqlx::query_scalar("SELECT count(*) FROM referral_codes WHERE affiliate_id = $1")
-crates/db/src/affiliates.rs:286: let items = sqlx::query_as(&format!(
-crates/db/src/affiliates.rs:297: let total = sqlx::query_scalar(&format!("SELECT count(*) {FROM}"))
-crates/db/src/affiliates.rs:314: let res = sqlx::query(
+crates/db/src/affiliates.rs:225: sqlx::query(
+crates/db/src/affiliates.rs:255: let res = sqlx::query(
+crates/db/src/affiliates.rs:278: sqlx::query_scalar(
+crates/db/src/affiliates.rs:299: let items = sqlx::query_as(&format!(
+crates/db/src/affiliates.rs:310: let total = sqlx::query_scalar(&format!("SELECT count(*) {FROM}"))
 crates/db/src/affiliates.rs:31: sqlx::query(
-crates/db/src/affiliates.rs:333: let res = sqlx::query(
+crates/db/src/affiliates.rs:327: let res = sqlx::query(
+crates/db/src/affiliates.rs:346: let res = sqlx::query(
 crates/db/src/affiliates.rs:51: let items = sqlx::query_as(&format!(
 crates/db/src/affiliates.rs:60: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM affiliates a WHERE {FILTER}"))
 crates/db/src/affiliates.rs:73: sqlx::query_as(&format!(
 crates/db/src/affiliates.rs:87: sqlx::query_as(&format!(
-crates/db/src/auth.rs:131: sqlx::query(
-crates/db/src/auth.rs:180: let row: Option<(Uuid, Uuid, Uuid, bool, bool, bool)> = sqlx::query_as(
-crates/db/src/auth.rs:219: sqlx::query("UPDATE refresh_tokens SET revoked_at = now(), replaced_by = $2 WHERE id = $1")
-crates/db/src/auth.rs:232: sqlx::query_scalar("SELECT family_id FROM refresh_tokens WHERE token_hash = $1")
-crates/db/src/auth.rs:243: sqlx::query(
-crates/db/src/auth.rs:263: sqlx::query(
-crates/db/src/auth.rs:33: sqlx::query("INSERT INTO workspaces (id, name, slug) VALUES ($1, $2, $3)")
-crates/db/src/auth.rs:43: sqlx::query(
-crates/db/src/auth.rs:59: sqlx::query("SELECT pg_advisory_xact_lock(hashtext('bf_bootstrap'))")
-crates/db/src/auth.rs:66: sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users WHERE role = 'super_admin')")
-crates/db/src/auth.rs:75: sqlx::query_as(&format!("SELECT {USER_COLS} FROM users WHERE email = $1"))
-crates/db/src/auth.rs:82: sqlx::query_as(&format!("SELECT {USER_COLS} FROM users WHERE id = $1"))
-crates/db/src/auth.rs:90: sqlx::query_scalar("SELECT token_version FROM users WHERE id = $1")
-crates/db/src/auth.rs:98: sqlx::query("UPDATE users SET token_version = token_version + 1 WHERE id = $1")
+crates/db/src/auth.rs:126: sqlx::query(
+crates/db/src/auth.rs:175: let row: Option<(Uuid, Uuid, Uuid, bool, bool, bool)> = sqlx::query_as(
+crates/db/src/auth.rs:214: sqlx::query("UPDATE refresh_tokens SET revoked_at = now(), replaced_by = $2 WHERE id = $1")
+crates/db/src/auth.rs:227: sqlx::query_scalar("SELECT family_id FROM refresh_tokens WHERE token_hash = $1")
+crates/db/src/auth.rs:238: sqlx::query(
+crates/db/src/auth.rs:258: sqlx::query(
+crates/db/src/auth.rs:280: sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+crates/db/src/auth.rs:290: sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+crates/db/src/auth.rs:304: sqlx::query("INSERT INTO notifications (id, user_id, kind, body) VALUES ($1, $2, $3, $4)")
+crates/db/src/auth.rs:38: sqlx::query(
+crates/db/src/auth.rs:54: sqlx::query("SELECT pg_advisory_xact_lock(hashtext('bf_bootstrap'))")
+crates/db/src/auth.rs:61: sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM users WHERE role = 'super_admin')")
+crates/db/src/auth.rs:70: sqlx::query_as(&format!("SELECT {USER_COLS} FROM users WHERE email = $1"))
+crates/db/src/auth.rs:77: sqlx::query_as(&format!("SELECT {USER_COLS} FROM users WHERE id = $1"))
+crates/db/src/auth.rs:85: sqlx::query_scalar("SELECT token_version FROM users WHERE id = $1")
+crates/db/src/auth.rs:93: sqlx::query("UPDATE users SET token_version = token_version + 1 WHERE id = $1")
+crates/db/src/billing.rs:34: sqlx::query(
+crates/db/src/billing.rs:52: sqlx::query_as(
+crates/db/src/billing.rs:77: let (programs, affiliates, monthly_clicks): (i64, i64, i64) = sqlx::query_as(
 crates/db/src/ledger.rs:52: sqlx::query(
 crates/db/src/ledger.rs:78: let row = sqlx::query_as::<_, Balance>(
 crates/db/src/ops.rs:112: let n = sqlx::query("DELETE FROM webhook_endpoints WHERE id = $1 AND workspace_id = $2")
 crates/db/src/ops.rs:150: let items = sqlx::query_as(&format!(
 crates/db/src/ops.rs:159: let total = sqlx::query_scalar(&format!(
 crates/db/src/ops.rs:175: sqlx::query_as(&format!(
-crates/db/src/ops.rs:186: sqlx::query("UPDATE webhook_deliveries SET attempt = 0, next_attempt_at = now() WHERE id = $1")
-crates/db/src/ops.rs:210: sqlx::query(
-crates/db/src/ops.rs:230: let items = sqlx::query_as(&format!(
-crates/db/src/ops.rs:239: let total = sqlx::query_scalar("SELECT count(*) FROM email_templates WHERE workspace_id = $1")
-crates/db/src/ops.rs:251: sqlx::query_as(&format!(
-crates/db/src/ops.rs:265: sqlx::query_as(&format!(
-crates/db/src/ops.rs:281: sqlx::query_as(&format!(
-crates/db/src/ops.rs:298: let n = sqlx::query("DELETE FROM email_templates WHERE id = $1 AND workspace_id = $2")
-crates/db/src/ops.rs:326: let items = sqlx::query_as(&format!(
+crates/db/src/ops.rs:190: sqlx::query(
+crates/db/src/ops.rs:219: sqlx::query(
+crates/db/src/ops.rs:239: let items = sqlx::query_as(&format!(
+crates/db/src/ops.rs:248: let total = sqlx::query_scalar("SELECT count(*) FROM email_templates WHERE workspace_id = $1")
+crates/db/src/ops.rs:260: sqlx::query_as(&format!(
+crates/db/src/ops.rs:274: sqlx::query_as(&format!(
+crates/db/src/ops.rs:290: sqlx::query_as(&format!(
+crates/db/src/ops.rs:307: let n = sqlx::query("DELETE FROM email_templates WHERE id = $1 AND workspace_id = $2")
 crates/db/src/ops.rs:32: sqlx::query(
-crates/db/src/ops.rs:336: let total = sqlx::query_scalar(&format!(
-crates/db/src/ops.rs:352: sqlx::query_as(
-crates/db/src/ops.rs:390: sqlx::query_as(&format!(
-crates/db/src/ops.rs:415: let items = sqlx::query_as(&format!(
-crates/db/src/ops.rs:425: let total = sqlx::query_scalar(&format!(
-crates/db/src/ops.rs:441: sqlx::query_as(&format!(
-crates/db/src/ops.rs:458: sqlx::query_scalar("SELECT settings FROM workspaces WHERE id = $1")
-crates/db/src/ops.rs:469: let n = sqlx::query("UPDATE workspaces SET settings = $2 WHERE id = $1")
-crates/db/src/ops.rs:501: let items = sqlx::query_as(&format!(
-crates/db/src/ops.rs:512: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM audit_log WHERE {FILTER}"))
+crates/db/src/ops.rs:335: let items = sqlx::query_as(&format!(
+crates/db/src/ops.rs:345: let total = sqlx::query_scalar(&format!(
+crates/db/src/ops.rs:361: sqlx::query_as(
+crates/db/src/ops.rs:399: sqlx::query_as(&format!(
+crates/db/src/ops.rs:424: let items = sqlx::query_as(&format!(
+crates/db/src/ops.rs:434: let total = sqlx::query_scalar(&format!(
+crates/db/src/ops.rs:450: sqlx::query_as(&format!(
+crates/db/src/ops.rs:467: sqlx::query_scalar("SELECT settings FROM workspaces WHERE id = $1")
+crates/db/src/ops.rs:478: let n = sqlx::query("UPDATE workspaces SET settings = $2 WHERE id = $1")
+crates/db/src/ops.rs:510: let items = sqlx::query_as(&format!(
+crates/db/src/ops.rs:521: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM audit_log WHERE {FILTER}"))
 crates/db/src/ops.rs:53: let items = sqlx::query_as(&format!(
 crates/db/src/ops.rs:63: sqlx::query_scalar("SELECT count(*) FROM webhook_endpoints WHERE workspace_id = $1")
 crates/db/src/ops.rs:75: sqlx::query_as(&format!(
 crates/db/src/ops.rs:93: sqlx::query_as(&format!(
-crates/db/src/payouts.rs:24: sqlx::query_as(
-crates/db/src/payouts.rs:48: sqlx::query_as(
+crates/db/src/payouts.rs:28: sqlx::query_as(
+crates/db/src/payouts.rs:54: sqlx::query_as(
 crates/db/src/programs.rs:113: sqlx::query_as(&format!(
 crates/db/src/programs.rs:143: sqlx::query_as(&format!(
 crates/db/src/programs.rs:175: sqlx::query_as(&format!(
@@ -158,10 +163,18 @@ crates/db/src/programs.rs:436: let items = sqlx::query_as(&format!(
 crates/db/src/programs.rs:445: let total = sqlx::query_scalar(&format!("SELECT count(*) {FROM}"))
 crates/db/src/programs.rs:460: let res = sqlx::query(
 crates/db/src/programs.rs:477: sqlx::query_scalar(
-crates/db/src/programs.rs:491: let res = sqlx::query(
+crates/db/src/programs.rs:492: let res = sqlx::query(
 crates/db/src/programs.rs:60: sqlx::query_as(&format!(
 crates/db/src/programs.rs:90: let items = sqlx::query_as(&format!(
 crates/db/src/programs.rs:99: let total = sqlx::query_scalar(&format!("SELECT count(*) FROM programs WHERE {FILTER}"))
+crates/db/src/reset_tokens.rs:15: sqlx::query("DELETE FROM password_reset_tokens WHERE user_id = $1 AND used_at IS NULL")
+crates/db/src/reset_tokens.rs:19: sqlx::query(
+crates/db/src/reset_tokens.rs:35: sqlx::query_scalar(
+crates/db/src/throttle.rs:19: let locked: Option<Option<bool>> = sqlx::query_scalar(
+crates/db/src/throttle.rs:40: sqlx::query(
+crates/db/src/throttle.rs:49: let (failures, window_started_at, locked_until, lock_count): Row = sqlx::query_as(
+crates/db/src/throttle.rs:64: sqlx::query(
+crates/db/src/throttle.rs:85: sqlx::query("DELETE FROM auth_throttle WHERE scope = $1 AND key = $2")
 crates/db/src/totp.rs:105: sqlx::query("DELETE FROM user_recovery_codes WHERE user_id = $1")
 crates/db/src/totp.rs:116: sqlx::query_scalar(
 crates/db/src/totp.rs:129: sqlx::query_as(

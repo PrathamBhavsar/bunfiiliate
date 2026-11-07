@@ -20,7 +20,11 @@ pub struct CsvRow {
 
 /// Active affiliates whose payable, net of payouts still open (draft or approved), is
 /// positive and at least their `payout_min_cents`. A negative payable (clawback) is never owed.
-pub async fn owed(conn: &mut PgConnection, program_id: Uuid) -> Result<Vec<Owed>, sqlx::Error> {
+pub async fn owed(
+    conn: &mut PgConnection,
+    workspace_id: Uuid,
+    program_id: Uuid,
+) -> Result<Vec<Owed>, sqlx::Error> {
     sqlx::query_as(
         "SELECT affiliate_id, amount_cents FROM ( \
            SELECT a.id AS affiliate_id, a.payout_min_cents, \
@@ -29,11 +33,12 @@ pub async fn owed(conn: &mut PgConnection, program_id: Uuid) -> Result<Vec<Owed>
                     WHERE p.affiliate_id = a.id AND pb.program_id = $1 \
                       AND p.status IN ('draft', 'approved')), 0)::bigint AS amount_cents \
            FROM affiliate_balances b JOIN affiliates a ON a.id = b.affiliate_id \
-           WHERE b.program_id = $1 AND a.status = 'active') o \
+           WHERE b.program_id = $1 AND a.workspace_id = $2 AND a.status = 'active') o \
          WHERE amount_cents > 0 AND amount_cents >= payout_min_cents \
          ORDER BY affiliate_id",
     )
     .bind(program_id)
+    .bind(workspace_id)
     .fetch_all(conn)
     .await
 }
@@ -43,6 +48,7 @@ pub async fn owed(conn: &mut PgConnection, program_id: Uuid) -> Result<Vec<Owed>
 /// Payouts shrunk to nothing by reversals are left out: there is nothing to send.
 pub async fn batch_rows(
     conn: &mut PgConnection,
+    workspace_id: Uuid,
     batch_id: Uuid,
 ) -> Result<Vec<CsvRow>, sqlx::Error> {
     sqlx::query_as(
@@ -51,9 +57,11 @@ pub async fn batch_rows(
          FROM payouts p JOIN payout_batches b ON b.id = p.batch_id \
            JOIN programs pr ON pr.id = b.program_id \
            JOIN affiliates a ON a.id = p.affiliate_id JOIN users u ON u.id = a.user_id \
-         WHERE p.batch_id = $1 AND p.amount_cents > 0 ORDER BY 1, p.id",
+         WHERE p.batch_id = $1 AND pr.workspace_id = $2 AND p.amount_cents > 0 \
+         ORDER BY 1, p.id",
     )
     .bind(batch_id)
+    .bind(workspace_id)
     .fetch_all(conn)
     .await
 }

@@ -586,7 +586,8 @@ async fn insert_code(
     if !bf_db::programs::program_exists(&mut *tx, ws, spec.program_id).await? {
         return Err(AppError::NotFound("program not found"));
     }
-    if bf_db::affiliates::count_codes(&mut *tx, spec.affiliate_id).await? >= MAX_CODES_PER_AFFILIATE
+    if bf_db::affiliates::count_codes(&mut *tx, ws, spec.affiliate_id).await?
+        >= MAX_CODES_PER_AFFILIATE
     {
         return Err(bad("an affiliate can hold at most 100 referral codes"));
     }
