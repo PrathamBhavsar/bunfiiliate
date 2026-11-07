@@ -163,8 +163,9 @@ async fn enable_provider(pool: &PgPool, provider: &str) {
 
 async fn add_plan(pool: &PgPool, key: &str, max_programs: Option<i32>, max_aff: Option<i32>) {
     sqlx::query(
-        "INSERT INTO billing_plans (id, key, name, price_cents, max_programs, max_affiliates) \
-         VALUES ($1, $2, $2, 1000, $3, $4)",
+        "INSERT INTO billing_plans (id, key, name, price_cents, max_programs, max_affiliates, \
+                                    lemonsqueezy_variant_id) \
+         VALUES ($1, $2, $2, 1000, $3, $4, 'var_' || $2)",
     )
     .bind(Uuid::now_v7())
     .bind(key)
@@ -189,7 +190,7 @@ async fn sub(pool: &PgPool, ws: Uuid) -> (String, String, String) {
 fn event(ws: Uuid, id: Option<&str>, status: &str, updated: &str, plan: &str) -> String {
     let wid = id.map_or(String::new(), |i| format!(r#""webhook_id":"{i}","#));
     format!(
-        r#"{{"meta":{{"event_name":"subscription_updated",{wid}"custom_data":{{"workspace_id":"{ws}","plan_key":"{plan}"}}}},"data":{{"id":"sub_9","attributes":{{"status":"{status}","updated_at":"{updated}","renews_at":"2027-01-01T00:00:00Z","ends_at":"2026-12-01T00:00:00Z"}}}}}}"#
+        r#"{{"meta":{{"event_name":"subscription_updated",{wid}"custom_data":{{"workspace_id":"{ws}","plan_key":"{plan}"}}}},"data":{{"id":"sub_9","attributes":{{"variant_id":"var_{plan}","status":"{status}","updated_at":"{updated}","renews_at":"2027-01-01T00:00:00Z","ends_at":"2026-12-01T00:00:00Z"}}}}}}"#
     )
 }
 
@@ -530,4 +531,93 @@ async fn provider_secret_is_sealed_and_never_returned(pool: PgPool) {
         (st, r["result"].as_str()),
         (StatusCode::OK, Some("applied"))
     );
+}
+
+/// Webhook body with explicit variant and optional plan claim, for entitlement tests.
+fn event_for(
+    ws: Uuid,
+    id: &str,
+    variant: &str,
+    claim: Option<&str>,
+    store: Option<&str>,
+) -> String {
+    let claim = claim.map_or(String::new(), |c| format!(r#","plan_key":"{c}""#));
+    let store = store.map_or(String::new(), |s| format!(r#""store_id":"{s}","#));
+    format!(
+        r#"{{"meta":{{"event_name":"subscription_updated","webhook_id":"{id}","custom_data":{{"workspace_id":"{ws}"{claim}}}}},"data":{{"id":"sub_9","attributes":{{{store}"variant_id":"{variant}","status":"active","updated_at":"2026-03-01T00:00:00Z","renews_at":"2027-01-01T00:00:00Z"}}}}}}"#
+    )
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn plan_comes_from_the_purchased_variant_not_custom_data(pool: PgPool) {
+    let app = app(pool.clone());
+    let t = tenant(&pool, &app, UserRole::Admin).await;
+    add_plan(&pool, "starter", None, None).await;
+    add_plan(&pool, "pro", None, None).await;
+    enable_provider(&pool, "lemonsqueezy").await;
+
+    // Paid for the starter variant but claims pro in custom data: refused, nothing changes.
+    let b = event_for(t.ws, "x1", "var_starter", Some("pro"), None);
+    let (st, _) = hook(&app, "lemonsqueezy", &b, signed(&b)).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+    assert_eq!(sub(&pool, t.ws).await.0, "free");
+
+    // Unmapped variant: refused.
+    let b = event_for(t.ws, "x2", "var_nope", Some("pro"), None);
+    assert_eq!(
+        hook(&app, "lemonsqueezy", &b, signed(&b)).await.0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(sub(&pool, t.ws).await.0, "free");
+
+    // No claim at all: the variant decides.
+    let b = event_for(t.ws, "x3", "var_pro", None, None);
+    let (st, r) = hook(&app, "lemonsqueezy", &b, signed(&b)).await;
+    assert_eq!(
+        (st, r["result"].as_str()),
+        (StatusCode::OK, Some("applied"))
+    );
+    assert_eq!(sub(&pool, t.ws).await.0, "pro");
+
+    // Claim matching the variant is accepted too.
+    let b = event_for(t.ws, "x4", "var_starter", Some("starter"), None);
+    assert_eq!(
+        hook(&app, "lemonsqueezy", &b, signed(&b)).await.0,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn a_variant_maps_to_one_plan(pool: PgPool) {
+    add_plan(&pool, "pro", None, None).await;
+    let dup = sqlx::query(
+        "INSERT INTO billing_plans (id, key, name, price_cents, lemonsqueezy_variant_id) \
+         VALUES ($1, 'pro2', 'pro2', 1, 'var_pro')",
+    )
+    .bind(Uuid::now_v7())
+    .execute(&pool)
+    .await;
+    assert!(dup.is_err(), "two plans must not share a variant");
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn plans_list_orders_by_price_and_needs_admin(pool: PgPool) {
+    let app = app(pool.clone());
+    let t = tenant(&pool, &app, UserRole::Admin).await;
+    add_plan(&pool, "pro", Some(5), None).await;
+    let (st, v) = call(&app, &t, "GET", "/api/v1/billing/plans", json!({})).await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    let keys: Vec<_> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["key"].clone())
+        .collect();
+    assert_eq!(keys, [json!("free"), json!("pro")]);
+    assert_eq!(v[1]["max_programs"], 5);
+    assert!(v[1]["max_affiliates"].is_null());
+
+    let aff = tenant(&pool, &app, UserRole::Affiliate).await;
+    let (st, _) = call(&app, &aff, "GET", "/api/v1/billing/plans", json!({})).await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
 }

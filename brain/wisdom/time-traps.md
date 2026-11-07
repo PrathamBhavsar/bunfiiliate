@@ -45,3 +45,9 @@ timestamp: 2026-10-26
 - **pnpm prompt hangs scripts**: after a pnpm version mix-up, `pnpm install` asks "modules directories will be removed... Proceed?" and `make e2e` (web build step) waits forever without a TTY. Run `CI=true pnpm install --frozen-lockfile` once; the pinned `packageManager` is 9.15.9, the global pnpm is 12.
 - **Ack after rollback**: the spool writer must undo a failed group (truncate) before it answers the writers' errors; the reverse order let a test (and a retrying caller) see the torn group, a 1-in-10 flake under load.
 - **Reload debounce vs UI**: delaying the tracker snapshot reload by a debounce made `/r/<code>` 404 right after the UI created it (caught by e2e). Reload on the first change, rate-limit the rest.
+
+## Shared CARGO_TARGET_DIR across worktrees
+Cargo's metadata hash ignores the checkout path, so concurrent worktrees on one target dir overwrite each other's artifacts and produce phantom errors (e.g. missing struct fields). Use a per-worktree target dir (`CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0` keeps it small) or hold all gates until workers stop.
+
+## e2e 503 on a full host disk
+Spool disk-full shedding trips at 85% disk used; `scripts/e2e.sh` pins `BF_SPOOL_*` so the suite does not depend on host disk.

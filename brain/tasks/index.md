@@ -71,4 +71,8 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | B04 | feat/b-payout-providers | done, merged (0073; mock/paypal/wise; web rail selector and Wise live test open) |
 | B08 | feat/b-signup-contact | done, merged (0079) |
 | B10 | feat/b-billing-trait | done, merged (0078; mock + lemonsqueezy) |
-
+| B05+B06 | feat/b-tax-currency | done, merged (0074 tax forms/invoices, 0075 exchange rates) |
+| B07+B11 | feat/b-notify-billing-ui | done, merged (0076 notify channels; billing UI) |
+| C20+C21+C22 | feat/c-partitions | done, merged (0080 clicks partitioning, partition upkeep) |
+| C10-C13 | feat/c-ops | done, merged (backup drill, spool disk-full shedding, alerts, HA docs) |
+| billing-variant | feat/billing-variant-plan | done, merged (0082; plan from purchased variant, store check) |

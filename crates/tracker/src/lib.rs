@@ -160,6 +160,7 @@ pub fn router(state: AppState) -> Router {
         .merge(events)
         .merge(v2_events)
         .merge(v2_beacon)
+        .layer(map_response(retry_after))
         .with_state(state)
 }
 
@@ -171,6 +172,16 @@ async fn tracker_js(headers: HeaderMap) -> Response {
     }
     let js = [(CONTENT_TYPE, "application/javascript; charset=utf-8")];
     (cache, js, TRACKER_JS).into_response()
+}
+
+/// Every 503 tells clients when to come back (writer queue full or spool disk full).
+async fn retry_after(mut res: Response) -> Response {
+    if res.status() == StatusCode::SERVICE_UNAVAILABLE {
+        res.headers_mut()
+            .entry(axum::http::header::RETRY_AFTER)
+            .or_insert(HeaderValue::from_static("5"));
+    }
+    res
 }
 
 async fn readyz(State(s): State<AppState>) -> StatusCode {
@@ -206,6 +217,12 @@ async fn redirect(
     let Ok(location) = HeaderValue::try_from(location) else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
+    // Spool disk full: the visitor still gets to the landing page, but the click is lost
+    // (counted in `bf_spool_shed_total{route="r"}`). Redirecting beats a dead link.
+    if s.spool.is_shedding() {
+        metrics::spool_shed("r");
+        return (StatusCode::FOUND, [(LOCATION, location)]).into_response();
+    }
     match ingest(s, Record::Click(click)).await {
         Ok(()) => (StatusCode::FOUND, [(LOCATION, location)]).into_response(),
         Err(status) => status.into_response(),
@@ -579,6 +596,16 @@ impl AppState {
 /// ack), then hand it to the DB writer. Runs detached so a dropped client connection
 /// cannot strand a spooled record outside the queue and stall the checkpoint.
 async fn ingest(state: AppState, record: Record) -> Result<(), StatusCode> {
+    // Disk full: 503 before taking a queue slot. `/c` and the event routes land here;
+    // `/r` is handled in `redirect` so it can still redirect.
+    if state.spool.is_shedding() {
+        metrics::spool_shed(if matches!(record, Record::Click(_)) {
+            "c"
+        } else {
+            "events"
+        });
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
     let started = Instant::now();
     let task = tokio::spawn(async move {
         // Clicks leave the last tenth of the queue to signed conversion events.
@@ -595,6 +622,14 @@ async fn ingest(state: AppState, record: Record) -> Result<(), StatusCode> {
             })?;
         let payload = serde_json::to_vec(&record).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         let end = state.spool.write(&payload).await.map_err(|e| {
+            if matches!(e, bf_spool::SpoolError::Full) {
+                metrics::spool_shed(if matches!(record, Record::Click(_)) {
+                    "c"
+                } else {
+                    "events"
+                });
+                return StatusCode::SERVICE_UNAVAILABLE;
+            }
             tracing::error!(error = %e, "spool write failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;

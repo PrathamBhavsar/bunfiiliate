@@ -107,6 +107,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alerts/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Alertmanager webhook receiver. Public route: authenticated by `BF_ALERT_TOKEN`; 404 when
+         *     the token is not configured.
+         */
+        post: operations["webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/summary": {
         parameters: {
             query?: never;
@@ -116,6 +136,26 @@ export interface paths {
         };
         /** Totals for a day range, optionally broken down by a dimension. */
         get: operations["summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/summary-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Revenue and commission of every program, converted to one currency day by day with the
+         *     latest rate on or before each day (cross rates go through USD, rounded half-even to cents).
+         */
+        get: operations["summary_all"];
         put?: never;
         post?: never;
         delete?: never;
@@ -376,6 +416,23 @@ export interface paths {
         put?: never;
         /** Start a plan change. `mock` switches the plan at once; `lemonsqueezy` returns a hosted checkout. */
         post: operations["checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace. */
+        get: operations["list_billing_plans"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -769,6 +826,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/tax-form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in affiliate's tax form. */
+        get: operations["me_get"];
+        /** Submit or replace the signed-in affiliate's tax form. */
+        put: operations["me_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/members": {
         parameters: {
             query?: never;
@@ -1036,6 +1111,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payouts/{id}/invoice.html": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invoice of an approved or paid payout: the workspace admin, or the affiliate it belongs to. */
+        get: operations["invoice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/programs": {
         parameters: {
             query?: never;
@@ -1265,6 +1357,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/reports/1099-style.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One row per affiliate and currency whose payouts paid in the year reach the threshold. */
+        get: operations["report_1099"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/analytics.csv": {
         parameters: {
             query?: never;
@@ -1294,6 +1403,41 @@ export interface paths {
         /** Replace the workspace's settings with the given JSON object (max 16 KiB). */
         put: operations["put_settings"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/notify-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which notification channels are configured. URLs are never returned. */
+        get: operations["get_channels"];
+        /** Set or clear the Telegram and Discord webhook URLs (sealed at rest). */
+        put: operations["put_channels"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/test-notify-channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test message to a configured channel now, independent of the outbox. */
+        post: operations["test_channel"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1558,6 +1702,12 @@ export interface components {
             /** Format: uuid */
             workspace_id: string;
         };
+        AlertAck: {
+            /** @description Alerts accepted from the payload. */
+            alerts: number;
+            /** @description Super admins each alert was delivered to. */
+            recipients: number;
+        };
         Approved: {
             /** Format: int64 */
             amount_cents: number;
@@ -1614,6 +1764,11 @@ export interface components {
             status: string;
             /** Format: int64 */
             total_cents: number;
+        };
+        ChannelsView: {
+            discord_set: boolean;
+            /** @description The URL itself is write-only. */
+            telegram_set: boolean;
         };
         CheckoutRequest: {
             plan_key: string;
@@ -2743,6 +2898,11 @@ export interface components {
             /** @description The webhook secret is write-only; this only says one is stored. */
             webhook_secret_set: boolean;
         };
+        PutChannels: {
+            discord_url?: string | null;
+            /** @description Absent: unchanged. `null` or empty: cleared. */
+            telegram_url?: string | null;
+        };
         PutCredentials: {
             /** @description `paypal_payouts`: `client_id`, `client_secret`. `wise`: `api_token`, `profile_id`. */
             credentials: {
@@ -2849,9 +3009,50 @@ export interface components {
             from: string;
             to: string;
         };
+        SummaryAll: {
+            /** Format: int64 */
+            commission_cents: number;
+            display_currency: string;
+            from: string;
+            /**
+             * Format: int64
+             * @description Converted revenue of every program with a rate, in `display_currency` cents.
+             */
+            revenue_cents: number;
+            to: string;
+            /** @description Programs left out of the totals; never silently converted 1:1. */
+            unconverted: components["schemas"]["Unconverted"][];
+        };
+        TaxForm: {
+            /** @description ISO 3166 alpha-2, upper case. */
+            country?: string | null;
+            /** @description `w8`, `w9`, or `none` when nothing was submitted. */
+            kind: string;
+            legal_name?: string | null;
+            /** @description RFC 3339 UTC. */
+            submitted_at?: string | null;
+            /** @description Last 4 digits of the tax id; the full id is never stored. */
+            tax_id_last4?: string | null;
+        };
+        TaxFormInput: {
+            /** @description Two letters. */
+            country: string;
+            /** @description `w8` or `w9`. */
+            kind: string;
+            legal_name: string;
+            /** @description Exactly 4 digits when present. Anything longer is refused, never truncated. */
+            tax_id_last4?: string | null;
+        };
         TemplatePatch: {
             body?: string | null;
             subject?: string | null;
+        };
+        TestRequest: {
+            /** @description `telegram` or `discord`. */
+            channel: string;
+        };
+        TestResult: {
+            sent: boolean;
         };
         TestWebhook: {
             /** @description The event body to deliver. */
@@ -2874,6 +3075,17 @@ export interface components {
             enrolled: boolean;
             /** Format: int64 */
             recovery_codes_remaining: number;
+        };
+        /** @description Money of a program that could not be converted: no cached rate on or before the day. */
+        Unconverted: {
+            /** Format: int64 */
+            commission_cents: number;
+            /** @description The program's own currency; amounts are in its minor unit. */
+            currency: string;
+            /** Format: uuid */
+            program_id: string;
+            /** Format: int64 */
+            revenue_cents: number;
         };
         UsageView: {
             /** Format: int64 */
@@ -3217,6 +3429,57 @@ export interface operations {
             };
         };
     };
+    webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertAck"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     summary: {
         parameters: {
             query?: {
@@ -3251,6 +3514,48 @@ export interface operations {
             };
             /** @description Unknown program or other affiliate */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    summary_all: {
+        parameters: {
+            query?: {
+                /** @description ISO 4217 code every program's money is converted to. Default `USD`. */
+                display_currency?: string;
+                /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
+                from?: string;
+                /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryAll"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3797,6 +4102,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_billing_plans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanView"][];
                 };
             };
         };
@@ -4847,6 +5171,73 @@ export interface operations {
             };
         };
     };
+    me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxForm"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    me_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxFormInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxForm"];
+                };
+            };
+            /** @description Bad kind, name, country or tax id */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_members: {
         parameters: {
             query?: {
@@ -5511,6 +5902,38 @@ export interface operations {
                 };
                 content?: never;
             };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    invoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Payout id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description text/html */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Unknown, draft, or someone else's payout */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6293,6 +6716,37 @@ export interface operations {
             };
         };
     };
+    report_1099: {
+        parameters: {
+            query?: {
+                /** @description Calendar year (UTC) of the payout's paid date. Default: the current year. */
+                year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description text/csv */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     report_csv: {
         parameters: {
             query?: {
@@ -6397,6 +6851,103 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_channels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelsView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    put_channels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutChannels"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelsView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    test_channel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -34,6 +34,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/v1/billing/checkout", post(checkout))
         .route("/api/v1/billing/subscription", get(subscription))
+        .route("/api/v1/billing/plans", get(list_billing_plans))
         .route("/api/v1/billing/providers", get(list_providers))
         .route("/api/v1/billing/providers/{provider}", put(set_provider))
         .route("/api/v1/webhooks/billing/{provider}", post(webhook))
@@ -75,6 +76,14 @@ pub trait BillingProvider {
     }
     async fn checkout(&self, c: &CheckoutInput<'_>) -> Result<CheckoutOutcome, ProviderError>;
     fn parse_event(&self, body: &[u8]) -> Result<SubscriptionEvent, ProviderError>;
+    /// Whether the plan must come from the purchased variant rather than `custom_data`.
+    fn plan_from_variant(&self) -> bool {
+        false
+    }
+    /// Whether an event's store is ours. Providers with a configured store reject others.
+    fn store_matches(&self, _store_id: Option<&str>) -> bool {
+        true
+    }
 }
 
 /// Activates immediately; its events use the LemonSqueezy wire format.
@@ -165,6 +174,16 @@ impl BillingProvider for LemonSqueezy {
     fn parse_event(&self, body: &[u8]) -> Result<SubscriptionEvent, ProviderError> {
         parse_lemonsqueezy(body)
     }
+    fn plan_from_variant(&self) -> bool {
+        true
+    }
+    fn store_matches(&self, store_id: Option<&str>) -> bool {
+        match &self.store_id {
+            Some(ours) => store_id == Some(ours.as_str()),
+            // No store configured: no checkout can have been created here, nothing to compare.
+            None => true,
+        }
+    }
 }
 
 fn parse_time(v: &Value) -> Option<DateTime<Utc>> {
@@ -207,6 +226,12 @@ pub fn parse_lemonsqueezy(body: &[u8]) -> Result<SubscriptionEvent, ProviderErro
         .as_str()
         .map(str::to_owned)
         .or_else(|| v["data"]["id"].as_i64().map(|n| n.to_string()));
+    // LemonSqueezy sends these as numbers or strings depending on the endpoint.
+    let text = |x: &Value| {
+        x.as_str()
+            .map(str::to_owned)
+            .or_else(|| x.as_i64().map(|n| n.to_string()))
+    };
     let period_end = if status == SubStatus::Canceled {
         parse_time(&attrs["ends_at"])
     } else {
@@ -220,6 +245,8 @@ pub fn parse_lemonsqueezy(body: &[u8]) -> Result<SubscriptionEvent, ProviderErro
         plan_key: v["meta"]["custom_data"]["plan_key"]
             .as_str()
             .map(str::to_owned),
+        variant_id: text(&attrs["variant_id"]),
+        store_id: text(&attrs["store_id"]),
         updated_at,
         current_period_end: period_end,
     })
@@ -377,6 +404,37 @@ pub struct PlanView {
     max_programs: Option<i32>,
     max_affiliates: Option<i32>,
     max_monthly_clicks: Option<i64>,
+}
+
+impl From<db::Plan> for PlanView {
+    fn from(p: db::Plan) -> Self {
+        Self {
+            key: p.key,
+            name: p.name,
+            price_cents: p.price_cents,
+            currency: p.currency,
+            max_programs: p.max_programs,
+            max_affiliates: p.max_affiliates,
+            max_monthly_clicks: p.max_monthly_clicks,
+        }
+    }
+}
+
+/// Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace.
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/plans",
+    tag = "billing",
+    security(("cookie" = [])),
+    responses((status = 200, body = Vec<PlanView>)),
+)]
+pub async fn list_billing_plans(
+    State(s): State<AppState>,
+    auth: Auth<Admin>,
+) -> Result<Json<Vec<PlanView>>, AppError> {
+    auth.principal.workspace_scope(None)?;
+    let plans = db::list_plans(&s.pool).await?;
+    Ok(Json(plans.into_iter().map(PlanView::from).collect()))
 }
 
 #[derive(Serialize, ToSchema)]
@@ -582,6 +640,27 @@ async fn handle_webhook<P: BillingProvider>(
         return Err(AppError::BadRequest("bad signature".into()));
     }
     let ev = p.parse_event(body).map_err(provider_err)?;
+    if !p.store_matches(ev.store_id.as_deref()) {
+        return Err(AppError::BadRequest("event is for another store".into()));
+    }
+    // The plan is what was purchased (the variant), never what the checkout data claims.
+    let plan_key = if p.plan_from_variant() && ev.status != SubStatus::Canceled {
+        let variant = ev
+            .variant_id
+            .as_deref()
+            .ok_or_else(|| AppError::BadRequest("event has no variant".into()))?;
+        let key = db::plan_key_by_lemonsqueezy_variant(&s.pool, variant)
+            .await?
+            .ok_or_else(|| AppError::BadRequest("variant is not mapped to a plan".into()))?;
+        if ev.plan_key.as_deref().is_some_and(|claim| claim != key) {
+            return Err(AppError::BadRequest(
+                "plan does not match the purchased variant".into(),
+            ));
+        }
+        Some(key)
+    } else {
+        ev.plan_key.clone()
+    };
     let mut tx = s.pool.begin().await?;
     if !db::claim_event(&mut *tx, name, &ev.event_id).await? {
         return Ok((
@@ -598,7 +677,7 @@ async fn handle_webhook<P: BillingProvider>(
             provider: name,
             provider_subscription_id: ev.provider_subscription_id.as_deref(),
             status: ev.status.as_str(),
-            plan_key: ev.plan_key.as_deref(),
+            plan_key: plan_key.as_deref(),
             event_at: ev.updated_at,
             current_period_end: ev.current_period_end,
         },
@@ -612,6 +691,26 @@ async fn handle_webhook<P: BillingProvider>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lemonsqueezy_store_check_and_variant_fields() {
+        let p = |store: Option<&str>| LemonSqueezy {
+            api_key: None,
+            store_id: store.map(str::to_owned),
+            base: String::new(),
+        };
+        assert!(p(Some("42")).store_matches(Some("42")));
+        assert!(!p(Some("42")).store_matches(Some("43")));
+        assert!(!p(Some("42")).store_matches(None));
+        assert!(p(None).store_matches(Some("anything")));
+        assert!(p(None).plan_from_variant());
+        assert!(!MockProvider.plan_from_variant());
+        let body = br#"{"meta":{"event_name":"subscription_created","custom_data":{"workspace_id":"0190a000-0000-7000-8000-000000000001"}},"data":{"id":7,"attributes":{"store_id":42,"variant_id":123,"status":"active","updated_at":"2026-03-01T00:00:00Z"}}}"#;
+        let e = parse_lemonsqueezy(body).unwrap();
+        assert_eq!(e.store_id.as_deref(), Some("42"));
+        assert_eq!(e.variant_id.as_deref(), Some("123"));
+        assert_eq!(e.plan_key, None);
+    }
 
     fn body(extra_meta: &str, status: &str) -> Vec<u8> {
         format!(

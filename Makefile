@@ -1,4 +1,4 @@
-.PHONY: sql-lint migrations-check pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test tracker-openapi-check
+.PHONY: backup-drill sql-lint migrations-check pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test tracker-openapi-check
 
 ci:
 	cargo fmt --check
@@ -66,3 +66,6 @@ migrations-check:
 	scripts/tests/check_migrations_test.sh
 	scripts/check-migrations.sh
 	cargo test -p bf-db --test upgrade
+
+backup-drill:
+	scripts/tests/backup_drill.sh

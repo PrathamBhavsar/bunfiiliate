@@ -1,0 +1,16 @@
+[Unit]
+Description=bunfiiliate backup (pg_dump + spool copy)
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=bunfiiliate
+Group=bunfiiliate
+EnvironmentFile=/etc/bunfiiliate/bunfiiliate.env
+Environment=BF_BACKUP_DIR=/var/backups/bunfiiliate
+ExecStart=/usr/local/share/bunfiiliate/backup/backup.sh
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/backups/bunfiiliate /var/spool/bunfiiliate

@@ -5,6 +5,7 @@ pub mod auth;
 pub mod billing;
 pub mod ledger;
 pub mod ops;
+pub mod partitions;
 pub mod payouts;
 pub mod programs;
 pub mod reset_tokens;

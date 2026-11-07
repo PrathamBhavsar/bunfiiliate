@@ -460,7 +460,9 @@ impl<R: Role> FromRequestParts<AppState> for Auth<R> {
 /// (same-origin deployment behind Caddy). Missing or mismatched Origin is 403.
 pub async fn check_origin(req: Request, next: Next) -> Result<Response, AppError> {
     // Provider webhooks are server-to-server and signature-verified; they carry no Origin.
-    let provider_webhook = req.uri().path().starts_with("/api/v1/webhooks/billing/");
+    // The Alertmanager sink is the same kind of caller: bearer-token authenticated.
+    let provider_webhook = req.uri().path().starts_with("/api/v1/webhooks/billing/")
+        || req.uri().path() == "/api/v1/alerts/webhook";
     if !provider_webhook && !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) {
         let origin = req.headers().get(ORIGIN).and_then(|v| v.to_str().ok());
         let host = req

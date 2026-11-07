@@ -149,6 +149,16 @@ function BatchPanel({ batch: b }: { batch: Batch }) {
                 <span className="min-w-0 break-words">{p.email}</span>
                 <span className="flex shrink-0 items-center gap-2">
                   <StatusBadge status={p.status} />
+                  {(b.status === "approved" || b.status === "paid") && (
+                    <a
+                      href={`/api/v1/payouts/${p.id}/invoice.html`}
+                      target="_blank"
+                      rel="noopener"
+                      className="underline underline-offset-2"
+                    >
+                      Invoice
+                    </a>
+                  )}
                   <span className="tabular-nums">{formatCents(p.amount_cents, b.currency)}</span>
                 </span>
               </li>

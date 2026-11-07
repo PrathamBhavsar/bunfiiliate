@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-07] Plan v2 wave 7 + billing variant fix (tribe)
+
+- **Merged**: B05, B06, B07, B11, C10-C13, C20-C22, billing plan-from-variant fix. Migrations 0074-0076, 0080, 0082 (0081 intentionally unused).
+- **Lessons**: Cargo's metadata hash ignores the checkout path, so worktrees sharing `CARGO_TARGET_DIR` clobber each other's artifacts (stale-field errors in clippy): give concurrent workers their own target dirs, or run no gate while workers build. The spool disk-full shedding (C11) makes e2e return 503 on a host above 85% disk used: `scripts/e2e.sh` pins the thresholds. LemonSqueezy plan must come from the purchased variant, never from `custom_data`.
+- **Known limits**: web UI for B01, B03, B04 rail selector still open.
+- **Validation**: `make ci` and `make e2e` pass on the integration branch before merge.
+
 ## [2026-11-07] Plan v2 wave 6 (tribe)
 
 - **Merged**: B00, B01, B02, B04, B08, B10. Migrations 0070, 0071, 0073, 0078, 0079.

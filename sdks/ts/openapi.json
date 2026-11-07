@@ -428,6 +428,67 @@
         ]
       }
     },
+    "/api/v1/alerts/webhook": {
+      "post": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Alertmanager webhook receiver. Public route: authenticated by `BF_ALERT_TOKEN`; 404 when\nthe token is not configured.",
+        "operationId": "webhook",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/summary": {
       "get": {
         "tags": [
@@ -503,6 +564,81 @@
           },
           "404": {
             "description": "Unknown program or other affiliate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/analytics/summary-all": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Revenue and commission of every program, converted to one currency day by day with the\nlatest rate on or before each day (cross rates go through USD, rounded half-even to cents).",
+        "operationId": "summary_all",
+        "parameters": [
+          {
+            "name": "display_currency",
+            "in": "query",
+            "description": "ISO 4217 code every program's money is converted to. Default `USD`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryAll"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -1244,6 +1380,35 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/plans": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace.",
+        "operationId": "list_billing_plans",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlanView"
+                  }
                 }
               }
             }
@@ -3048,6 +3213,96 @@
         ]
       }
     },
+    "/api/v1/me/tax-form": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "The signed-in affiliate's tax form.",
+        "operationId": "me_get",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxForm"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Submit or replace the signed-in affiliate's tax form.",
+        "operationId": "me_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxFormInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxForm"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad kind, name, country or tax id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/members": {
       "get": {
         "tags": [
@@ -4122,6 +4377,54 @@
           },
           "404": {
             "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/{id}/invoice.html": {
+      "get": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "Invoice of an approved or paid payout: the workspace admin, or the affiliate it belongs to.",
+        "operationId": "invoice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Payout id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/html",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown, draft, or someone else's payout",
             "content": {
               "application/json": {
                 "schema": {
@@ -5422,6 +5725,54 @@
         ]
       }
     },
+    "/api/v1/reports/1099-style.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "One row per affiliate and currency whose payouts paid in the year reach the threshold.",
+        "operationId": "report_1099",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Calendar year (UTC) of the payout's paid date. Default: the current year.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/csv",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/reports/analytics.csv": {
       "get": {
         "tags": [
@@ -5587,6 +5938,142 @@
             }
           },
           "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/notify-channels": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Which notification channels are configured. URLs are never returned.",
+        "operationId": "get_channels",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelsView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Set or clear the Telegram and Discord webhook URLs (sealed at rest).",
+        "operationId": "put_channels",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutChannels"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/test-notify-channel": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Send a test message to a configured channel now, independent of the outbox.",
+        "operationId": "test_channel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
             "description": "",
             "content": {
               "application/json": {
@@ -6600,6 +7087,25 @@
           }
         }
       },
+      "AlertAck": {
+        "type": "object",
+        "required": [
+          "alerts",
+          "recipients"
+        ],
+        "properties": {
+          "alerts": {
+            "type": "integer",
+            "description": "Alerts accepted from the payload.",
+            "minimum": 0
+          },
+          "recipients": {
+            "type": "integer",
+            "description": "Super admins each alert was delivered to.",
+            "minimum": 0
+          }
+        }
+      },
       "Approved": {
         "type": "object",
         "required": [
@@ -6770,6 +7276,22 @@
           "total_cents": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ChannelsView": {
+        "type": "object",
+        "required": [
+          "telegram_set",
+          "discord_set"
+        ],
+        "properties": {
+          "discord_set": {
+            "type": "boolean"
+          },
+          "telegram_set": {
+            "type": "boolean",
+            "description": "The URL itself is write-only."
           }
         }
       },
@@ -9984,6 +10506,25 @@
           }
         }
       },
+      "PutChannels": {
+        "type": "object",
+        "properties": {
+          "discord_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "telegram_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absent: unchanged. `null` or empty: cleared."
+          }
+        },
+        "additionalProperties": false
+      },
       "PutCredentials": {
         "type": "object",
         "required": [
@@ -10365,6 +10906,111 @@
           }
         ]
       },
+      "SummaryAll": {
+        "type": "object",
+        "required": [
+          "display_currency",
+          "from",
+          "to",
+          "revenue_cents",
+          "commission_cents",
+          "unconverted"
+        ],
+        "properties": {
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "display_currency": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "revenue_cents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Converted revenue of every program with a rate, in `display_currency` cents."
+          },
+          "to": {
+            "type": "string"
+          },
+          "unconverted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Unconverted"
+            },
+            "description": "Programs left out of the totals; never silently converted 1:1."
+          }
+        }
+      },
+      "TaxForm": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 3166 alpha-2, upper case."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`w8`, `w9`, or `none` when nothing was submitted."
+          },
+          "legal_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "submitted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC 3339 UTC."
+          },
+          "tax_id_last4": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Last 4 digits of the tax id; the full id is never stored."
+          }
+        }
+      },
+      "TaxFormInput": {
+        "type": "object",
+        "required": [
+          "kind",
+          "legal_name",
+          "country"
+        ],
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "Two letters."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`w8` or `w9`."
+          },
+          "legal_name": {
+            "type": "string"
+          },
+          "tax_id_last4": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exactly 4 digits when present. Anything longer is refused, never truncated."
+          }
+        }
+      },
       "TemplatePatch": {
         "type": "object",
         "properties": {
@@ -10379,6 +11025,29 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "TestRequest": {
+        "type": "object",
+        "required": [
+          "channel"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string",
+            "description": "`telegram` or `discord`."
+          }
+        }
+      },
+      "TestResult": {
+        "type": "object",
+        "required": [
+          "sent"
+        ],
+        "properties": {
+          "sent": {
+            "type": "boolean"
           }
         }
       },
@@ -10433,6 +11102,34 @@
             "type": "boolean"
           },
           "recovery_codes_remaining": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Unconverted": {
+        "type": "object",
+        "description": "Money of a program that could not be converted: no cached rate on or before the day.",
+        "required": [
+          "program_id",
+          "currency",
+          "revenue_cents",
+          "commission_cents"
+        ],
+        "properties": {
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currency": {
+            "type": "string",
+            "description": "The program's own currency; amounts are in its minor unit."
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revenue_cents": {
             "type": "integer",
             "format": "int64"
           }

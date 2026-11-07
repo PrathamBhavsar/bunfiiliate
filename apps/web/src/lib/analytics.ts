@@ -8,6 +8,7 @@ import { api } from "./api";
 export type Summary = components["schemas"]["Summary"];
 export type Point = components["schemas"]["Point"];
 export type Dim = components["schemas"]["Dim"];
+export type SummaryAll = components["schemas"]["SummaryAll"];
 export type Range = { from: string; to: string };
 /** Empty string = all. */
 export type Scope = { program_id: string; affiliate_id: string };
@@ -36,6 +37,21 @@ export function useSummary(range: Range, scope: Scope, dim: Dim | null) {
     queryFn: ({ signal }) =>
       ok(api.GET("/api/v1/analytics/summary", { signal, params: { query: { ...query(range, scope), dim: dim ?? undefined } } })),
   });
+}
+
+/** Every program converted to one currency; `null` currency = not asked for (single-currency workspace). */
+export function useSummaryAll(range: Range, currency: string | null) {
+  return useQuery({
+    queryKey: ["analytics", "summary-all", range, currency],
+    enabled: currency !== null,
+    queryFn: ({ signal }) =>
+      ok(api.GET("/api/v1/analytics/summary-all", { signal, params: { query: { from: range.from, to: range.to, display_currency: currency ?? undefined } } })),
+  });
+}
+
+/** Distinct program currencies, sorted. More than one means the display-currency selector is shown. */
+export function currenciesOf(programs: Program[] | undefined): string[] {
+  return [...new Set((programs ?? []).map((p) => p.currency))].sort();
 }
 
 export function useTimeseries(range: Range, scope: Scope) {
@@ -68,6 +84,18 @@ export async function downloadReport(range: Range, scope: Scope, dim: Dim) {
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement("a"), { href: url, download: name });
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url));
+  return name;
+}
+
+/** Fetch the 1099-style CSV (paid totals per affiliate for a calendar year) as a file. Returns the file name. */
+export async function download1099(year: number) {
+  const blob = await ok<Blob>(
+    api.GET("/api/v1/reports/1099-style.csv", { parseAs: "blob", params: { query: { year } } }) as never,
+  );
+  const name = `1099-style-${year}.csv`;
+  const url = URL.createObjectURL(blob);
+  Object.assign(document.createElement("a"), { href: url, download: name }).click();
   setTimeout(() => URL.revokeObjectURL(url));
   return name;
 }

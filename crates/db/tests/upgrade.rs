@@ -134,3 +134,50 @@ fn applied_migration_checksum_unchanged() {
          run UPDATE_CHECKSUMS=1 cargo test -p bf-db --test upgrade"
     );
 }
+
+/// C20: click rows present before 0080 survive the swap to a partitioned table, month by month.
+#[sqlx::test(migrations = false)]
+async fn migration_preserves_existing_clicks(pool: PgPool) {
+    load_snapshot(&pool, "0050").await;
+    sqlx::raw_sql(
+        "INSERT INTO programs (id, workspace_id, name, currency, public_key, webhook_secret) \
+           SELECT '00000000-0000-0000-0000-0000000000a1', id, 'p', 'USD', 'pk-up', 's' FROM workspaces; \
+         INSERT INTO affiliates (id, workspace_id, user_id) \
+           SELECT '00000000-0000-0000-0000-0000000000b1', workspace_id, id FROM users; \
+         INSERT INTO clicks (id, program_id, affiliate_id, code, visitor_id, ts) \
+           SELECT gen_random_uuid(), '00000000-0000-0000-0000-0000000000a1', \
+                  '00000000-0000-0000-0000-0000000000b1', 'c', 'v' || g, \
+                  timestamptz '2025-01-31 23:59:59+00' + (g % 3) * interval '1 month' \
+                    + (g % 7) * interval '1 second' \
+           FROM generate_series(1, 1000) g;",
+    )
+    .execute(&pool)
+    .await
+    .unwrap();
+    let per_month = "SELECT m || '=' || n FROM (SELECT to_char(ts AT TIME ZONE 'UTC', 'YYYY-MM') AS m, \
+                     count(*) AS n FROM clicks GROUP BY 1) t ORDER BY m";
+    let before: Vec<String> = sqlx::query_scalar(per_month)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        before.len(),
+        4,
+        "boundary seconds straddle months: {before:?}"
+    );
+
+    bf_db::migrate(&pool).await.unwrap();
+
+    let after: Vec<String> = sqlx::query_scalar(per_month)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(before, after);
+    assert_eq!(count(&pool, "clicks").await, 1000);
+    assert_eq!(bf_db::partitions::default_rows(&pool).await.unwrap(), 0);
+    let old: Option<String> = sqlx::query_scalar("SELECT to_regclass('clicks_old')::text")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(old.is_none(), "legacy table dropped");
+}

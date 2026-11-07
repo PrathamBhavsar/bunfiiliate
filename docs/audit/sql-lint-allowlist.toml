@@ -304,3 +304,23 @@ reason = "tracker snapshot loader: every workspace by design, no request context
 file = "crates/db/src/tracker.rs"
 fn = "load_program_keys"
 reason = "tracker snapshot loader: every workspace by design, no request context"
+
+[[allow]]
+file = "crates/api/src/fx.rs"
+fn = "tick"
+reason = "exchange-rate worker loop: lists the currencies in use across every program, no request context; exchange_rates has no tenant column"
+
+[[allow]]
+file = "crates/db/src/partitions.rs"
+fn = "month_partitions"
+reason = "catalog query on pg_inherits for clicks partitions; system maintenance, no tenant rows"
+
+[[allow]]
+file = "crates/db/src/partitions.rs"
+fn = "drop_expired_partitions"
+reason = "retention loop over all programs' rollup watermark; DDL on whole month partitions (name-pattern checked), no request context"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "notify_super_admins_alert"
+reason = "alert sink fans out to every super admin across workspaces; token-authenticated, no request tenant"

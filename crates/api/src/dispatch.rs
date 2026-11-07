@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 use crate::mail::{Mailer, default_template, render, template_key, vars};
 use crate::metrics;
+use crate::notify_channels::{self, Channels};
 use crate::ssrf;
 
 pub const MAX_ATTEMPTS: i32 = 8;
@@ -76,8 +77,25 @@ fn uuid_field(payload: &Value, key: &str) -> Option<Uuid> {
 
 /// Dispatch every ready outbox row; returns how many were claimed.
 pub async fn dispatch_outbox(pool: &PgPool, mailer: &Mailer) -> Result<u64, sqlx::Error> {
+    dispatch_all(pool, mailer, None).await
+}
+
+/// [`dispatch_outbox`] that also forwards default topics to the workspace's notify channels.
+pub async fn dispatch_outbox_notify(
+    pool: &PgPool,
+    mailer: &Mailer,
+    channels: &Channels,
+) -> Result<u64, sqlx::Error> {
+    dispatch_all(pool, mailer, Some(channels)).await
+}
+
+async fn dispatch_all(
+    pool: &PgPool,
+    mailer: &Mailer,
+    channels: Option<&Channels>,
+) -> Result<u64, sqlx::Error> {
     let mut n = 0;
-    while dispatch_next(pool, mailer).await? {
+    while dispatch_next(pool, mailer, channels).await? {
         n += 1;
     }
     Ok(n)
@@ -89,7 +107,11 @@ struct Mail {
     body: String,
 }
 
-async fn dispatch_next(pool: &PgPool, mailer: &Mailer) -> Result<bool, sqlx::Error> {
+async fn dispatch_next(
+    pool: &PgPool,
+    mailer: &Mailer,
+    channels: Option<&Channels>,
+) -> Result<bool, sqlx::Error> {
     let mut tx = pool.begin().await?;
     let Some((id, topic, payload)) = sqlx::query_as::<_, (i64, String, Value)>(
         "SELECT id, topic, payload FROM outbox \
@@ -103,7 +125,8 @@ async fn dispatch_next(pool: &PgPool, mailer: &Mailer) -> Result<bool, sqlx::Err
     };
 
     let mut mail = None;
-    if let Some(program) = uuid_field(&payload, "program_id") {
+    let program = uuid_field(&payload, "program_id");
+    if let Some(program) = program {
         queue_deliveries(&mut tx, id, &topic, program).await?;
         mail = notify(&mut tx, &topic, &payload, program).await?;
     }
@@ -113,6 +136,11 @@ async fn dispatch_next(pool: &PgPool, mailer: &Mailer) -> Result<bool, sqlx::Err
         .await?;
     tx.commit().await?;
 
+    if let (Some(ch), Some(program)) = (channels, program)
+        && let Err(e) = notify_channels::forward(ch, pool, program, &topic, &payload).await
+    {
+        tracing::warn!(outbox = id, error = %e, "notify channels failed");
+    }
     if let Some(m) = mail
         && let Err(e) = mailer.send(&m.to, &m.subject, &m.body).await
     {

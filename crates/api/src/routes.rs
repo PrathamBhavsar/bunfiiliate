@@ -22,8 +22,9 @@ use crate::auth::{
 use crate::error::{AppError, AppJson, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    admin_reset, affiliates, analytics, billing, mail, money, ops, password_reset, payout_rails,
-    payout_requests, payouts, programs, totp, webhooks, workspaces,
+    admin_reset, affiliates, analytics, billing, invoice, mail, money, notify_channels, ops,
+    password_reset, payout_rails, payout_requests, payouts, programs, tax, totp, webhooks,
+    workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -63,17 +64,18 @@ impl Modify for CookieAuth {
         affiliates::unenroll, affiliates::create_code, affiliates::list_codes,
         affiliates::delete_code, affiliates::me_affiliate, affiliates::me_update,
         affiliates::me_create_code, affiliates::me_list_codes, affiliates::me_delete_code,
-        analytics::summary, analytics::timeseries, analytics::report_csv,
+        analytics::summary, analytics::summary_all, analytics::timeseries, analytics::report_csv,
         webhooks::create_endpoint, webhooks::list_endpoints, webhooks::get_endpoint,
         webhooks::update_endpoint, webhooks::delete_endpoint, webhooks::list_deliveries,
         webhooks::redeliver, webhooks::list_inbound, webhooks::replay_inbound,
         webhooks::test_webhook,
         mail::create_template, mail::list_templates, mail::get_template,
         mail::update_template, mail::delete_template,
-        ops::healthz, ops::readyz,
+        ops::healthz, ops::readyz, crate::alerts::webhook,
         ops::list_notifications, ops::mark_read,
         ops::create_contact, ops::list_contacts, ops::update_contact,
         ops::get_settings, ops::put_settings, ops::list_audit,
+        notify_channels::get_channels, notify_channels::put_channels, notify_channels::test_channel,
         money::list_customers, money::get_customer,
         money::list_conversions, money::get_conversion,
         money::approve, money::reject, money::reverse,
@@ -85,15 +87,16 @@ impl Modify for CookieAuth {
         payout_rails::delete_credentials,
         payout_requests::me_create, payout_requests::me_list, payout_requests::admin_list,
         payout_requests::approve, payout_requests::reject,
-        billing::checkout, billing::subscription, billing::list_providers,
+        billing::checkout, billing::subscription, billing::list_billing_plans, billing::list_providers,
         billing::set_provider, billing::webhook,
+        tax::me_get, tax::me_put, tax::report_1099, invoice::invoice,
     ),
     components(schemas(
         LoginRequest, UserView, workspaces::SignupRequest, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account,
         billing::CheckoutRequest, billing::CheckoutResponse, billing::SubscriptionView,
         billing::PlanView, billing::UsageView, billing::ProviderView, billing::SetSecret,
-        billing::WebhookAck
+        billing::WebhookAck, crate::alerts::AlertAck
     )),
     modifiers(&CookieAuth),
     info(title = "bunfiiliate API", version = "0.1.0")
@@ -118,11 +121,15 @@ pub fn routes() -> Router<AppState> {
         .merge(webhooks::routes())
         .merge(mail::routes())
         .merge(ops::routes())
+        .merge(notify_channels::routes())
+        .merge(crate::alerts::routes())
         .merge(money::routes())
         .merge(payouts::routes())
         .merge(payout_rails::routes())
         .merge(payout_requests::routes())
         .merge(billing::routes())
+        .merge(tax::routes())
+        .merge(invoice::routes())
 }
 
 /// One OpenAPI operation, for the tenant audit inventory.

@@ -344,7 +344,7 @@ pub fn export_csv(rows: &[CsvRow]) -> String {
 
 /// RFC 4180 quoting, only when needed. A leading `= + - @` (after any whitespace or control characters) is defused with a
 /// quote so a spreadsheet never reads an affiliate-controlled email as a formula.
-fn field(s: &str) -> String {
+pub(crate) fn field(s: &str) -> String {
     let lead = s.trim_start_matches(|c: char| c.is_whitespace() || c.is_control());
     let s = if lead.starts_with(['=', '+', '-', '@']) {
         format!("'{s}")

@@ -91,6 +91,17 @@ pub async fn usage_at(
     })
 }
 
+/// Every plan, cheapest first.
+pub async fn list_plans(db: impl PgExecutor<'_>) -> Result<Vec<Plan>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, key, name, price_cents, currency::text AS currency, max_programs, \
+                max_affiliates, max_monthly_clicks, is_default \
+         FROM billing_plans ORDER BY price_cents, key",
+    )
+    .fetch_all(db)
+    .await
+}
+
 /// A plan by its key.
 pub async fn plan_by_key(db: impl PgExecutor<'_>, key: &str) -> Result<Option<Plan>, sqlx::Error> {
     sqlx::query_as(
@@ -101,6 +112,17 @@ pub async fn plan_by_key(db: impl PgExecutor<'_>, key: &str) -> Result<Option<Pl
     .bind(key)
     .fetch_optional(db)
     .await
+}
+
+/// The plan key a LemonSqueezy variant is mapped to; `None` for an unmapped variant.
+pub async fn plan_key_by_lemonsqueezy_variant(
+    db: impl PgExecutor<'_>,
+    variant: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    sqlx::query_scalar("SELECT key FROM billing_plans WHERE lemonsqueezy_variant_id = $1")
+        .bind(variant)
+        .fetch_optional(db)
+        .await
 }
 
 /// The LemonSqueezy variant id mapped to a plan, if any.
