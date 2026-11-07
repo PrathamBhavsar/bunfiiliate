@@ -1,0 +1,7 @@
+{
+  "secret": "whsec_test",
+  "idempotency_key": "ord_123-evt",
+  "t": 1767225600,
+  "body": "{\"schema\":\"bf.event.v2\",\"type\":\"sale\",\"external_id\":\"ord_123\",\"amount_cents\":4900,\"currency\":\"USD\"}",
+  "header": "t=1767225600,v1=82a91ec2653b39361e294409465ef124f3f2bed3d235ee4c28b7fa5fabd42a22"
+}

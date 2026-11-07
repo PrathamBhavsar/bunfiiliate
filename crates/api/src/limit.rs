@@ -103,6 +103,11 @@ pub const REGISTER: Rule = Rule {
     per_ip: 10,
     per_email: 5,
 };
+pub const RESET: Rule = Rule {
+    route: "reset",
+    per_ip: 10,
+    per_email: 5,
+};
 pub const CONTACT: Rule = Rule {
     route: "contact",
     per_ip: 10,

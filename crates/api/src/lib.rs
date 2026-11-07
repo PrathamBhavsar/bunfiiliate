@@ -14,6 +14,7 @@ pub mod metrics;
 pub mod money;
 pub mod ops;
 pub mod page;
+pub mod password_reset;
 pub mod payouts;
 pub mod programs;
 pub mod routes;

@@ -23,7 +23,8 @@ use crate::auth::{
 use crate::error::{AppError, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    affiliates, analytics, mail, money, ops, payouts, programs, totp, webhooks, workspaces,
+    affiliates, analytics, mail, money, ops, password_reset, payouts, programs, totp, webhooks,
+    workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -45,6 +46,7 @@ impl Modify for CookieAuth {
 #[openapi(
     paths(
         login, refresh, logout, me, csrf,
+        password_reset::reset,
         totp::enrol, totp::confirm, totp::regenerate, totp::disable, totp::status,
         workspaces::create_workspace, workspaces::list_workspaces,
         workspaces::invite_member, workspaces::list_members,
@@ -78,7 +80,7 @@ impl Modify for CookieAuth {
         payouts::me_payouts,
     ),
     components(schemas(
-        LoginRequest, UserView, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
+        LoginRequest, UserView, password_reset::ResetRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account
     )),
     modifiers(&CookieAuth),
@@ -94,6 +96,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/v1/auth/logout", post(logout))
         .route("/api/v1/auth/me", get(me))
         .route("/api/v1/auth/csrf", get(csrf))
+        .merge(password_reset::routes())
         .merge(totp::routes())
         .merge(workspaces::routes())
         .merge(programs::routes())
@@ -104,6 +107,41 @@ pub fn routes() -> Router<AppState> {
         .merge(ops::routes())
         .merge(money::routes())
         .merge(payouts::routes())
+}
+
+/// One OpenAPI operation, for the tenant audit inventory.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteInfo {
+    pub method: String,
+    pub path: String,
+    /// Operation declares a security requirement (cookie session).
+    pub secured: bool,
+    pub path_params: Vec<String>,
+}
+
+/// Every operation in the OpenAPI doc, sorted by path then method.
+pub fn route_table() -> Vec<RouteInfo> {
+    let doc = serde_json::to_value(ApiDoc::openapi()).expect("openapi serialises");
+    let mut out = Vec::new();
+    for (path, item) in doc["paths"].as_object().into_iter().flatten() {
+        for (method, op) in item.as_object().into_iter().flatten() {
+            let path_params = op["parameters"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter(|p| p["in"] == "path")
+                .filter_map(|p| p["name"].as_str().map(str::to_owned))
+                .collect();
+            out.push(RouteInfo {
+                method: method.clone(),
+                path: path.clone(),
+                secured: op["security"].as_array().is_some_and(|a| !a.is_empty()),
+                path_params,
+            });
+        }
+    }
+    out.sort_by(|a, b| (&a.path, &a.method).cmp(&(&b.path, &b.method)));
+    out
 }
 
 async fn openapi() -> Json<utoipa::openapi::OpenApi> {

@@ -15,6 +15,8 @@ const MAX_EXTERNAL_ID: usize = 255;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
     Generic,
+    /// `POST /v2/events`: `Bf-Signature: t=<secs>,v1=<hex>[,v1=<hex>]` over `<t>.<key>.<body>`.
+    GenericV2,
     Stripe,
     Paddle,
 }
@@ -31,7 +33,7 @@ impl Source {
     /// The `event_source` enum label.
     pub fn name(self) -> &'static str {
         match self {
-            Source::Generic => "generic",
+            Source::Generic | Source::GenericV2 => "generic",
             Source::Stripe => "stripe",
             Source::Paddle => "paddle",
         }
@@ -40,14 +42,14 @@ impl Source {
     /// Status for an accepted delivery: generic acks with 202, webhooks with 200.
     pub fn accepted(self) -> axum::http::StatusCode {
         match self {
-            Source::Generic => axum::http::StatusCode::ACCEPTED,
+            Source::Generic | Source::GenericV2 => axum::http::StatusCode::ACCEPTED,
             Source::Stripe | Source::Paddle => axum::http::StatusCode::OK,
         }
     }
 
     pub fn secret(self, p: &ProgramSecrets) -> Option<&str> {
         match self {
-            Source::Generic => Some(p.webhook_secret.as_str()),
+            Source::Generic | Source::GenericV2 => Some(p.webhook_secret.as_str()),
             Source::Stripe => p.stripe_secret.as_deref(),
             Source::Paddle => p.paddle_secret.as_deref(),
         }
@@ -81,15 +83,21 @@ impl Source {
                 }
                 Ok(())
             }
+            // Bf-Signature only; the v1 headers are not accepted here (no downgrade confusion).
+            Source::GenericV2 => {
+                let key = idempotency_key(headers).ok_or(VerifyError::Missing)?;
+                let h = header(headers, "bf-signature").ok_or(VerifyError::Missing)?;
+                timestamped(h, ',', ("t", "v1"), (b".", Some(key)), body, secret, now)
+            }
             // Stripe-Signature: t=<ts>,v1=<hex>[,v1=<hex>][,v0=<hex>]; signed `<ts>.<body>`.
             Source::Stripe => {
                 let h = header(headers, "stripe-signature").ok_or(VerifyError::Missing)?;
-                timestamped(h, ',', ("t", "v1"), b".", body, secret, now)
+                timestamped(h, ',', ("t", "v1"), (b".", None), body, secret, now)
             }
             // Paddle-Signature: ts=<ts>;h1=<hex>[;h1=<hex>]; signed `<ts>:<body>`.
             Source::Paddle => {
                 let h = header(headers, "paddle-signature").ok_or(VerifyError::Missing)?;
-                timestamped(h, ';', ("ts", "h1"), b":", body, secret, now)
+                timestamped(h, ';', ("ts", "h1"), (b":", None), body, secret, now)
             }
         }
     }
@@ -98,7 +106,7 @@ impl Source {
     /// Paddle `event_id`.
     pub fn external_id(self, headers: &HeaderMap, payload: &Value) -> Option<String> {
         let id = match self {
-            Source::Generic => idempotency_key(headers)?,
+            Source::Generic | Source::GenericV2 => idempotency_key(headers)?,
             Source::Stripe => payload.get("id")?.as_str()?,
             Source::Paddle => payload.get("event_id")?.as_str()?,
         };
@@ -111,7 +119,7 @@ fn timestamped(
     header: &str,
     sep: char,
     (ts_key, sig_key): (&str, &str),
-    glue: &[u8],
+    (glue, key): (&[u8], Option<&str>),
     body: &[u8],
     secret: &str,
     now: i64,
@@ -129,7 +137,11 @@ fn timestamped(
     if sigs.is_empty() {
         return Err(VerifyError::Malformed);
     }
-    let mac = mac(secret, &[ts.as_bytes(), glue, body]);
+    // Providers sign `<ts><glue><body>`; Bf-Signature signs `<ts>.<key>.<body>`.
+    let mac = match key {
+        Some(k) => mac(secret, &[ts.as_bytes(), b".", k.as_bytes(), b".", body]),
+        None => mac(secret, &[ts.as_bytes(), glue, body]),
+    };
     if !sigs.iter().any(|s| mac.clone().verify_slice(s).is_ok()) {
         return Err(VerifyError::Mismatch);
     }
