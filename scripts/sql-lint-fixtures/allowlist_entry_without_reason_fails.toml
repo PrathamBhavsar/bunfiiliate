@@ -1,0 +1,4 @@
+[[allow]]
+file = "_allowlist_entry_without_reason_fails/allowlist_entry_without_reason_fails.rs"
+fn = "sweep"
+reason = ""

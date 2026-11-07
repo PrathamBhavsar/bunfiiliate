@@ -989,3 +989,59 @@ async fn ops_webhook_api_version_rejects_unknown_value(pool: PgPool) {
         .await;
     assert!(r.is_err());
 }
+
+mod health {
+    use super::*;
+
+    fn health_app(pool: &PgPool) -> Router {
+        Api::new(pool).app
+    }
+
+    async fn get(app: &Router, path: &str) -> (StatusCode, Value) {
+        let res = app
+            .clone()
+            .oneshot(Request::get(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let st = res.status();
+        let b = axum::body::to_bytes(res.into_body(), 1 << 20)
+            .await
+            .unwrap();
+        (st, serde_json::from_slice(&b).unwrap_or(Value::Null))
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn healthz_200_no_auth(pool: PgPool) {
+        let (st, _) = get(&health_app(&pool), "/healthz").await;
+        assert_eq!(st, StatusCode::OK);
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn readyz_reports_migration_head(pool: PgPool) {
+        let (st, body) = get(&health_app(&pool), "/readyz").await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(body["migration_head"], bf_db::embedded_head());
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn readyz_503_when_behind_head(pool: PgPool) {
+        sqlx::query("DELETE FROM _sqlx_migrations WHERE version = (SELECT max(version) FROM _sqlx_migrations)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (st, body) = get(&health_app(&pool), "/readyz").await;
+        assert_eq!(st, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["status"], "migrating");
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn readyz_503_when_db_down(pool: PgPool) {
+        let app = health_app(&pool);
+        pool.close().await;
+        let (st, body) = get(&app, "/readyz").await;
+        assert_eq!(st, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["status"], "db_unavailable");
+        let (st, _) = get(&app, "/healthz").await;
+        assert_eq!(st, StatusCode::OK);
+    }
+}

@@ -1,0 +1,734 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "bunfiiliate tracker",
+    "description": "Tracker contract v2",
+    "license": {
+      "name": "AGPL-3.0-only",
+      "identifier": "AGPL-3.0-only"
+    },
+    "version": "2"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "operationId": "get_healthz",
+        "responses": {
+          "200": {
+            "description": "Alive"
+          }
+        }
+      }
+    },
+    "/r/{code}": {
+      "get": {
+        "tags": [
+          "redirect"
+        ],
+        "operationId": "get_redirect",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Referral code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to the landing URL"
+          },
+          "404": {
+            "description": "Unknown code"
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "operationId": "get_readyz",
+        "responses": {
+          "200": {
+            "description": "Ready"
+          },
+          "503": {
+            "description": "Database unreachable"
+          }
+        }
+      }
+    },
+    "/t.js": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "operationId": "get_tracker_js",
+        "responses": {
+          "200": {
+            "description": "Tracking script",
+            "content": {
+              "application/javascript": {}
+            }
+          },
+          "304": {
+            "description": "Not modified"
+          }
+        }
+      }
+    },
+    "/v2/c": {
+      "post": {
+        "tags": [
+          "v2"
+        ],
+        "operationId": "post_beacon",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClickBeacon"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Recorded"
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Shedding load, retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/events/{key}": {
+      "post": {
+        "tags": [
+          "v2"
+        ],
+        "operationId": "post_event",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Program public key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "[A-Za-z0-9_-]{1,64}",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Bf-Signature",
+            "in": "header",
+            "description": "t=<unix>,v1=<hex hmac-sha256 of `<t>.<key>.<body>`>",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventV2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Duplicate of an earlier event",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bad signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key reused with a different body",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Shedding load, retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/openapi.json": {
+      "get": {
+        "tags": [
+          "v2"
+        ],
+        "operationId": "get_openapi",
+        "responses": {
+          "200": {
+            "description": "This document",
+            "content": {
+              "application/json": {}
+            }
+          }
+        }
+      }
+    },
+    "/v2/webhooks/paddle/{key}": {
+      "post": {
+        "tags": [
+          "v2"
+        ],
+        "operationId": "post_paddle",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Program public key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Paddle-Signature",
+            "in": "header",
+            "description": "Paddle signature",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted or duplicate (`status` says which)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bad signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Shedding load, retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/webhooks/stripe/{key}": {
+      "post": {
+        "tags": [
+          "v2"
+        ],
+        "operationId": "post_stripe",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Program public key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Stripe-Signature",
+            "in": "header",
+            "description": "Stripe signature",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Accepted or duplicate (`status` says which)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bad signature",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown program",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Body too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Shedding load, retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Accepted": {
+        "type": "object",
+        "required": [
+          "status",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "description": "`accepted` or `duplicate`."
+          }
+        }
+      },
+      "ClickBeacon": {
+        "type": "object",
+        "description": "`click-beacon.schema.json`.",
+        "required": [
+          "v",
+          "vid",
+          "url"
+        ],
+        "properties": {
+          "click": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pk": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ts": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "url": {
+            "type": "string",
+            "description": "http(s), at most 2048."
+          },
+          "v": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Const 2.",
+            "minimum": 0
+          },
+          "vid": {
+            "type": "string",
+            "description": "8..64 of `[A-Za-z0-9_-]`."
+          }
+        }
+      },
+      "Customer": {
+        "type": "object",
+        "properties": {
+          "email_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "64 lowercase hex."
+          },
+          "external_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ErrorBody": {
+        "type": "object",
+        "description": "Error body (all `/v2` routes), `error.schema.json`.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        }
+      },
+      "ErrorDetail": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "`^[a-z][a-z0-9_]*$`"
+          },
+          "message": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "EventV2": {
+        "type": "object",
+        "description": "`bf.event.v2`, `event.schema.json`.",
+        "required": [
+          "schema",
+          "type",
+          "external_id",
+          "occurred_at"
+        ],
+        "properties": {
+          "amount_cents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Integer cents, `>= 0`; required for sale, refund, chargeback.",
+            "minimum": 0
+          },
+          "click_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Three uppercase letters."
+          },
+          "customer": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Customer"
+              }
+            ]
+          },
+          "external_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          "meta": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "Flat map (string, number, bool), at most 20 keys.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "occurred_at": {
+            "type": "string",
+            "description": "RFC 3339 with offset."
+          },
+          "ref_external_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Required for refund and chargeback."
+          },
+          "schema": {
+            "type": "string",
+            "description": "Const `bf.event.v2`."
+          },
+          "type": {
+            "type": "string",
+            "description": "`sale|signup|lead|refund|chargeback|custom:<name>`."
+          }
+        }
+      }
+    }
+  }
+}

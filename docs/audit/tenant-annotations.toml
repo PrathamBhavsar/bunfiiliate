@@ -835,3 +835,72 @@ source = "tracker"
 kind = "webhook"
 role = "none"
 reason = "Paddle inbound, program key in path"
+
+[[route]]
+method = "get"
+path = "/v2/openapi.json"
+source = "tracker"
+kind = "public"
+role = "none"
+reason = "spec is public"
+path = "/api/v1/me/payout-requests"
+source = "api"
+kind = "self"
+role = "Affiliate"
+reason = "own affiliate row only"
+
+[[route]]
+method = "post"
+path = "/api/v1/me/payout-requests"
+source = "api"
+kind = "self"
+role = "Affiliate"
+reason = "own affiliate row only"
+
+[[route]]
+method = "get"
+path = "/api/v1/payout-requests"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "post"
+path = "/api/v1/payout-requests/{id}/approve"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "post"
+path = "/api/v1/payout-requests/{id}/reject"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "get"
+path = "/healthz"
+source = "api"
+kind = "public"
+role = "none"
+reason = "liveness probe"
+
+[[route]]
+method = "get"
+path = "/readyz"
+source = "api"
+kind = "public"
+role = "none"
+reason = "readiness probe (db ping + migration head)"
+
+[[route]]
+method = "get"
+path = "/v2/openapi.json"
+source = "tracker"
+kind = "public"
+role = "none"
+reason = "published contract, no tenant data"

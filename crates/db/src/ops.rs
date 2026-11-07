@@ -182,11 +182,20 @@ pub async fn get_delivery(
 }
 
 /// Queue a finished delivery for a fresh run of attempts.
-pub async fn requeue_delivery(db: impl PgExecutor<'_>, id: Uuid) -> Result<(), sqlx::Error> {
-    sqlx::query("UPDATE webhook_deliveries SET attempt = 0, next_attempt_at = now() WHERE id = $1")
-        .bind(id)
-        .execute(db)
-        .await?;
+pub async fn requeue_delivery(
+    db: impl PgExecutor<'_>,
+    workspace_id: Uuid,
+    id: Uuid,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE webhook_deliveries d SET attempt = 0, next_attempt_at = now() \
+         FROM webhook_endpoints e \
+         WHERE e.id = d.endpoint_id AND e.workspace_id = $2 AND d.id = $1",
+    )
+    .bind(id)
+    .bind(workspace_id)
+    .execute(db)
+    .await?;
     Ok(())
 }
 

@@ -631,6 +631,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/payout-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in affiliate's own requests, newest first. */
+        get: operations["me_list"];
+        put?: never;
+        /** File a payout request for the signed-in affiliate. */
+        post: operations["me_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/payouts": {
         parameters: {
             query?: never;
@@ -729,6 +747,57 @@ export interface paths {
         put?: never;
         /** Mark one of the signed-in user's notifications read. */
         post: operations["mark_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payout-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace payout requests, newest first. */
+        get: operations["admin_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payout-requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve: drafts a payout sized from the current balance. */
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payout-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject with a reason shown to the affiliate. */
+        post: operations["reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1214,6 +1283,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liveness: the process is up. No auth, no DB. */
+        get: operations["healthz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness: Postgres answers and the schema is at (or past) the migration head
+         *     this binary embeds. No auth.
+         */
+        get: operations["readyz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1233,6 +1339,10 @@ export interface components {
             user_id: string;
             /** Format: uuid */
             workspace_id: string;
+        };
+        Approved: {
+            /** Format: int64 */
+            amount_cents: number;
         };
         /** @enum {string} */
         AttributionModel: "first_touch" | "last_touch";
@@ -1592,6 +1702,13 @@ export interface components {
              */
             hold_days?: number | null;
             name: string;
+        };
+        NewRequest: {
+            currency: string;
+            /** Format: uuid */
+            program_id: string;
+            /** Format: int64 */
+            requested_cents: number;
         };
         NewSite: {
             /** @description Bare host, e.g. `shop.example.com`. */
@@ -2080,6 +2197,35 @@ export interface components {
              */
             total: number;
         };
+        Paged_RequestView: {
+            items: {
+                /** Format: uuid */
+                affiliate_id: string;
+                created_at: string;
+                currency: string;
+                decided_at?: string | null;
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                payout_id?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                rejection_reason?: string | null;
+                /** Format: int64 */
+                requested_cents: number;
+                /** @description `pending`, `approved`, `rejected` or `paid`. */
+                status: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_Site: {
             items: {
                 domain: string;
@@ -2270,6 +2416,27 @@ export interface components {
             payout_email?: string | null;
             /** @description Slug of the workspace to join. */
             workspace: string;
+        };
+        RejectBody: {
+            reason: string;
+        };
+        RequestView: {
+            /** Format: uuid */
+            affiliate_id: string;
+            created_at: string;
+            currency: string;
+            decided_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            payout_id?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            rejection_reason?: string | null;
+            /** Format: int64 */
+            requested_cents: number;
+            /** @description `pending`, `approved`, `rejected` or `paid`. */
+            status: string;
         };
         ResetRequest: {
             /** @description Six-digit authenticator code, or a recovery code (`xxxxx-xxxxx`). */
@@ -3912,6 +4079,91 @@ export interface operations {
             };
         };
     };
+    me_list: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `pending`, `approved`, `rejected` or `paid`. */
+                status?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_RequestView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    me_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestView"];
+                };
+            };
+            /** @description Over balance, under minimum or wrong currency */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not enrolled */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A request is already pending */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     me_payouts: {
         parameters: {
             query?: {
@@ -4184,6 +4436,130 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    admin_list: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `pending`, `approved`, `rejected` or `paid`. */
+                status?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_RequestView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description RequestView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Approved"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Decided already, or nothing payable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description RequestView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectBody"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing reason */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Decided already */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5690,6 +6066,49 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
+            };
+        };
+    };
+    healthz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description alive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readyz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not ready */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

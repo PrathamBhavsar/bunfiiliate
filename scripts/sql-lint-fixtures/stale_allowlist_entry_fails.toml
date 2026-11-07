@@ -1,0 +1,4 @@
+[[allow]]
+file = "_stale_allowlist_entry_fails/stale_allowlist_entry_fails.rs"
+fn = "fine"
+reason = "nothing to allow"

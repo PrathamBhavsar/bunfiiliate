@@ -6,6 +6,7 @@ pub mod event;
 pub mod geo;
 pub mod idem;
 pub mod metrics;
+pub mod openapi;
 pub mod proxy;
 pub mod snapshot;
 pub mod v2;
@@ -143,6 +144,7 @@ pub fn router(state: AppState) -> Router {
         .layer(DefaultBodyLimit::max(MAX_EVENT_BODY))
         .route_layer(axum::middleware::from_fn(deprecation::v1));
     Router::new()
+        .route("/v2/openapi.json", get(openapi::serve))
         .route("/t.js", get(tracker_js))
         .route("/r/{code}", get(redirect))
         .route(

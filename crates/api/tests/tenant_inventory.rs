@@ -234,6 +234,8 @@ fn public_routes_allowlist() {
         .collect();
     let want: BTreeSet<String> = [
         "api get /api/openapi.json",
+        "api get /healthz",
+        "api get /readyz",
         "api post /api/v1/affiliates/register",
         "api post /api/v1/auth/login",
         "api post /api/v1/auth/refresh",
@@ -246,7 +248,9 @@ fn public_routes_allowlist() {
         "tracker get /r/{code}",
         "tracker post /c",
         "tracker post /v2/c",
+        "tracker get /v2/openapi.json",
         "tracker get /healthz",
+        "tracker get /v2/openapi.json",
         "tracker get /readyz",
     ]
     .map(str::to_owned)

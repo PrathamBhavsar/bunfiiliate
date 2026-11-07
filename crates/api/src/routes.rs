@@ -22,8 +22,8 @@ use crate::auth::{
 use crate::error::{AppError, AppJson, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    admin_reset, affiliates, analytics, mail, money, ops, password_reset, payouts, programs, totp,
-    webhooks, workspaces,
+    admin_reset, affiliates, analytics, mail, money, ops, password_reset, payout_requests, payouts,
+    programs, totp, webhooks, workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -69,6 +69,7 @@ impl Modify for CookieAuth {
         webhooks::redeliver,
         mail::create_template, mail::list_templates, mail::get_template,
         mail::update_template, mail::delete_template,
+        ops::healthz, ops::readyz,
         ops::list_notifications, ops::mark_read,
         ops::create_contact, ops::list_contacts, ops::update_contact,
         ops::get_settings, ops::put_settings, ops::list_audit,
@@ -79,6 +80,8 @@ impl Modify for CookieAuth {
         payouts::create_batch_route, payouts::list_batches, payouts::get_batch,
         payouts::approve, payouts::mark_paid_route, payouts::cancel, payouts::export,
         payouts::me_payouts,
+        payout_requests::me_create, payout_requests::me_list, payout_requests::admin_list,
+        payout_requests::approve, payout_requests::reject,
     ),
     components(schemas(
         LoginRequest, UserView, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
@@ -109,6 +112,7 @@ pub fn routes() -> Router<AppState> {
         .merge(ops::routes())
         .merge(money::routes())
         .merge(payouts::routes())
+        .merge(payout_requests::routes())
 }
 
 /// One OpenAPI operation, for the tenant audit inventory.

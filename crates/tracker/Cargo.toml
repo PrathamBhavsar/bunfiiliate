@@ -19,9 +19,11 @@ serde_json.workspace = true
 sha2.workspace = true
 sqlx.workspace = true
 tokio = { workspace = true, features = ["net", "signal"] }
+utoipa = { version = "5", features = ["uuid"] }
 tracing.workspace = true
 uuid.workspace = true
 woothee.workspace = true
 
 [dev-dependencies]
+proptest.workspace = true
 tower = { version = "0.5", features = ["util"] }

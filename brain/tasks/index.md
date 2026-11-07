@@ -57,4 +57,12 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | A14 | feat/js-sdk | done, merged |
 | C01 | feat/c-inventory | done, merged |
 | C02 | feat/c-matrix | done, merged (known_leaks.txt empty: no leaks found) |
+| A10 | feat/pentest-suite | done, merged (`make pentest`, checklist PT-01..21) |
+| A13 | feat/tracker-v1-compat | done, merged (Deprecation/Sunset on v1; /t.js serves v2) |
+| A15 | feat/tracker-contract-tests | done, merged (tracker OpenAPI + contract tests in make ci) |
+| A-web | feat/web-auth-pages | done, merged (TOTP settings, reset-password, admin issue token) |
+| B09 | feat/b-billing-schema | done, merged (0077) |
+| B03 | feat/b-payout-requests | done, merged (0072; web UI still open) |
+| C03+C04 | feat/c-sql-lint-guard | done, merged (`make sql-lint` in ci) |
+| C14+C15+C16 | feat/c-migrations-ops | done, merged (migration checksums, api /healthz /readyz) |
 
