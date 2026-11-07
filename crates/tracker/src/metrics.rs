@@ -20,6 +20,28 @@ pub static SPOOL_BYTES: Gauge = Gauge::new();
 /// Spool offset already in Postgres; `bf_spool_lag` is the bytes between the two.
 pub static SPOOL_CHECKPOINT: Gauge = Gauge::new();
 
+/// Spool free bytes on its filesystem, sampled each second.
+pub static SPOOL_FREE_BYTES: Gauge = Gauge::new();
+/// Total bytes of spool segments on disk.
+pub static SPOOL_DISK_BYTES: Gauge = Gauge::new();
+/// 1 while the spool disk is (nearly) full and the tracker sheds.
+pub static SPOOL_SHEDDING: Gauge = Gauge::new();
+/// Requests shed because the spool disk is full, by route (indexed like `SHED_ROUTES`).
+static SPOOL_SHED: [Counter; 3] = [Counter::new(), Counter::new(), Counter::new()];
+const SHED_ROUTES: [&str; 3] = ["c", "r", "events"];
+
+pub fn spool_shed(route: &str) {
+    if let Some(i) = SHED_ROUTES.iter().position(|r| *r == route) {
+        SPOOL_SHED[i].inc();
+    }
+}
+
+pub fn spool_report(free: u64, bytes: u64, shedding: bool) {
+    SPOOL_FREE_BYTES.set(free);
+    SPOOL_DISK_BYTES.set(bytes);
+    SPOOL_SHEDDING.set(shedding as u64);
+}
+
 /// v1 (deprecated) requests by matched route, indexed like `V1_ROUTES`.
 static V1_REQUESTS: [Counter; 4] = [
     Counter::new(),
@@ -76,6 +98,34 @@ pub fn render() -> String {
         "bf_snapshot_decrypt_fail_total",
         "Program rows skipped by a snapshot load: secret failed to decrypt.",
         &SNAPSHOT_DECRYPT_FAIL,
+    );
+    out.push_str(
+        "# HELP bf_spool_shed_total Requests shed because the spool disk is full.\n\
+         # TYPE bf_spool_shed_total counter\n",
+    );
+    for (route, c) in SHED_ROUTES.iter().zip(&SPOOL_SHED) {
+        out.push_str(&format!(
+            "bf_spool_shed_total{{route=\"{route}\"}} {}\n",
+            c.get()
+        ));
+    }
+    gauge(
+        &mut out,
+        "bf_spool_free_bytes",
+        "Free bytes on the spool filesystem.",
+        &SPOOL_FREE_BYTES,
+    );
+    gauge(
+        &mut out,
+        "bf_spool_disk_bytes",
+        "Bytes of spool segments on disk.",
+        &SPOOL_DISK_BYTES,
+    );
+    gauge(
+        &mut out,
+        "bf_spool_shedding",
+        "1 while the spool disk is full and the tracker sheds.",
+        &SPOOL_SHEDDING,
     );
     gauge(
         &mut out,

@@ -638,3 +638,43 @@ pub async fn requeue_inbound(
     .rows_affected();
     Ok(n == 1)
 }
+
+// ---- alerts (Alertmanager sink)
+
+/// Notify every super admin of one alert. `firing` posts an `alert` notification; a resolved
+/// alert posts `alert_resolved` and marks the earlier firing ones with the same prefix read.
+/// Returns the number of super admins notified.
+pub async fn notify_super_admins_alert(
+    pool: &PgPool,
+    firing: bool,
+    name_prefix: &str,
+    body: &str,
+) -> Result<usize, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    let ids: Vec<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE role = 'super_admin'")
+        .fetch_all(&mut *tx)
+        .await?;
+    let kind = if firing { "alert" } else { "alert_resolved" };
+    for id in &ids {
+        if !firing {
+            sqlx::query(
+                "UPDATE notifications SET read_at = COALESCE(read_at, now()) \
+                 WHERE user_id = $1 AND kind = 'alert' AND read_at IS NULL \
+                   AND left(body, length($2)) = $2",
+            )
+            .bind(id)
+            .bind(name_prefix)
+            .execute(&mut *tx)
+            .await?;
+        }
+        sqlx::query("INSERT INTO notifications (id, user_id, kind, body) VALUES ($1, $2, $3, $4)")
+            .bind(Uuid::now_v7())
+            .bind(id)
+            .bind(kind)
+            .bind(body)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(ids.len())
+}

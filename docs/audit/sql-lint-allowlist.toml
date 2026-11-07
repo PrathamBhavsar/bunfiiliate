@@ -304,3 +304,8 @@ reason = "tracker snapshot loader: every workspace by design, no request context
 file = "crates/db/src/tracker.rs"
 fn = "load_program_keys"
 reason = "tracker snapshot loader: every workspace by design, no request context"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "notify_super_admins_alert"
+reason = "alert sink fans out to every super admin across workspaces; token-authenticated, no request tenant"

@@ -1,0 +1,69 @@
+# Alert rules. Only metrics the binaries really export (crates/*/src/metrics.rs); the test
+# `rules_reference_only_exported_metrics` fails on a typo or an invented name.
+# Every rule has a runbook anchor in docs/ops/alerts.md.
+groups:
+  - name: bunfiiliate
+    rules:
+      - alert: TrackerDown
+        expr: up{job="bf-tracker"} == 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "Tracker metrics endpoint is not answering"
+          runbook: "docs/ops/alerts.md#trackerdown"
+      - alert: ApiDown
+        expr: up{job="bf-api"} == 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "API metrics endpoint is not answering"
+          runbook: "docs/ops/alerts.md#apidown"
+      - alert: SpoolShedding
+        expr: bf_spool_shedding == 1
+        for: 1m
+        labels: {severity: page}
+        annotations:
+          summary: "Spool disk full: tracker is answering 503 and dropping /r clicks"
+          runbook: "docs/ops/alerts.md#spoolshedding"
+      - alert: SpoolDiskLow
+        expr: bf_spool_free_bytes < 1073741824
+        for: 5m
+        labels: {severity: warn}
+        annotations:
+          summary: "Under 1 GiB free on the spool filesystem"
+          runbook: "docs/ops/alerts.md#spooldisklow"
+      - alert: SpoolLagHigh
+        expr: bf_spool_lag > 67108864
+        for: 5m
+        labels: {severity: warn}
+        annotations:
+          summary: "More than 64 MiB of spool not yet in Postgres"
+          runbook: "docs/ops/alerts.md#spoollaghigh"
+      - alert: TrackerShedding
+        expr: increase(bf_shed_total[5m]) > 0
+        for: 5m
+        labels: {severity: warn}
+        annotations:
+          summary: "Writer queue full: tracker is shedding requests"
+          runbook: "docs/ops/alerts.md#trackershedding"
+      - alert: DeadLetterGrowing
+        expr: increase(bf_dead_lettered_total[15m]) > 0
+        for: 5m
+        labels: {severity: warn}
+        annotations:
+          summary: "Spool records are being skipped after Postgres rejected them"
+          runbook: "docs/ops/alerts.md#deadlettergrowing"
+      - alert: WebhookDeliveryBacklog
+        expr: bf_outbox_depth > 1000
+        for: 10m
+        labels: {severity: warn}
+        annotations:
+          summary: "Outbound webhook outbox is backing up"
+          runbook: "docs/ops/alerts.md#webhookdeliverybacklog"
+      - alert: WebhookDeliveryFailing
+        expr: rate(bf_webhook_delivery_failures_total[10m]) > 0.1
+        for: 10m
+        labels: {severity: warn}
+        annotations:
+          summary: "Outbound webhook deliveries are failing"
+          runbook: "docs/ops/alerts.md#webhookdeliveryfailing"
