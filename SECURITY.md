@@ -91,3 +91,9 @@ The following areas are explicitly excluded from our threat model for v1 (see [`
 - **Auth abuse limits**: login, register and contact-requests have an in-process per-IP and per-email sliding-window limiter (HTTP 429), and password hashing runs with bounded concurrency. This is best effort and per process: put real volumetric limits in Caddy or Cloudflare in front of the API.
 - **Refresh tokens**: re-presenting a token within 10 s of its rotation is a plain 401 and keeps the session; later reuse revokes the whole family and writes an `auth.refresh_reuse` audit entry. A session family cannot be refreshed past 90 days.
 - **Request size**: the API rejects request bodies over 64 KB.
+
+---
+
+## Pentest suite
+
+The checklist of attack classes and the tests that cover them is in [docs/security/pentest-checklist.md](docs/security/pentest-checklist.md). Run `make pentest` (set `BASE_URL` to add live probes against a deployment).
