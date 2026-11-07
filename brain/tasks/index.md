@@ -81,3 +81,4 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | billing-variant | feat/billing-variant-plan | done, merged (0082; plan from purchased variant, store check) |
 | C30+C31+C32 | feat/c30-code-stats | done, merged (per-code stats API + pages, routing ADR 0006) |
 | notify-redact | fix/notify-redact-url | done, merged (reqwest errors stripped of channel URL) |
+| C40+C41+C42 | feat/c40-42-bench | done on branch; reproducible `bench/run.sh` (schema v1, pinned oha, median of repeats), `bench/compare.py` + thresholds + nightly workflow, benchmark publishing rules + `gen_docs.py` |

@@ -12,6 +12,12 @@
 - **Lessons**: a conversion has no code column; attribute it through `customers.first_click_id` -> `clicks.code`. The click query is bounded on `ts` both sides (test `per_code_stats_query_has_ts_bound`). Query keys are `["admin"|"portal","code-stats",...]`, never `"me"`.
 - **Known limits**: Playwright cases for the stats pages belong to C34.
 
+## [2026-11-07] C40-C42 bench (tribe #39)
+
+- **Done on `feat/c40-42-bench`**: `bench/run.sh` (pinned oha 1.16.0, exit 2 if missing, warm-up, repeats, seeded codes, `--quick`, `--write-docs`), result schema v1 with hardware block, `bench/compare.py` (0/1/3, noisy downgrade), `bench-nightly.yml` (self-hosted authoritative, hosted advisory), `bench/gen_docs.py`, publishing rules in `docs/benchmarks.md`, `check-bench-numbers.sh` reads the new schema.
+- **Lessons**: see [Bench](/wisdom/bench.md).
+- **Known limits**: no baseline and no schema v1 full result committed: the full run fails its own error gate (503 shedding on `/r` off mode, see wisdom). Quick run, helper tests, compare self-test, docs/site check pass.
+
 ## [2026-11-07] Plan v2 wave 7 + billing variant fix (tribe)
 
 - **Merged**: B05, B06, B07, B11, C10-C13, C20-C22, billing plan-from-variant fix. Migrations 0074-0076, 0080, 0082 (0081 intentionally unused).

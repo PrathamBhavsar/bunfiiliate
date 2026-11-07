@@ -14,3 +14,4 @@ bench/results/*.json
 .reports/
 .coord/
 BOARD.md
+__pycache__/
