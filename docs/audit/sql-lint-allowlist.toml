@@ -1,0 +1,306 @@
+# Fns the C03 lint cannot prove scoped. Reason required; stale entries fail the lint.
+
+[[allow]]
+file = "crates/api/src/analytics.rs"
+fn = "report_csv"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/analytics.rs"
+fn = "rollup"
+reason = "rollup worker loop: aggregates every program, no request context"
+
+[[allow]]
+file = "crates/api/src/analytics.rs"
+fn = "summary"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/analytics.rs"
+fn = "timeseries"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/dispatch.rs"
+fn = "lease_due"
+reason = "webhook dispatcher loop leases due deliveries across all workspaces"
+
+[[allow]]
+file = "crates/api/src/dispatch.rs"
+fn = "send_one"
+reason = "webhook dispatcher: delivery id was leased by lease_due, system loop"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "count"
+reason = "generic count helper; every caller passes a format! query whose const carries the workspace predicate (CUSTOMERS, CONVERSIONS, ENTRIES, BALANCES)"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "get_customer"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "get_view"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "list"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "list_balances"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "list_customers"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "list_entries"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/money.rs"
+fn = "run_action"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/payouts.rs"
+fn = "detail"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/payouts.rs"
+fn = "list_batches"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/payouts.rs"
+fn = "me_payouts"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/api/src/secrets.rs"
+fn = "pending_rows"
+reason = "secrets re-encryption CLI runs over every workspace by design (operator tool)"
+
+[[allow]]
+file = "crates/api/src/secrets.rs"
+fn = "reencrypt"
+reason = "secrets re-encryption CLI runs over every workspace by design (operator tool)"
+
+[[allow]]
+file = "crates/api/src/worker.rs"
+fn = "approve_batch"
+reason = "hold-approval worker loop across all programs"
+
+[[allow]]
+file = "crates/api/src/worker.rs"
+fn = "handle"
+reason = "inbound event worker: program id comes from the verified tracker event, loop spans workspaces"
+
+[[allow]]
+file = "crates/api/src/worker.rs"
+fn = "release_hold"
+reason = "hold-release worker loop across all programs"
+
+[[allow]]
+file = "crates/api/src/worker.rs"
+fn = "reverse"
+reason = "inbound event worker: conversion row already resolved from the claimed event"
+
+[[allow]]
+file = "crates/api/src/worker.rs"
+fn = "settle"
+reason = "inbound event worker: conversion row already resolved from the claimed event"
+
+[[allow]]
+file = "crates/api/src/worker.rs"
+fn = "touches"
+reason = "inbound event worker: scoped by the program of the claimed event"
+
+[[allow]]
+file = "crates/db/src/affiliates.rs"
+fn = "affiliate_for_user"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/affiliates.rs"
+fn = "get_affiliate"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/affiliates.rs"
+fn = "list_affiliates"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/affiliates.rs"
+fn = "list_codes"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/affiliates.rs"
+fn = "list_enrollments"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/auth.rs"
+fn = "bump_token_version"
+reason = "session revocation by user id after the caller authenticated that user or an admin check in the handler"
+
+[[allow]]
+file = "crates/db/src/auth.rs"
+fn = "set_password_hash"
+reason = "password change/reset by user id after reset-token or session verification"
+
+[[allow]]
+file = "crates/db/src/auth.rs"
+fn = "super_admin_exists"
+reason = "bootstrap check over all users; no tenant context exists yet"
+
+[[allow]]
+file = "crates/db/src/auth.rs"
+fn = "token_version"
+reason = "auth layer lookup by user id from a verified token; users are the identity, not tenant data"
+
+[[allow]]
+file = "crates/db/src/auth.rs"
+fn = "user_by_email"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/auth.rs"
+fn = "user_by_id"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "get_delivery"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "get_endpoint"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "get_template"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "insert_contact"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "list_audit"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "list_contacts"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "list_deliveries"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "list_endpoints"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "list_notifications"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "list_templates"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "mark_notification_read"
+reason = "self scoped: user_id predicate; notifications are per user, not per workspace"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "set_contact_status"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "template_by_key"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "update_endpoint"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "update_template"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "get_program"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "insert_program"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "list_conversion_types"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "list_plans"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "list_programs"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "list_sites"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "set_webhook_secret"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/programs.rs"
+fn = "update_program"
+reason = "format!/const-built SQL; expanded text was read by hand and carries the workspace predicate (docs/audit/findings.md)"
+
+[[allow]]
+file = "crates/db/src/tracker.rs"
+fn = "load_codes"
+reason = "tracker snapshot loader: every workspace by design, no request context"
+
+[[allow]]
+file = "crates/db/src/tracker.rs"
+fn = "load_program_keys"
+reason = "tracker snapshot loader: every workspace by design, no request context"

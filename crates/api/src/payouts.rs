@@ -45,12 +45,14 @@ fn invalid<T>(_: T) -> AppError {
     AppError::Conflict("payout batch cannot take this action")
 }
 
-async fn lock(c: &mut PgConnection, id: Uuid) -> Result<Batch, AppError> {
+async fn lock(c: &mut PgConnection, ws: Uuid, id: Uuid) -> Result<Batch, AppError> {
     let row: Option<(String, String)> = sqlx::query_as(
         "SELECT b.status::text, p.currency::text FROM payout_batches b \
-         JOIN programs p ON p.id = b.program_id WHERE b.id = $1 FOR UPDATE OF b",
+         JOIN programs p ON p.id = b.program_id \
+         WHERE b.id = $1 AND p.workspace_id = $2 FOR UPDATE OF b",
     )
     .bind(id)
+    .bind(ws)
     .fetch_optional(&mut *c)
     .await?;
     let (st, cur) = row.ok_or(AppError::NotFound("payout batch not found"))?;
@@ -63,6 +65,7 @@ async fn lock(c: &mut PgConnection, id: Uuid) -> Result<Batch, AppError> {
 /// One payout line for an affiliate, claiming their approved, unclaimed conversions.
 pub(crate) async fn insert_payout(
     tx: &mut PgConnection,
+    ws: Uuid,
     batch: Uuid,
     program_id: Uuid,
     affiliate_id: Uuid,
@@ -73,14 +76,17 @@ pub(crate) async fn insert_payout(
     sqlx::query(
         "INSERT INTO payouts (id, batch_id, affiliate_id, amount_cents, payout_email) \
          SELECT $1, $2, a.id, $4, COALESCE(a.payout_email, u.email)::text \
-         FROM affiliates a JOIN users u ON u.id = a.user_id WHERE a.id = $3",
+         FROM affiliates a JOIN users u ON u.id = a.user_id \
+         WHERE a.id = $3 AND a.workspace_id = $5",
     )
     .bind(payout)
     .bind(batch)
     .bind(affiliate_id)
     .bind(amount_cents)
+    .bind(ws)
     .execute(&mut *tx)
     .await?;
+    // scope: program_id comes from a program locked with the workspace predicate by the caller
     sqlx::query(
         "UPDATE conversions SET payout_id = $1 \
          WHERE program_id = $2 AND affiliate_id = $3 AND status = 'approved' AND payout_id IS NULL",
@@ -97,22 +103,27 @@ pub(crate) async fn insert_payout(
 /// conversions. `None` when nobody is owed.
 pub async fn create_batch(
     pool: &PgPool,
+    ws: Uuid,
     program_id: Uuid,
     created_by: Uuid,
 ) -> Result<Option<Uuid>, AppError> {
     let mut tx = pool.begin().await?;
     // NO KEY UPDATE keeps ingest (FK checks) running but serializes batch creation, so two
     // callers cannot both claim the same payable.
-    sqlx::query_scalar::<_, i32>("SELECT 1 FROM programs WHERE id = $1 FOR NO KEY UPDATE")
-        .bind(program_id)
-        .fetch_optional(&mut *tx)
-        .await?
-        .ok_or(AppError::NotFound("program not found"))?;
-    let owed = payouts::owed(&mut tx, program_id).await?;
+    sqlx::query_scalar::<_, i32>(
+        "SELECT 1 FROM programs WHERE id = $1 AND workspace_id = $2 FOR NO KEY UPDATE",
+    )
+    .bind(program_id)
+    .bind(ws)
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(AppError::NotFound("program not found"))?;
+    let owed = payouts::owed(&mut tx, ws, program_id).await?;
     if owed.is_empty() {
         return Ok(None);
     }
     let batch = Uuid::now_v7();
+    // scope: program_id was locked with the workspace predicate above
     sqlx::query("INSERT INTO payout_batches (id, program_id, created_by) VALUES ($1, $2, $3)")
         .bind(batch)
         .bind(program_id)
@@ -120,21 +131,36 @@ pub async fn create_batch(
         .execute(&mut *tx)
         .await?;
     for o in owed {
-        insert_payout(&mut tx, batch, program_id, o.affiliate_id, o.amount_cents).await?;
+        insert_payout(
+            &mut tx,
+            ws,
+            batch,
+            program_id,
+            o.affiliate_id,
+            o.amount_cents,
+        )
+        .await?;
     }
     tx.commit().await?;
     Ok(Some(batch))
 }
 
-pub async fn approve_batch(pool: &PgPool, batch: Uuid, approved_by: Uuid) -> Result<(), AppError> {
+pub async fn approve_batch(
+    pool: &PgPool,
+    ws: Uuid,
+    batch: Uuid,
+    approved_by: Uuid,
+) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-    let b = lock(&mut tx, batch).await?;
+    let b = lock(&mut tx, ws, batch).await?;
     b.status.transition(PayoutEvent::Approve).map_err(invalid)?;
+    // scope: payout batch already locked with the workspace predicate by lock()
     sqlx::query("UPDATE payout_batches SET status = 'approved', approved_by = $2 WHERE id = $1")
         .bind(batch)
         .bind(approved_by)
         .execute(&mut *tx)
         .await?;
+    // scope: payout batch already locked with the workspace predicate by lock()
     sqlx::query("UPDATE payouts SET status = 'approved' WHERE batch_id = $1")
         .bind(batch)
         .execute(&mut *tx)
@@ -143,18 +169,21 @@ pub async fn approve_batch(pool: &PgPool, batch: Uuid, approved_by: Uuid) -> Res
 }
 
 /// Only a draft batch can be cancelled; its conversions go back to the payable pool.
-pub async fn cancel_batch(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
+pub async fn cancel_batch(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-    let b = lock(&mut tx, batch).await?;
+    let b = lock(&mut tx, ws, batch).await?;
     b.status.transition(PayoutEvent::Cancel).map_err(invalid)?;
+    // scope: payout batch already locked with the workspace predicate by lock()
     sqlx::query("UPDATE payout_batches SET status = 'cancelled' WHERE id = $1")
         .bind(batch)
         .execute(&mut *tx)
         .await?;
+    // scope: payout batch already locked with the workspace predicate by lock()
     sqlx::query("UPDATE payouts SET status = 'cancelled' WHERE batch_id = $1")
         .bind(batch)
         .execute(&mut *tx)
         .await?;
+    // scope: payout batch already locked with the workspace predicate by lock()
     sqlx::query(
         "UPDATE conversions SET payout_id = NULL \
          WHERE payout_id IN (SELECT id FROM payouts WHERE batch_id = $1)",
@@ -167,13 +196,14 @@ pub async fn cancel_batch(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
 
 /// Pay an approved batch: post payable -> cash per payout and turn its claimed conversions
 /// `paid`. A second call finds the batch paid and is rejected.
-pub async fn mark_paid(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
+pub async fn mark_paid(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
-    let b = lock(&mut tx, batch).await?;
+    let b = lock(&mut tx, ws, batch).await?;
     // The batch itself moves no money; its payouts do.
     b.status
         .transition(PayoutEvent::MarkPaid(Money::new(0, b.currency)))
         .map_err(invalid)?;
+    // scope: payout batch already locked with the workspace predicate by lock()
     let rows: Vec<(Uuid, Uuid, i64, String)> = sqlx::query_as(
         "SELECT id, affiliate_id, amount_cents, status::text FROM payouts \
          WHERE batch_id = $1 ORDER BY id FOR UPDATE",
@@ -181,6 +211,7 @@ pub async fn mark_paid(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
     .bind(batch)
     .fetch_all(&mut *tx)
     .await?;
+    // scope: payout batch already locked with the workspace predicate by lock()
     let program: Uuid = sqlx::query_scalar("SELECT program_id FROM payout_batches WHERE id = $1")
         .bind(batch)
         .fetch_one(&mut *tx)
@@ -197,12 +228,14 @@ pub async fn mark_paid(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
             }
             _ => None,
         };
+        // scope: payout batch already locked with the workspace predicate by lock()
         sqlx::query("UPDATE payouts SET status = 'paid', ledger_txn_id = $2 WHERE id = $1")
             .bind(payout)
             .bind(txn_id)
             .execute(&mut *tx)
             .await?;
         // Approved -> Paid; a conversion reversed since the batch was drafted stays reversed.
+        // scope: payout batch already locked with the workspace predicate by lock()
         sqlx::query(
             "UPDATE conversions SET status = 'paid' WHERE payout_id = $1 AND status = 'approved'",
         )
@@ -210,6 +243,7 @@ pub async fn mark_paid(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
         .execute(&mut *tx)
         .await?;
     }
+    // scope: payout batch already locked with the workspace predicate by lock()
     sqlx::query(
         "UPDATE payout_requests SET status = 'paid' WHERE status = 'approved' \
          AND payout_id IN (SELECT id FROM payouts WHERE batch_id = $1)",
@@ -225,14 +259,20 @@ pub async fn mark_paid(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
 }
 
 /// CSV of a batch for the bank/payout tool.
-pub async fn batch_csv(pool: &PgPool, batch: Uuid) -> Result<String, AppError> {
+pub async fn batch_csv(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<String, AppError> {
     let mut conn = pool.acquire().await?;
-    sqlx::query_scalar::<_, i32>("SELECT 1 FROM payout_batches WHERE id = $1")
-        .bind(batch)
-        .fetch_optional(&mut *conn)
-        .await?
-        .ok_or(AppError::NotFound("payout batch not found"))?;
-    Ok(export_csv(&payouts::batch_rows(&mut conn, batch).await?))
+    sqlx::query_scalar::<_, i32>(
+        "SELECT 1 FROM payout_batches b JOIN programs pr ON pr.id = b.program_id \
+         WHERE b.id = $1 AND pr.workspace_id = $2",
+    )
+    .bind(batch)
+    .bind(ws)
+    .fetch_optional(&mut *conn)
+    .await?
+    .ok_or(AppError::NotFound("payout batch not found"))?;
+    Ok(export_csv(
+        &payouts::batch_rows(&mut conn, ws, batch).await?,
+    ))
 }
 
 /// `email,amount,currency` with a header; amounts are decimal with two places.
@@ -365,6 +405,7 @@ async fn detail(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<BatchDetail, AppErr
         .fetch_optional(pool)
         .await?
         .ok_or(AppError::NotFound("payout batch not found"))?;
+    // scope: batch id checked against the workspace by the first query
     let payouts = sqlx::query_as(
         "SELECT p.id, p.affiliate_id, COALESCE(p.payout_email, a.payout_email, u.email)::text AS email, \
                 p.amount_cents, p.status::text AS status, p.ledger_txn_id \
@@ -412,7 +453,7 @@ pub async fn create_batch_route(
 ) -> Result<(StatusCode, Json<BatchDetail>), AppError> {
     let ws = auth.principal.workspace_scope(None)?;
     require_program(&mut *s.pool.acquire().await?, ws, req.program_id).await?;
-    let id = create_batch(&s.pool, req.program_id, auth.principal.user_id)
+    let id = create_batch(&s.pool, ws, req.program_id, auth.principal.user_id)
         .await?
         .ok_or(AppError::Conflict("nobody is owed a payout"))?;
     audit::record(
@@ -504,7 +545,7 @@ pub async fn approve(
 ) -> Result<Json<BatchDetail>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
     require_batch(&s.pool, ws, id).await?;
-    approve_batch(&s.pool, id, auth.principal.user_id).await?;
+    approve_batch(&s.pool, ws, id, auth.principal.user_id).await?;
     audit::record(
         &s.pool,
         &auth.principal,
@@ -537,7 +578,7 @@ pub async fn mark_paid_route(
 ) -> Result<Json<BatchDetail>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
     require_batch(&s.pool, ws, id).await?;
-    mark_paid(&s.pool, id).await?;
+    mark_paid(&s.pool, ws, id).await?;
     audit::record(
         &s.pool,
         &auth.principal,
@@ -570,7 +611,7 @@ pub async fn cancel(
 ) -> Result<Json<BatchDetail>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
     require_batch(&s.pool, ws, id).await?;
-    cancel_batch(&s.pool, id).await?;
+    cancel_batch(&s.pool, ws, id).await?;
     audit::record(
         &s.pool,
         &auth.principal,
@@ -610,7 +651,7 @@ pub async fn export(
                 format!("attachment; filename=\"payouts-{id}.csv\""),
             ),
         ],
-        batch_csv(&s.pool, id).await?,
+        batch_csv(&s.pool, ws, id).await?,
     ))
 }
 

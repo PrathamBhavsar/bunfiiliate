@@ -327,7 +327,7 @@ pub async fn redeliver(
     if d.next_attempt_at.is_some() {
         return Err(AppError::Conflict("delivery is still pending"));
     }
-    bf_db::ops::requeue_delivery(&mut *tx, id).await?;
+    bf_db::ops::requeue_delivery(&mut *tx, ws, id).await?;
     let action = "webhook_delivery.redeliver";
     audit::record(
         &mut *tx,

@@ -196,7 +196,7 @@ pub async fn approve_request(
         .bind(admin)
         .execute(&mut *tx)
         .await?;
-    let payout = insert_payout(&mut tx, batch, r.program, r.affiliate, owed).await?;
+    let payout = insert_payout(&mut tx, ws, batch, r.program, r.affiliate, owed).await?;
     sqlx::query(
         "UPDATE payout_requests SET status = 'approved', payout_id = $2, decided_at = now(), \
          decided_by = $3 WHERE id = $1",

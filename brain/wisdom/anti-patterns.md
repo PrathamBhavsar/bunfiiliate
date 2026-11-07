@@ -38,5 +38,6 @@ timestamp: 2026-10-26
 28. Evicting expired keys by scanning a map on the tracker hot path, or short-circuiting fraud rules. Rotate key maps by generation (O(1) amortized, bounded) and run every rule on every click, or a stateful window misses clicks another rule flagged.
 29. Adding cents across programs of different currencies (dashboard/analytics "all programs"). Use the program's currency, or the shared one if every program has it; otherwise show no money and ask for a program (`currencyFor`).
 30. A web query key starting with `"me"`. `refresh()` (`lib/admin.ts`) invalidates everything except the `["me"]` session query by key prefix, so a `["me", ...]` query never refetches after a mutation and the page shows stale data. Key portal queries under `"portal"`.
+31. A db/api fn that reads or writes tenant tables without a workspace id. Take `ws: Uuid` and put it in the SQL (`workspace_id = $n`, or join `programs`/`affiliates`); a handler-only check (`require_batch`) is not enough. Child statements keyed by an already-scoped id get a `// scope: <reason>` comment; system loops go in `docs/audit/sql-lint-allowlist.toml`. `make sql-lint` enforces it, and `format!`/const/`query!` SQL fails closed.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).

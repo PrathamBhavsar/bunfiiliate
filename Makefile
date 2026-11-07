@@ -1,10 +1,11 @@
-.PHONY: pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test tracker-openapi-check
+.PHONY: sql-lint pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test tracker-openapi-check
 
 ci:
 	cargo fmt --check
 	cargo clippy --workspace -- -D warnings
 	cargo test --workspace
 	cargo deny check
+	$(MAKE) sql-lint
 	$(MAKE) web openapi-check tracker-openapi-check js-test
 
 fmt:
@@ -51,6 +52,10 @@ js-test:
 
 pentest:
 	scripts/pentest.sh
+
+sql-lint:
+	python3 -I scripts/sql-scope-lint.py --self-test
+	python3 -I scripts/sql-scope-lint.py
 
 tracker-openapi-check:
 	cargo run -q -p tracker -- openapi > /tmp/bf-tracker-openapi.json
