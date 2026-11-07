@@ -8425,7 +8425,7 @@
           },
           "password": {
             "type": "string",
-            "description": "Min 8 characters."
+            "description": "Min 12 characters."
           },
           "payout_email": {
             "type": [

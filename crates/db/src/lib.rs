@@ -2,6 +2,7 @@
 
 pub mod affiliates;
 pub mod auth;
+pub mod billing;
 pub mod ledger;
 pub mod ops;
 pub mod payouts;

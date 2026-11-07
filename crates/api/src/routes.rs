@@ -1,7 +1,6 @@
 //! `/api/v1/auth/*` and the OpenAPI document.
 
 use axum::extract::State;
-use axum::extract::rejection::JsonRejection;
 use axum::http::header::SET_COOKIE;
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::routing::{get, post};
@@ -20,7 +19,7 @@ use crate::auth::{
     REFRESH_TTL_SECS, cookie, csrf_set_cookie, dummy_hash, hash_refresh_token, new_csrf_token,
     new_refresh_token, verify_password_bounded,
 };
-use crate::error::{AppError, ErrorBody, ErrorDetail};
+use crate::error::{AppError, AppJson, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
     admin_reset, affiliates, analytics, mail, money, ops, password_reset, payouts, programs, totp,
@@ -245,9 +244,8 @@ fn refresh_expiry() -> chrono::DateTime<Utc> {
 async fn login(
     State(s): State<AppState>,
     headers: HeaderMap,
-    body: Result<Json<LoginRequest>, JsonRejection>,
+    AppJson(req): AppJson<LoginRequest>,
 ) -> Result<(HeaderMap, Json<UserView>), AppError> {
-    let Json(req) = body?;
     limit::check(&s.limiter, &limit::LOGIN, &headers, &req.email)?;
     let user = bf_db::auth::user_by_email(&s.pool, &req.email).await?;
     // An unknown email verifies against a dummy hash so it costs the same as a wrong password.

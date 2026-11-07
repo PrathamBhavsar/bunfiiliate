@@ -24,19 +24,14 @@ pub struct User {
 
 const USER_COLS: &str = "id, workspace_id, email::text AS email, password_hash, role";
 
+/// Creates the workspace and its default-plan subscription (B09) in one statement.
 pub async fn create_workspace(
     db: impl PgExecutor<'_>,
     id: Uuid,
     name: &str,
     slug: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("INSERT INTO workspaces (id, name, slug) VALUES ($1, $2, $3)")
-        .bind(id)
-        .bind(name)
-        .bind(slug)
-        .execute(db)
-        .await?;
-    Ok(())
+    crate::billing::create_workspace_with_subscription(db, id, name, slug).await
 }
 
 pub async fn create_user(db: impl PgExecutor<'_>, user: &User) -> Result<(), sqlx::Error> {

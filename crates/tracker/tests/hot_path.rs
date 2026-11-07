@@ -505,7 +505,7 @@ async fn static_endpoints(pool: PgPool) {
     let body = axum::body::to_bytes(res.into_body(), usize::MAX)
         .await
         .unwrap();
-    assert_eq!(&body[..], include_bytes!("../js/tracker.min.js"));
+    assert_eq!(&body[..], include_bytes!("../js/tracker.v2.min.js"));
     let res = app
         .clone()
         .oneshot(
