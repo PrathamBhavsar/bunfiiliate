@@ -1,0 +1,4 @@
+node_modules
+dist
+public/llms.txt
+.impeccable/review/

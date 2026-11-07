@@ -5,6 +5,13 @@
 - **Done**: cargo-dist 0.34.0 (`dist-workspace.toml`, `.github/workflows/release.yml`), `web-asset.yml` (pnpm build, uploads `bunfiiliate-web-static.tar.gz` to the release), `docker.yml` (GHCR multi-arch), `docs/releasing.md`. `repository` added to workspace package; `[package.metadata.dist] dist = true` on api and tracker.
 - **Lessons**: `publish = false` hides bins from dist until `dist = true`. GITHUB_TOKEN-created releases do not fire `release: published`, so web-asset triggers on the tag and polls. No sqlx `query!` macros, so no offline data needed.
 - **Unverified**: real tag run (never pushed).
+## [2026-11-07] S1 marketing + docs site (feat/site)
+- **Review pass**: finish reviewer round 2 = ship. Fixed: mobile ledger sheet, Money group as ledger rows, FAQ plus is a Hugeicons icon, footer blurb via `md()`, live column links to benchmarks and ledger spec, `.btn` nowrap. Wrong clone URL in `docs/self-hosting.md` fixed on `fix/docs-clone-url` (unmerged).
+
+- **Done**: `site/` Vite (vanilla JS, custom-element components) landing + docs. Geist Pixel Square display, Satoshi body, Geist Mono code, Hugeicons. `<x-ascii>` canvas with the `rain` scene (clicks land in a ledger that sums to 0.00). Docs from `site/content/docs/*.md`, hash routed, search on `/`, `llms.txt` generated at build. `.github/workflows/site.yml` builds, smoke-tests (`site/scripts/smoke.mjs`) and deploys to Pages from `prod`.
+- **Decision**: kit (`site/src/kit`) is canonical here and copied to sendesk and learnpuppy with `site/scripts/sync-kit.sh`. Copy states only verified facts: "sub-millisecond" is quoted as 0.4 ms p50 with `BF_FSYNC=off` and 13 ms with `always`, per `docs/benchmarks.md`. No usage claims; the stats block reads live GitHub numbers.
+- **Lessons**: README says payouts are CSV only but `docs/self-hosting.md` documents PayPal and Wise rails (Wise unverified); check code and docs, not one README. `docs/self-hosting.md` clones `github.com/bunfiiliate/bunfiiliate`, which is not the real remote.
+- **Open**: Satoshi (Fontshare licence) is committed as woff2; confirm redistribution terms before the repo is promoted.
 
 ## [2026-11-07] C34 + C90 final gate
 

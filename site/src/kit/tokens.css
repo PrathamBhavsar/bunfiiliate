@@ -1,0 +1,28 @@
+@font-face { font-family: "Geist Pixel Square"; src: url("/fonts/GeistPixel-Square.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Satoshi"; font-weight: 400; src: url("/fonts/Satoshi-400.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Satoshi"; font-weight: 500; src: url("/fonts/Satoshi-500.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Satoshi"; font-weight: 700; src: url("/fonts/Satoshi-700.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Geist Mono"; font-weight: 400; src: url("/fonts/GeistMono-Regular.woff2") format("woff2"); font-display: swap; }
+
+/* Brand skins override --accent* in src/brand.css */
+:root {
+  color-scheme: dark;
+  --bg: #07090a;
+  --bg-2: #0c1110;
+  --bg-3: #131a17;
+  --fg: #e8eee4;
+  --fg-dim: #98a396;
+  --line: #1d2622;
+  --line-2: #2d3a34;
+  --accent: #b8ff3c;
+  --accent-ink: #07090a;
+
+  --font-display: "Geist Pixel Square", ui-monospace, "SF Mono", monospace;
+  --font-body: "Satoshi", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --gutter: clamp(16px, 4vw, 48px);
+  --maxw: 1240px;
+  --nav-h: 64px;
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
