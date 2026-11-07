@@ -168,8 +168,8 @@ define("x-footer", class extends HTMLElement {
       <div class="foot">
         <div>${mark()}<p>${esc(brand.footBlurb)}</p></div>
         ${col("Product", [["Features", `${base}#features`], ["Install", `${base}#install`], ["Releases", `${gh}/releases`]])}
-        ${col("Docs", [["Quickstart", `${base}docs/#/quickstart`], ["Configuration", `${base}docs/#/configuration`], ["Security", `${base}docs/#/security`], ["llms.txt", `${base}llms.txt`]])}
-        ${col("Project", [["GitHub", gh], ["Issues", `${gh}/issues`], ["Security policy", `${gh}/blob/staging/SECURITY.md`]])}
+        ${col("Docs", (brand.footDocs ?? [["Quickstart", "quickstart"], ["Configuration", "configuration"], ["Security", "security"]]).map(([t, s]) => [t, `${base}docs/#/${s}`]).concat([["llms.txt", `${base}llms.txt`]]))}
+        ${col("Project", brand.footProject ?? [["GitHub", gh], ["Issues", `${gh}/issues`], ["Security policy", `${gh}/blob/staging/SECURITY.md`]])}
       </div>
       <div class="foot-end"><span>${esc(brand.license)}</span><span>${esc(brand.footNote)}</span></div>
     </div>`;
