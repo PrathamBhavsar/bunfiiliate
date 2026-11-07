@@ -5,6 +5,7 @@ pub mod affiliates;
 pub mod analytics;
 pub mod audit;
 pub mod auth;
+pub mod billing;
 pub mod bootstrap;
 pub mod dispatch;
 pub mod error;

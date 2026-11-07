@@ -244,6 +244,7 @@ fn public_routes_allowlist() {
         "api post /api/v1/auth/password/reset",
         "api post /api/v1/auth/password/reset-with-token",
         "api post /api/v1/contact-requests",
+        "api post /api/v1/webhooks/billing/{provider}",
         "tracker get /t.js",
         "tracker get /r/{code}",
         "tracker post /c",

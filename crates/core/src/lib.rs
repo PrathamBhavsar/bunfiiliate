@@ -1,6 +1,7 @@
 //! Pure domain types and money math. No IO.
 
 pub mod attribution;
+pub mod billing;
 pub mod commission;
 pub mod fraud;
 pub mod ids;

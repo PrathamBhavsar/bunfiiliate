@@ -105,6 +105,7 @@ pub async fn register(
     let ws = bf_db::workspaces::workspace_id_by_slug(&s.pool, &req.workspace)
         .await?
         .ok_or(AppError::NotFound("workspace not found"))?;
+    crate::billing::enforce(&s.pool, ws, bf_core::billing::Limit::Affiliates).await?;
     let password = req.password;
     let password_hash = hash_password_bounded(password).await?;
     let user = User {

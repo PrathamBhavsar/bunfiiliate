@@ -459,7 +459,9 @@ impl<R: Role> FromRequestParts<AppState> for Auth<R> {
 /// Middleware: mutating requests must carry an `Origin` equal to the request's own host
 /// (same-origin deployment behind Caddy). Missing or mismatched Origin is 403.
 pub async fn check_origin(req: Request, next: Next) -> Result<Response, AppError> {
-    if !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) {
+    // Provider webhooks are server-to-server and signature-verified; they carry no Origin.
+    let provider_webhook = req.uri().path().starts_with("/api/v1/webhooks/billing/");
+    if !provider_webhook && !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) {
         let origin = req.headers().get(ORIGIN).and_then(|v| v.to_str().ok());
         let host = req
             .headers()
