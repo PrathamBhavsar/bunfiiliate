@@ -70,6 +70,7 @@ pub async fn batch_rows(
 /// May be zero or negative (clawbacks); the caller applies the minimum. Active affiliates only.
 pub async fn owed_for(
     conn: &mut PgConnection,
+    workspace_id: Uuid,
     program_id: Uuid,
     affiliate_id: Uuid,
 ) -> Result<Option<i64>, sqlx::Error> {
@@ -79,10 +80,12 @@ pub async fn owed_for(
                 WHERE p.affiliate_id = a.id AND pb.program_id = $1 \
                   AND p.status IN ('draft', 'approved')), 0)::bigint \
          FROM affiliate_balances b JOIN affiliates a ON a.id = b.affiliate_id \
-         WHERE b.program_id = $1 AND a.id = $2 AND a.status = 'active'",
+         WHERE b.program_id = $1 AND a.id = $2 AND a.workspace_id = $3 \
+           AND a.status = 'active'",
     )
     .bind(program_id)
     .bind(affiliate_id)
+    .bind(workspace_id)
     .fetch_optional(conn)
     .await
 }

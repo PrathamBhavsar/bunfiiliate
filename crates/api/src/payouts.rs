@@ -251,6 +251,7 @@ pub async fn mark_paid(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<(), AppEr
     .bind(batch)
     .execute(&mut *tx)
     .await?;
+    // scope: batch row locked with the workspace predicate by lock() in this transaction
     sqlx::query("UPDATE payout_batches SET status = 'paid', paid_at = now() WHERE id = $1")
         .bind(batch)
         .execute(&mut *tx)

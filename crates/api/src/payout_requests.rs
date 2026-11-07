@@ -75,14 +75,17 @@ pub async fn create_request(
             "currency does not match the program".into(),
         ));
     }
-    let min: i64 = sqlx::query_scalar("SELECT payout_min_cents FROM affiliates WHERE id = $1")
-        .bind(affiliate)
-        .fetch_one(&mut *tx)
-        .await?;
+    let min: i64 = sqlx::query_scalar(
+        "SELECT payout_min_cents FROM affiliates WHERE id = $1 AND workspace_id = $2",
+    )
+    .bind(affiliate)
+    .bind(ws)
+    .fetch_one(&mut *tx)
+    .await?;
     if requested_cents < min {
         return Err(AppError::BadRequest("below the minimum payout".into()));
     }
-    let owed = db::owed_for(&mut tx, program, affiliate)
+    let owed = db::owed_for(&mut tx, ws, program, affiliate)
         .await?
         .unwrap_or(0);
     if requested_cents > owed {
@@ -165,27 +168,35 @@ pub async fn approve_request(
     let r = lock_pending(&mut tx, ws, id).await?;
     // Same lock as batch creation, so a batch cannot claim this payable concurrently; the
     // affiliate row lock serializes concurrent approvals for one affiliate.
-    let cur: String =
-        sqlx::query_scalar("SELECT currency::text FROM programs WHERE id = $1 FOR NO KEY UPDATE")
-            .bind(r.program)
-            .fetch_one(&mut *tx)
-            .await?;
-    sqlx::query_scalar::<_, i32>("SELECT 1 FROM affiliates WHERE id = $1 FOR NO KEY UPDATE")
-        .bind(r.affiliate)
-        .fetch_one(&mut *tx)
-        .await?;
+    let cur: String = sqlx::query_scalar(
+        "SELECT currency::text FROM programs WHERE id = $1 AND workspace_id = $2 FOR NO KEY UPDATE",
+    )
+    .bind(r.program)
+    .bind(ws)
+    .fetch_one(&mut *tx)
+    .await?;
+    sqlx::query_scalar::<_, i32>(
+        "SELECT 1 FROM affiliates WHERE id = $1 AND workspace_id = $2 FOR NO KEY UPDATE",
+    )
+    .bind(r.affiliate)
+    .bind(ws)
+    .fetch_one(&mut *tx)
+    .await?;
     if !cur.eq_ignore_ascii_case(&r.currency) {
         return Err(AppError::Conflict(
             "program currency changed since the request",
         ));
     }
-    let owed = db::owed_for(&mut tx, r.program, r.affiliate)
+    let owed = db::owed_for(&mut tx, ws, r.program, r.affiliate)
         .await?
         .unwrap_or(0);
-    let min: i64 = sqlx::query_scalar("SELECT payout_min_cents FROM affiliates WHERE id = $1")
-        .bind(r.affiliate)
-        .fetch_one(&mut *tx)
-        .await?;
+    let min: i64 = sqlx::query_scalar(
+        "SELECT payout_min_cents FROM affiliates WHERE id = $1 AND workspace_id = $2",
+    )
+    .bind(r.affiliate)
+    .bind(ws)
+    .fetch_one(&mut *tx)
+    .await?;
     if owed <= 0 || owed < min {
         return Err(AppError::Conflict("nothing payable at the minimum"));
     }
@@ -336,6 +347,7 @@ async fn list(
         return Err(AppError::BadRequest("unknown status".into()));
     }
     let base = select();
+    // scope: select() filters pr.workspace_id = $1
     let items = sqlx::query_as(&format!(
         "{base} ORDER BY r.created_at DESC, r.id DESC LIMIT $5 OFFSET $6"
     ))
@@ -392,6 +404,7 @@ pub async fn me_create(
         &req.currency,
     )
     .await?;
+    // scope: select() filters pr.workspace_id = $1
     let view = sqlx::query_as(&format!("{} AND r.id = $5", select()))
         .bind(ws)
         .bind(own)
