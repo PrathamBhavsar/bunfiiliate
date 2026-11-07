@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Pencil, TriangleAlert } from "lucide-react";
 import { Facts } from "@/components/admin-ui";
 import { FormDialog } from "@/components/form-dialog";
+import { SecuritySection } from "@/components/security-section";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -78,6 +79,7 @@ export default function ProfilePage() {
           />
         )}
       </div>
+      <SecuritySection />
     </section>
   );
 }

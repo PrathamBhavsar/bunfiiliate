@@ -1,6 +1,7 @@
 "use client";
 
 import { Facts, Section } from "@/components/admin-ui";
+import { ResetTokenDialog } from "@/components/reset-token-dialog";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormDialog } from "@/components/form-dialog";
 import { ResourceView, type ResourceConfig } from "@/components/resource-view";
@@ -72,6 +73,12 @@ function AffiliateDetail({ affiliate: a }: { affiliate: Affiliate }) {
             />
           ))}
         </div>
+      </Section>
+      <Section title="Account recovery">
+        <div className="flex flex-wrap items-center gap-2">
+          <ResetTokenDialog userId={a.user_id} email={a.email} />
+        </div>
+        <p className="text-xs text-muted">Use when the affiliate lost access. The token works once for an hour.</p>
       </Section>
       <Section
         title="Payout settings"
