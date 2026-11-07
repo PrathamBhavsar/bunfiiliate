@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-07] Plan v2 waves 1-3 (tribe)
+
+- **Process**: three goldfish reviews returned revise; `docs/plan/REVISIONS.md` is the binding addendum (migration numbers, sealed credentials, payout idempotency, C20 safety). Workers run in their own worktrees and delete them after merge: four worktrees held about 15 GB and filled the disk once.
+- **Merged**: A05-A09, A11, A12a/b, A14, C01, C02. Migrations 0061-0066. New: TOTP enrol, password reset (TOTP or recovery code), reset throttles, admin-assisted reset + Notifier, JWT kid rotation + token_version, CSRF double-submit (cookie auth only) + security headers, tracker /v2 routes, tenant route inventory + cross-tenant matrix.
+- **Lessons**: a time-based test must replay the consumed step, not "now" (flaked at the 30 s boundary); every new route needs an entry in `docs/audit/tenant-annotations.toml` and the matrix needs a resource mapping.
+- **Validation**: `make ci` and `make e2e` pass on the integration branch before merge.
+
 ## [2026-11-07] Plan A: A01-A04 secrets at rest and TOTP core
 
 - **Creation**: `bf-core::secrets` (KeyRing, Vault), `bf-core::totp`; migration 0060; `api::secrets` (PROTECTED list, `reencrypt`, `check`); tracker snapshot decrypts once per reload, skips bad rows (503 for their key, `bf_snapshot_decrypt_fail_total`).

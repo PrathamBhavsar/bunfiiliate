@@ -45,4 +45,16 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | A02 | feat/plan-a | done (sealed columns, shown once on create/rotate, web one-time reveal) |
 | A03 | feat/plan-a | done (tracker decrypt at load, `api secrets reencrypt/check`, runbook) |
 | A04 | feat/plan-a | done (TOTP RFC 6238 + recovery codes; recovery hashing is salted argon2 in A05, not SHA-256) |
+| A05 | feat/totp-enrol | done, merged (API only; web settings UI still open) |
+| A06a | feat/password-reset | done, merged (web page still open) |
+| A06b | feat/auth-throttle | done, merged |
+| A07 | feat/admin-reset-notify | done, merged |
+| A08 | feat/jwt-hardening | done, merged (token_version is migration 0065) |
+| A09 | feat/csrf-headers | done, merged |
+| A11 | feat/tracker-v2-spec | done, merged |
+| A12a | feat/tracker-v2-impl | done, merged |
+| A12b | feat/tracker-v2-idem | done, merged (idempotency map is in memory, per instance) |
+| A14 | feat/js-sdk | done, merged |
+| C01 | feat/c-inventory | done, merged |
+| C02 | feat/c-matrix | done, merged (known_leaks.txt empty: no leaks found) |
 
