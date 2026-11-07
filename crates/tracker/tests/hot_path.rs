@@ -163,6 +163,7 @@ async fn undrained(pool: &PgPool, dir: &Path, cap: usize) -> (AppState, mpsc::Re
         trust: Default::default(),
         geo: Arc::new(Geo::disabled()),
         fraud: bf_core::default_rules().into(),
+        idem: Default::default(),
     };
     (state, rx)
 }

@@ -3,6 +3,7 @@
 
 pub mod event;
 pub mod geo;
+pub mod idem;
 pub mod metrics;
 pub mod proxy;
 pub mod snapshot;
@@ -73,6 +74,8 @@ pub struct AppState {
     pub trust: Arc<Trust>,
     pub geo: Arc<Geo>,
     pub fraud: Arc<[Box<dyn FraudRule>]>,
+    /// `/v2` duplicate detection (in memory, bounded).
+    pub idem: Arc<idem::Idem>,
 }
 
 pub struct Tracker {
@@ -106,6 +109,7 @@ pub async fn start(
         trust: Arc::default(),
         geo: Arc::new(geo),
         fraud: default_rules().into(),
+        idem: Arc::default(),
     };
     Ok(Tracker {
         state,
@@ -390,7 +394,7 @@ async fn v2_paddle(
 
 /// `/v2` ingest. Order: program (404), Idempotency-Key shape (400), signature (401), body
 /// validation (400). Nothing is spooled unless every check passes. Duplicate detection is
-/// A12b: a repeated key is still collapsed by the DB unique key.
+/// A12b: a repeated key answers 200 with the first id (409 if the body differs).
 async fn v2_conversion(
     source: Source,
     s: AppState,
@@ -446,17 +450,37 @@ async fn v2_conversion(
         return Err(ApiError::invalid("missing event id"));
     };
     let id = Uuid::now_v7();
+    let (pid, name) = (program.program_id, source.name());
+    let claim = s
+        .idem
+        .claim(pid, name, &external_id, idem::digest(body), id);
+    match claim {
+        idem::Claim::Duplicate(first) => {
+            let body = axum::Json(serde_json::json!({"status": "duplicate", "id": first}));
+            return Ok((StatusCode::OK, body).into_response());
+        }
+        idem::Claim::Conflict => {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "idempotency_conflict",
+                "Idempotency-Key was already used with a different body",
+            ));
+        }
+        idem::Claim::New => {}
+    }
     let event = InboundEvent {
         id,
-        program_id: program.program_id,
-        source: source.name().to_owned(),
-        external_id,
+        program_id: pid,
+        source: name.to_owned(),
+        external_id: external_id.clone(),
         payload,
         received_ms: now_ms(),
     };
-    ingest(s, Record::Event(event))
-        .await
-        .map_err(ApiError::from_status)?;
+    let idem_state = s.idem.clone();
+    if let Err(status) = ingest(s, Record::Event(event)).await {
+        idem_state.release(pid, name, &external_id);
+        return Err(ApiError::from_status(status));
+    }
     let body = axum::Json(serde_json::json!({"status": "accepted", "id": id}));
     Ok((source.accepted(), body).into_response())
 }
