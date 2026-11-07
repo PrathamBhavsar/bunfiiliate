@@ -41,3 +41,11 @@ timestamp: 2026-10-26
 31. A db/api fn that reads or writes tenant tables without a workspace id. Take `ws: Uuid` and put it in the SQL (`workspace_id = $n`, or join `programs`/`affiliates`); a handler-only check (`require_batch`) is not enough. Child statements keyed by an already-scoped id get a `// scope: <reason>` comment; system loops go in `docs/audit/sql-lint-allowlist.toml`. `make sql-lint` enforces it, and `format!`/const/`query!` SQL fails closed.
 
 See [Pre-Merge Gate](/wisdom/pre-merge-gate.md).
+32. Storing or logging a TOTP secret, recovery code, reset token, or provider secret in plaintext. Seal with the key ring; hash tokens/codes.
+33. Distinguishable reset/login failures (status, body, or timing) for unknown email vs bad code vs locked.
+34. Accepting a TOTP step `<= last_used_step`.
+35. Sealing a secret without row-bound AAD.
+36. Removing a KEK id before `api secrets check` exits 0.
+37. Accepting a JWT without strict `alg`/`kid`/`exp` checks, or mixing v1 and v2 signature header schemes on one endpoint.
+38. Changing a `/v2` payload field meaning or removing a field without a version bump.
+39. `pg_restore --clean` into a database with partitioned tables: it cannot drop inherited partition keys and exits non-zero. Wipe the schema first (`restore.sh --force`).

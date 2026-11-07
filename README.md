@@ -107,7 +107,17 @@ flowchart TD
 - **Cookie-based sessions**: HttpOnly, `SameSite=Strict`, `Secure` JWT cookie (`bf_at`, 15-minute expiration).
 - **Refresh token rotation**: Opaque refresh tokens (`bf_rt`, 30-day expiration) stored as SHA-256 hashes; detection of token reuse immediately revokes the entire token family.
 - **Origin verification**: Strict origin header matching on mutating HTTP requests to prevent CSRF.
-- **Password security**: Password hashing with Argon2.
+- **Password security**: Password hashing with Argon2; optional TOTP 2FA with recovery codes; rate-limited, non-enumerating password reset.
+- **Secrets at rest**: webhook and provider secrets are encrypted with a rotating master key.
+
+| Env var | Used by | Meaning |
+| --- | --- | --- |
+| `BF_MASTER_KEYS` / `BF_MASTER_KEY_FILE` | api, worker, tracker | `kid:base64(32B)` list, first is active (set only one) |
+| `BF_ALLOW_PLAINTEXT_SECRETS` | api, tracker | dev only, default unset |
+| `BF_JWT_SECRETS` | api | `kid:secret` list, first signs (legacy `JWT_SECRET` still read) |
+| `BF_HSTS` | api | `1` sends HSTS |
+| `BF_V1_SUNSET` | tracker | HTTP date for the v1 `Sunset` header |
+| `SMTP_URL` | api | enables mail (reset, notifications) |
 
 ---
 
