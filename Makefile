@@ -1,4 +1,4 @@
-.PHONY: ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test
+.PHONY: pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test
 
 ci:
 	cargo fmt --check
@@ -48,3 +48,6 @@ schemas-check:
 js-test:
 	node scripts/size-check.mjs
 	node --test scripts/ "sdks/js/test/*.test.ts"
+
+pentest:
+	scripts/pentest.sh

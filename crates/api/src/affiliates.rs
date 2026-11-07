@@ -69,7 +69,7 @@ pub struct Register {
     /// Slug of the workspace to join.
     workspace: String,
     email: String,
-    /// Min 8 characters.
+    /// Min 12 characters.
     password: String,
     payout_email: Option<String>,
 }
