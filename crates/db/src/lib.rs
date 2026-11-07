@@ -6,6 +6,7 @@ pub mod ledger;
 pub mod ops;
 pub mod payouts;
 pub mod programs;
+pub mod totp;
 pub mod tracker;
 pub mod workspaces;
 

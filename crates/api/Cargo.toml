@@ -13,6 +13,7 @@ bf-core.workspace = true
 bf-db.workspace = true
 bf-rt.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+data-encoding = "2"
 clap = { workspace = true, features = ["env"] }
 hmac = "0.12"
 lettre = { version = "0.11", default-features = false, features = ["builder", "smtp-transport", "tokio1", "tokio1-native-tls", "hostname"] }

@@ -98,6 +98,7 @@ dependencies = [
  "bf-rt",
  "chrono",
  "clap",
+ "data-encoding",
  "hmac",
  "lettre",
  "proptest",
