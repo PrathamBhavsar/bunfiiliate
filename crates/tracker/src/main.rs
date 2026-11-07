@@ -34,6 +34,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let vault = std::sync::Arc::new(load_vault()?);
     let mut tracker = tracker::start(pool, spool, &ip_salt, geo, vault).await?;
     tracker.state.trust = std::sync::Arc::new(trust);
+    let _space = bf_spool::space::spawn_sampler(
+        tracker.state.spool.clone(),
+        bf_spool::space::SpaceConfig::from_lookup(|k| std::env::var(k).ok()),
+        tracker::metrics::spool_report,
+    );
 
     let metrics = tokio::spawn(bf_rt::metrics::serve(
         "127.0.0.1:9100",

@@ -71,7 +71,7 @@ impl Modify for CookieAuth {
         webhooks::test_webhook,
         mail::create_template, mail::list_templates, mail::get_template,
         mail::update_template, mail::delete_template,
-        ops::healthz, ops::readyz,
+        ops::healthz, ops::readyz, crate::alerts::webhook,
         ops::list_notifications, ops::mark_read,
         ops::create_contact, ops::list_contacts, ops::update_contact,
         ops::get_settings, ops::put_settings, ops::list_audit,
@@ -96,7 +96,7 @@ impl Modify for CookieAuth {
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account,
         billing::CheckoutRequest, billing::CheckoutResponse, billing::SubscriptionView,
         billing::PlanView, billing::UsageView, billing::ProviderView, billing::SetSecret,
-        billing::WebhookAck
+        billing::WebhookAck, crate::alerts::AlertAck
     )),
     modifiers(&CookieAuth),
     info(title = "bunfiiliate API", version = "0.1.0")
@@ -122,6 +122,7 @@ pub fn routes() -> Router<AppState> {
         .merge(mail::routes())
         .merge(ops::routes())
         .merge(notify_channels::routes())
+        .merge(crate::alerts::routes())
         .merge(money::routes())
         .merge(payouts::routes())
         .merge(payout_rails::routes())

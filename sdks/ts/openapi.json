@@ -428,6 +428,67 @@
         ]
       }
     },
+    "/api/v1/alerts/webhook": {
+      "post": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Alertmanager webhook receiver. Public route: authenticated by `BF_ALERT_TOKEN`; 404 when\nthe token is not configured.",
+        "operationId": "webhook",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/analytics/summary": {
       "get": {
         "tags": [
@@ -7023,6 +7084,25 @@
           "workspace_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "AlertAck": {
+        "type": "object",
+        "required": [
+          "alerts",
+          "recipients"
+        ],
+        "properties": {
+          "alerts": {
+            "type": "integer",
+            "description": "Alerts accepted from the payload.",
+            "minimum": 0
+          },
+          "recipients": {
+            "type": "integer",
+            "description": "Super admins each alert was delivered to.",
+            "minimum": 0
           }
         }
       },

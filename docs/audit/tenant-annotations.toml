@@ -1080,3 +1080,11 @@ source = "api"
 kind = "scoped"
 role = "Admin"
 reason = "admin only; plans are instance-wide and hold no tenant data"
+
+[[route]]
+method = "post"
+path = "/api/v1/alerts/webhook"
+source = "api"
+kind = "public"
+role = "none"
+reason = "Alertmanager sink: BF_ALERT_TOKEN bearer (constant-time), 404 when unset; notifies super admins only, no tenant data"

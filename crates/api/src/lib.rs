@@ -2,6 +2,7 @@
 
 pub mod admin_reset;
 pub mod affiliates;
+pub mod alerts;
 pub mod analytics;
 pub mod audit;
 pub mod auth;

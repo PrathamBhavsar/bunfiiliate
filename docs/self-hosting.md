@@ -294,6 +294,8 @@ gunzip -c /backups/bunfiiliate-2026-10-26.sql.gz | \
   docker compose --env-file .env -f deploy/docker-compose.yml exec -T postgres psql -U postgres -d bunfiiliate
 ```
 
+For scheduled dumps that include the spool, restore checks, and a restore drill, use `deploy/backup/` ([backup and restore](ops/backup-restore.md)). Disk-full behaviour of the tracker is in [spool disk](ops/spool-disk.md), alerting in [alerts](ops/alerts.md), and multi-node notes in [high availability](ops/ha.md).
+
 ### Secrets at rest and master keys
 
 Webhook signing secrets, Stripe/Paddle secrets and endpoint secrets are stored encrypted (`bfenc1:` values: XChaCha20-Poly1305, a random data key per value wrapped by a master key). The API, worker and tracker all need `BF_MASTER_KEYS` (or `BF_MASTER_KEY_FILE`, same format, one key per line; set only one). Without it they refuse to start, unless `BF_ALLOW_PLAINTEXT_SECRETS=1`, which stores secrets in plaintext and logs a warning.

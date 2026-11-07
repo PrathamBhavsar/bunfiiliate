@@ -319,3 +319,8 @@ reason = "catalog query on pg_inherits for clicks partitions; system maintenance
 file = "crates/db/src/partitions.rs"
 fn = "drop_expired_partitions"
 reason = "retention loop over all programs' rollup watermark; DDL on whole month partitions (name-pattern checked), no request context"
+
+[[allow]]
+file = "crates/db/src/ops.rs"
+fn = "notify_super_admins_alert"
+reason = "alert sink fans out to every super admin across workspaces; token-authenticated, no request tenant"
