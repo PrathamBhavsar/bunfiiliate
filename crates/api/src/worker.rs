@@ -31,6 +31,10 @@ const APPROVE_EVERY: Duration = Duration::from_secs(60);
 const ROLLUP_EVERY: Duration = Duration::from_secs(60);
 const DISPATCH_EVERY: Duration = Duration::from_secs(1);
 const DELIVER_EVERY: Duration = Duration::from_secs(1);
+/// Partition upkeep (future months, retention, catch-all gauge); the first tick is at start.
+const PARTITIONS_EVERY: Duration = Duration::from_secs(6 * 3600);
+/// Month partitions created ahead of the current month.
+pub const PARTITION_MONTHS_AHEAD: u32 = 3;
 /// Predicate on an `affiliates a` row: active and enrolled in program `$2`.
 const ELIGIBLE: &str = "a.status = 'active' \
      AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = $2)";
@@ -64,8 +68,12 @@ async fn main_loop(pool: &PgPool, mailer: &Mailer) {
     let mut approve = tokio::time::interval(APPROVE_EVERY);
     let mut rollup = tokio::time::interval(ROLLUP_EVERY);
     let mut dispatch = tokio::time::interval(DISPATCH_EVERY);
+    let mut partitions = tokio::time::interval(PARTITIONS_EVERY);
     loop {
         tokio::select! {
+            _ = partitions.tick() => if let Err(e) = partition_maintenance(pool).await {
+                tracing::error!(error = %e, "partition maintenance failed");
+            },
             _ = ingest.tick() => match process_events(pool).await {
                 Ok(0) => {}
                 Ok(n) => {
@@ -100,6 +108,39 @@ async fn main_loop(pool: &PgPool, mailer: &Mailer) {
             }
         }
     }
+}
+
+/// `BF_CLICKS_RETENTION_MONTHS`: months of clicks to keep; unset, empty, invalid or 0 = forever.
+fn retention_months() -> u32 {
+    std::env::var("BF_CLICKS_RETENTION_MONTHS")
+        .ok()
+        .and_then(|v| v.trim().parse().ok())
+        .unwrap_or(0)
+}
+
+/// Create upcoming month partitions, apply retention, and sample `bf_clicks_default_rows`.
+pub async fn partition_maintenance(pool: &PgPool) -> Result<(), sqlx::Error> {
+    let now = chrono::Utc::now();
+    let made = bf_db::partitions::ensure_partitions(pool, PARTITION_MONTHS_AHEAD, now).await?;
+    if made > 0 {
+        tracing::info!(created = made, "clicks partitions created");
+    }
+    let report = bf_db::partitions::drop_expired_partitions(pool, retention_months(), now).await?;
+    for p in &report.dropped {
+        tracing::info!(partition = %p, "retention dropped clicks partition");
+    }
+    for (p, why) in &report.skipped {
+        tracing::warn!(partition = %p, reason = %why, "retention kept clicks partition");
+    }
+    let stuck = bf_db::partitions::default_rows(pool).await?;
+    metrics::CLICKS_DEFAULT_ROWS.set(stuck.max(0) as u64);
+    if stuck > 0 {
+        tracing::warn!(
+            rows = stuck,
+            "clicks_default holds rows: a month partition is missing"
+        );
+    }
+    Ok(())
 }
 
 /// Await a tick and record its duration.

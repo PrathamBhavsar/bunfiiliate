@@ -114,6 +114,7 @@ async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
     let cfg = Config::from_env()?;
     let pool = bf_db::connect(&cfg.database_url).await?;
     bf_db::migrate(&pool).await?;
+    api::worker::partition_maintenance(&pool).await?;
     let mailer = api::mail::Mailer::from_env()?;
     let vault = Arc::new(api::secrets::load_vault()?);
     let metrics = tokio::spawn(bf_rt::metrics::serve(

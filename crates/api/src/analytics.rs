@@ -54,6 +54,7 @@ pub async fn rollup(pool: &PgPool) -> Result<u64, sqlx::Error> {
     )
     .fetch_all(&mut *tx)
     .await?;
+    let floor = bf_db::partitions::retention_floor_tx(&mut tx).await?;
     let mut written = 0;
     for (program, last, changed) in programs {
         let from = last.map(|d| d - Duration::days(LOOKBACK_DAYS));
@@ -61,6 +62,13 @@ pub async fn rollup(pool: &PgPool) -> Result<u64, sqlx::Error> {
         let from = match (from, changed) {
             (Some(f), Some(c)) => Some(f.min(c)),
             (f, _) => f,
+        };
+        // Retention dropped the clicks before `floor`: rebuilding those days would erase
+        // their rollups and count zero clicks. Never recompute them.
+        let from = match (from, floor) {
+            (Some(f), Some(fl)) => Some(f.max(fl)),
+            (None, Some(fl)) => Some(fl),
+            (f, None) => f,
         };
         sqlx::query(
             "DELETE FROM daily_rollups WHERE program_id = $1 AND ($2::date IS NULL OR day >= $2)",
@@ -87,16 +95,27 @@ pub async fn rollup(pool: &PgPool) -> Result<u64, sqlx::Error> {
     Ok(written)
 }
 
-/// `$1` program, `$2` first day to rebuild (null = all history).
-const ROLLUP_SQL: &str = "\
-WITH facts AS ( \
-    SELECT k.affiliate_id, (k.ts AT TIME ZONE 'UTC')::date AS day, k.country::text AS country, \
+/// Click leg of the rollup facts. `ts` has a stable lower bound, so month partitions before
+/// `$2` are pruned (guarded by `clicks_queries_prune_partitions`). `$2` null = all history.
+macro_rules! click_leg {
+    () => {
+        "SELECT k.affiliate_id, (k.ts AT TIME ZONE 'UTC')::date AS day, k.country::text AS country, \
            k.os, k.browser, k.device, k.referrer_host AS referrer, \
            1::bigint AS clicks, 0::bigint AS conversions, 0::bigint AS revenue, 0::bigint AS commission \
     FROM clicks k \
     WHERE k.program_id = $1 \
-      AND ($2::date IS NULL OR k.ts >= $2::date::timestamp AT TIME ZONE 'UTC') \
-    UNION ALL \
+      AND k.ts >= COALESCE($2::date::timestamp AT TIME ZONE 'UTC', '-infinity'::timestamptz) "
+    };
+}
+
+/// The click leg alone, for the partition-pruning test.
+pub const ROLLUP_CLICK_LEG: &str = click_leg!();
+
+/// `$1` program, `$2` first day to rebuild (null = all history).
+const ROLLUP_SQL: &str = concat!(
+    "WITH facts AS ( ",
+    click_leg!(),
+    "UNION ALL \
     SELECT cv.affiliate_id, (cv.occurred_at AT TIME ZONE 'UTC')::date, k.country::text, \
            k.os, k.browser, k.device, k.referrer_host, \
            0, 1, cv.amount_cents, cv.commission_cents \
@@ -106,7 +125,8 @@ WITH facts AS ( \
     WHERE cv.program_id = $1 AND cv.status IN ('pending', 'approved', 'paid') \
       AND ($2::date IS NULL OR cv.occurred_at >= $2::date::timestamp AT TIME ZONE 'UTC') \
 ) \
-INSERT INTO daily_rollups \
+",
+    "INSERT INTO daily_rollups \
     (program_id, affiliate_id, day, dim, dim_value, clicks, conversions, revenue_cents, commission_cents) \
 SELECT $1, f.affiliate_id, f.day, d.dim::rollup_dim, coalesce(d.value, ''), \
        sum(f.clicks)::bigint, sum(f.conversions)::bigint, sum(f.revenue)::bigint, sum(f.commission)::bigint \
@@ -116,7 +136,8 @@ CROSS JOIN LATERAL (VALUES ('total', NULL::text), ('country', f.country), ('os',
 GROUP BY f.affiliate_id, f.day, d.dim, coalesce(d.value, '') \
 ON CONFLICT (program_id, affiliate_id, day, dim, dim_value) DO UPDATE SET \
     clicks = EXCLUDED.clicks, conversions = EXCLUDED.conversions, \
-    revenue_cents = EXCLUDED.revenue_cents, commission_cents = EXCLUDED.commission_cents";
+    revenue_cents = EXCLUDED.revenue_cents, commission_cents = EXCLUDED.commission_cents"
+);
 
 // ---- routes
 
