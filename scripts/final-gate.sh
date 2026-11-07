@@ -5,6 +5,7 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"
+export CI=true # pnpm must never prompt
 BASE="${FINAL_GATE_BASE:-prod}"
 GATE_DIR="${GATE_DIR:-$ROOT/.gate}"
 mkdir -p "$GATE_DIR"
