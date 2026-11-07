@@ -651,10 +651,10 @@ async fn run_matrix(pool: &PgPool, check_snapshot: bool) -> Run {
         if text.contains(&b.ws.to_string()) && !is_denied(st) {
             why.push("body contains B workspace id".into());
         }
-        if let Some(before) = before {
-            if snapshot(pool, b.ws).await != before {
-                why.push("B rows changed".into());
-            }
+        if let Some(before) = before
+            && snapshot(pool, b.ws).await != before
+        {
+            why.push("B rows changed".into());
         }
         if !why.is_empty() {
             run.violations.push((k, why.join("; ")));
