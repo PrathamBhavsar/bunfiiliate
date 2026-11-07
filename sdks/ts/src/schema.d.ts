@@ -727,7 +727,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One program. Secrets are included for admins only. */
+        /** One program. Secrets are never returned; they are shown once, on create and rotate. */
         get: operations["get_program"];
         put?: never;
         post?: never;

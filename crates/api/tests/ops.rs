@@ -32,6 +32,7 @@ impl Api {
         let state = AppState {
             pool: pool.clone(),
             jwt_secret: SECRET.into(),
+            vault: vault(),
             secure_cookies: true,
             limiter: Default::default(),
         };
@@ -282,10 +283,10 @@ async fn ops_webhook_signed_retried_then_delivered(pool: PgPool) {
     assert_eq!(delivery(&pool).await, (0, None, true));
 
     // first attempt: receiver answers 500 -> recorded, retry scheduled in the future
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+    assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
     assert_eq!(delivery(&pool).await, (1, Some(500), true));
     assert_eq!(
-        deliver_due(&pool, &http).await.unwrap(),
+        deliver_due(&pool, &http, &vault()).await.unwrap(),
         0,
         "backoff not elapsed"
     );
@@ -302,10 +303,10 @@ async fn ops_webhook_signed_retried_then_delivered(pool: PgPool) {
 
     // backoff elapsed: second attempt succeeds
     make_due(&pool).await;
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+    assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
     assert_eq!(delivery(&pool).await, (2, Some(200), false));
     assert_eq!(
-        deliver_due(&pool, &http).await.unwrap(),
+        deliver_due(&pool, &http, &vault()).await.unwrap(),
         0,
         "delivered once"
     );
@@ -357,7 +358,10 @@ async fn ops_webhook_targets_only_active_matching_endpoints(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 0);
-    assert_eq!(deliver_due(&pool, &http_client()).await.unwrap(), 0);
+    assert_eq!(
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
+        0
+    );
     assert!(seen.lock().unwrap().is_empty());
 
     // an endpoint switched off after queueing gets nothing either
@@ -374,7 +378,10 @@ async fn ops_webhook_targets_only_active_matching_endpoints(pool: PgPool) {
         live["id"].as_str().unwrap()
     );
     api.patch(&uri, &t.admin, json!({ "active": false })).await;
-    assert_eq!(deliver_due(&pool, &http_client()).await.unwrap(), 0);
+    assert_eq!(
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
+        0
+    );
     assert!(seen.lock().unwrap().is_empty());
 }
 
@@ -399,7 +406,7 @@ async fn ops_webhook_dead_after_max_attempts_then_redeliver(pool: PgPool) {
     let redeliver = format!("/api/v1/webhooks/deliveries/{delivery_id}/redeliver");
 
     for attempt in 1..=MAX_ATTEMPTS {
-        assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+        assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
         let pending = attempt < MAX_ATTEMPTS;
         assert_eq!(delivery(&pool).await, (attempt, Some(503), pending));
         if pending {
@@ -409,12 +416,16 @@ async fn ops_webhook_dead_after_max_attempts_then_redeliver(pool: PgPool) {
         }
     }
     assert_eq!(seen.lock().unwrap().len(), MAX_ATTEMPTS as usize);
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 0, "dead");
+    assert_eq!(
+        deliver_due(&pool, &http, &vault()).await.unwrap(),
+        0,
+        "dead"
+    );
 
     let (st, d) = api.post_empty(&redeliver, &t.admin).await;
     assert_eq!(st, StatusCode::OK, "{d}");
     assert_eq!(d["attempt"], 0);
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+    assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
     assert_eq!(delivery(&pool).await, (1, Some(200), false));
 
     let (_, list) = api.get("/api/v1/webhooks/deliveries", &t.admin).await;
@@ -464,7 +475,7 @@ async fn ops_webhook_endpoint_crud_scoping_and_guards(pool: PgPool) {
         (st, &upd["url"], &upd["events"]),
         (StatusCode::OK, &json!("https://y.io/h"), &json!([]))
     );
-    assert_eq!(upd["secret"], e["secret"], "update keeps the secret");
+    assert_eq!(upd["secret"], "", "update never returns the secret");
 
     // guards and tenancy
     assert_eq!(
@@ -850,7 +861,7 @@ async fn ops_slow_endpoint_holds_no_lock_while_in_flight(pool: PgPool) {
     dispatch_outbox(&pool, &Mailer::Log).await.unwrap();
 
     let p = pool.clone();
-    let sending = tokio::spawn(async move { deliver_due(&p, &http_client()).await });
+    let sending = tokio::spawn(async move { deliver_due(&p, &http_client(), &vault()).await });
     tokio::time::sleep(std::time::Duration::from_millis(700)).await;
 
     // The request is still in flight, yet the row is leased (not due again for a while) and
@@ -869,7 +880,7 @@ async fn ops_slow_endpoint_holds_no_lock_while_in_flight(pool: PgPool) {
         .expect("row is not locked while the request is in flight");
     drop(tx);
     assert_eq!(
-        deliver_due(&pool, &http_client()).await.unwrap(),
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
         0,
         "a leased delivery is not sent twice"
     );
@@ -891,4 +902,11 @@ async fn ops_webhook_endpoints_are_capped_per_workspace(pool: PgPool) {
         )
         .await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "{body}");
+}
+
+/// A real key ring, so the delivery tests exercise sealed endpoint secrets.
+fn vault() -> std::sync::Arc<bf_core::secrets::Vault> {
+    use bf_core::secrets::{KeyRing, Vault};
+    let ring = KeyRing::from_pairs("t1", &[("t1", [9u8; 32])]).unwrap();
+    std::sync::Arc::new(Vault::new(ring))
 }

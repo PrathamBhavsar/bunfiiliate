@@ -13,6 +13,8 @@ pub static BATCH: Histogram<7> = Histogram::new([1, 5, 10, 50, 100, 500, 1000], 
 pub static SHED: Counter = Counter::new();
 /// Records skipped because Postgres rejected them for good (bad data, not an outage).
 pub static DEAD_LETTERED: Counter = Counter::new();
+/// Program rows left out of a snapshot because a stored secret failed to decrypt.
+pub static SNAPSHOT_DECRYPT_FAIL: Counter = Counter::new();
 /// Spool end offset: total bytes appended.
 pub static SPOOL_BYTES: Gauge = Gauge::new();
 /// Spool offset already in Postgres; `bf_spool_lag` is the bytes between the two.
@@ -38,6 +40,12 @@ pub fn render() -> String {
         "bf_dead_lettered_total",
         "Spool records skipped after Postgres rejected them permanently.",
         &DEAD_LETTERED,
+    );
+    counter(
+        &mut out,
+        "bf_snapshot_decrypt_fail_total",
+        "Program rows skipped by a snapshot load: secret failed to decrypt.",
+        &SNAPSHOT_DECRYPT_FAIL,
     );
     gauge(
         &mut out,

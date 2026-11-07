@@ -152,7 +152,11 @@ async fn undrained(pool: &PgPool, dir: &Path, cap: usize) -> (AppState, mpsc::Re
     let (queue, rx) = mpsc::channel(cap);
     let state = AppState {
         pool: pool.clone(),
-        snapshot: Arc::new(ArcSwap::from_pointee(Snapshot::load(pool).await.unwrap())),
+        snapshot: Arc::new(ArcSwap::from_pointee(
+            Snapshot::load(pool, &bf_core::secrets::Vault::plaintext())
+                .await
+                .unwrap(),
+        )),
         spool: SpoolWriter::open(SpoolConfig::new(dir)).await.unwrap(),
         queue,
         ip_salt: SALT.into(),
@@ -180,9 +184,15 @@ struct Row {
 async fn thousand_clicks_thousand_rows(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     fire(&app, 1000).await;
@@ -206,9 +216,15 @@ async fn thousand_clicks_thousand_rows(pool: PgPool) {
 async fn click_fields_are_normalized(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let mut t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let mut t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     t.state.trust = Arc::new(Trust {
         cf: true,
         proxies: vec![],
@@ -260,18 +276,30 @@ async fn crash_before_flush_replays_exactly_once(pool: PgPool) {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Run 2: startup replays the spool.
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     assert_eq!(clicks(&pool).await, 1000);
     assert_eq!(t.state.spool.read_checkpoint().unwrap(), spool_end(&dir));
     drop(t);
 
     // Crash after the DB flush but before the checkpoint moved: replay again, no dupes.
     bf_spool::write_checkpoint(&dir, 0).unwrap();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     assert_eq!(clicks(&pool).await, 1000);
     assert_eq!(t.state.spool.read_checkpoint().unwrap(), spool_end(&dir));
     std::fs::remove_dir_all(&dir).ok();
@@ -288,9 +316,15 @@ async fn nul_bytes_and_null_landing_do_not_wedge_pipeline(pool: PgPool) {
     .await
     .unwrap();
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     let body = r#"{"code":"abc","vid":"v\u0000x","url":"https://a.com/p\u0000q","ref":"https://h\u0000.io"}"#;
@@ -315,9 +349,15 @@ async fn nul_bytes_and_null_landing_do_not_wedge_pipeline(pool: PgPool) {
 async fn unknown_code_is_404(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     let res = app
@@ -342,9 +382,15 @@ async fn unknown_code_is_404(pool: PgPool) {
 async fn beacon_click_field_is_accepted(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
     let send = |body: &'static str| {
         let app = app.clone();
@@ -393,9 +439,15 @@ async fn full_queue_sheds_load_with_503(pool: PgPool) {
 async fn snapshot_reloads_on_notify(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
     let get = |code: &str| {
         Request::get(format!("/r/{code}"))
@@ -425,9 +477,15 @@ async fn snapshot_reloads_on_notify(pool: PgPool) {
 #[sqlx::test(migrations = "../db/migrations")]
 async fn static_endpoints(pool: PgPool) {
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     let res = app
@@ -488,9 +546,15 @@ async fn static_endpoints(pool: PgPool) {
 async fn metrics_after_click_has_spool_lag(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     fire(&app, 1).await;
@@ -524,9 +588,15 @@ async fn fraud_flagged_clicks_are_stored_with_reason(pool: PgPool) {
     const BOT: &str = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)";
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let mut t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let mut t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     t.state.trust = Arc::new(Trust {
         cf: true,
         proxies: vec![],
@@ -584,9 +654,15 @@ fn spoofed_click(i: usize) -> Request<Body> {
 async fn client_supplied_ip_headers_are_ignored_by_default(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     // A fresh forged address on every click would sidestep the IP rules if it were believed.
@@ -624,9 +700,15 @@ async fn client_supplied_ip_headers_are_ignored_by_default(pool: PgPool) {
 async fn forwarded_for_is_believed_only_from_a_trusted_proxy(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let mut t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let mut t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     t.state.trust = Arc::new(
         Trust::from_lookup(|k| (k == "BF_TRUSTED_PROXIES").then(|| "172.16.0.0/12".to_string()))
             .unwrap(),
@@ -751,9 +833,15 @@ async fn spool_record(spool: &SpoolWriter, record: tracker::writer::Record) -> Q
 async fn a_record_postgres_rejects_is_dead_lettered_not_retried_forever(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let before = tracker::metrics::DEAD_LETTERED.get();
 
     // The orphan and a good click land in one batch; the orphan must not take the click down.
@@ -787,7 +875,9 @@ async fn startup_replay_skips_a_record_postgres_rejects(pool: PgPool) {
         // A previous run spooled an orphan click and then a good one, and died before flushing.
         let spool = SpoolWriter::open(SpoolConfig::new(&dir)).await.unwrap();
         spool_record(&spool, orphan_click()).await;
-        let snap = Snapshot::load(&pool).await.unwrap();
+        let snap = Snapshot::load(&pool, &bf_core::secrets::Vault::plaintext())
+            .await
+            .unwrap();
         let entry = &snap.codes["abc"];
         let good = tracker::writer::Record::Click(bf_db::tracker::Click {
             program_id: entry.program_id,
@@ -801,9 +891,15 @@ async fn startup_replay_skips_a_record_postgres_rejects(pool: PgPool) {
         spool_record(&spool, good).await;
     }
     // Before the fix this returned Err and the tracker crash-looped on the same record.
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .expect("replay survives the bad record");
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .expect("replay survives the bad record");
     assert_eq!(clicks(&pool).await, 1);
     assert_eq!(t.state.spool.read_checkpoint().unwrap(), spool_end(&dir));
     std::fs::remove_dir_all(&dir).ok();
@@ -813,9 +909,15 @@ async fn startup_replay_skips_a_record_postgres_rejects(pool: PgPool) {
 async fn a_burst_of_config_changes_converges_on_the_new_snapshot(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let first = t.state.snapshot.load_full();
     add_code(&pool, "burst").await;
     for _ in 0..50 {
@@ -842,9 +944,15 @@ async fn a_burst_of_config_changes_converges_on_the_new_snapshot(pool: PgPool) {
 async fn a_lone_config_change_is_live_without_waiting(pool: PgPool) {
     seed(&pool, "abc").await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     // Let the quiet period pass so the change is the first of a new burst.
     tokio::time::sleep(Duration::from_millis(400)).await;
     add_code(&pool, "instant").await;

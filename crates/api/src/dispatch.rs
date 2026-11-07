@@ -8,8 +8,10 @@
 //!   network error schedules the next attempt with exponential backoff; after [`MAX_ATTEMPTS`]
 //!   the delivery is dead (`next_attempt_at` null).
 
+use std::sync::Arc;
 use std::time::Duration;
 
+use bf_core::secrets::Vault;
 use chrono::Utc;
 use hmac::{Hmac, Mac};
 use serde_json::{Value, json};
@@ -208,7 +210,11 @@ const DELIVER_PER_TICK: i64 = (DELIVER_CONCURRENCY * 6) as i64;
 /// Rows are leased (their `next_attempt_at` pushed out and committed) before any HTTP call, so
 /// no transaction or row lock is held while a slow endpoint answers, and a slow endpoint only
 /// holds up its own request, not the worker's other ticks.
-pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, sqlx::Error> {
+pub async fn deliver_due(
+    pool: &PgPool,
+    http: &reqwest::Client,
+    vault: &Arc<Vault>,
+) -> Result<u64, sqlx::Error> {
     let due = lease_due(pool).await?;
     let attempted = due.len() as u64;
     let mut due = due.into_iter();
@@ -217,8 +223,8 @@ pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, s
         // Keep the window full: start the next send as soon as one finishes.
         while sends.len() < DELIVER_CONCURRENCY {
             let Some(d) = due.next() else { break };
-            let (pool, http) = (pool.clone(), http.clone());
-            sends.spawn(async move { send_one(&pool, &http, d).await });
+            let (pool, http, vault) = (pool.clone(), http.clone(), vault.clone());
+            sends.spawn(async move { send_one(&pool, &http, &vault, d).await });
         }
         match sends.join_next().await {
             None => return Ok(attempted),
@@ -233,6 +239,7 @@ pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, s
 struct Due {
     id: Uuid,
     attempt: i32,
+    endpoint_id: Uuid,
     url: String,
     secret: String,
     outbox_id: i64,
@@ -252,7 +259,7 @@ async fn lease_due(pool: &PgPool) -> Result<Vec<Due>, sqlx::Error> {
          leased AS ( \
              UPDATE webhook_deliveries d SET next_attempt_at = now() + $2 * interval '1 second' \
              FROM due WHERE d.id = due.id RETURNING d.id, d.attempt, d.endpoint_id, d.outbox_id) \
-         SELECT l.id, l.attempt, e.url, e.secret, o.id AS outbox_id, o.topic, o.payload \
+         SELECT l.id, l.attempt, l.endpoint_id, e.url, e.secret, o.id AS outbox_id, o.topic, o.payload \
          FROM leased l JOIN webhook_endpoints e ON e.id = l.endpoint_id \
          JOIN outbox o ON o.id = l.outbox_id",
     )
@@ -263,17 +270,24 @@ async fn lease_due(pool: &PgPool) -> Result<Vec<Due>, sqlx::Error> {
 }
 
 /// POST one leased delivery and record the outcome.
-async fn send_one(pool: &PgPool, http: &reqwest::Client, d: Due) -> Result<(), sqlx::Error> {
+async fn send_one(
+    pool: &PgPool,
+    http: &reqwest::Client,
+    vault: &Vault,
+    d: Due,
+) -> Result<(), sqlx::Error> {
     let body = json!({ "id": d.outbox_id, "topic": d.topic, "data": d.payload }).to_string();
     let ts = Utc::now().timestamp();
-    let sent = match ssrf::check_literal_host(&d.url) {
-        Err(_) => Err("url points at a private address".to_string()),
-        Ok(()) => http
+    let secret = vault.open_col("webhook_endpoints", "secret", d.endpoint_id, &d.secret);
+    let sent = match (ssrf::check_literal_host(&d.url), secret) {
+        (Err(_), _) => Err("url points at a private address".to_string()),
+        (Ok(()), Err(e)) => Err(format!("cannot open endpoint secret: {e}")),
+        (Ok(()), Ok(secret)) => http
             .post(&d.url)
             .header("content-type", "application/json")
             .header("x-bf-event", &d.topic)
             .header("x-bf-delivery", d.id.to_string())
-            .header("x-bf-signature", signature(&d.secret, ts, &body))
+            .header("x-bf-signature", signature(&secret, ts, &body))
             .body(body)
             .send()
             .await

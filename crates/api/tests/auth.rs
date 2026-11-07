@@ -24,6 +24,7 @@ fn app(pool: PgPool) -> Router {
     let state = AppState {
         pool,
         jwt_secret: "test-secret".into(),
+        vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
         secure_cookies: true,
         limiter: Default::default(),
     };

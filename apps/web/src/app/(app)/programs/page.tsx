@@ -7,6 +7,7 @@ import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { Button } from "@/components/ui/button";
 import { ok, refresh, required, toPage, type Program } from "@/lib/admin";
 import { api } from "@/lib/api";
+import { remember } from "@/lib/revealed";
 import type { ListFn } from "@/lib/use-resource";
 
 const list: ListFn<Program> = async ({ page, pageSize }, signal) =>
@@ -39,7 +40,8 @@ const config: ResourceConfig<Program> = {
       onSubmit={async (v) => {
         const currency = required(v.currency ?? "", "Currency").toUpperCase();
         if (!/^[A-Z]{3}$/.test(currency)) throw new Error("Currency must be a 3-letter code, e.g. USD");
-        await ok(api.POST("/api/v1/programs", { body: { ...programBody(v), currency } }));
+        const created = await ok(api.POST("/api/v1/programs", { body: { ...programBody(v), currency } }));
+        remember("program", created.id, created.webhook_secret);
         await refresh();
       }}
     />

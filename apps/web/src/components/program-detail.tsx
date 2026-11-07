@@ -18,6 +18,7 @@ import {
   wholeNumber,
 } from "@/lib/admin";
 import { api } from "@/lib/api";
+import { recall, remember } from "@/lib/revealed";
 import { Facts, ListState, Section } from "./admin-ui";
 import { ConfirmDialog } from "./confirm-dialog";
 import { FormDialog, type Field } from "./form-dialog";
@@ -144,11 +145,8 @@ export function ProgramDetail({ program }: { program: Program }) {
 
 function Secrets({ program }: { program: Program }) {
   const [shown, setShown] = useState(false);
-  const rows: [string, string | null | undefined][] = [
-    ["Webhook secret", program.webhook_secret],
-    ["Stripe secret", program.stripe_secret],
-    ["Paddle secret", program.paddle_secret],
-  ];
+  // The API shows the webhook secret once (create/rotate); this tab remembers it until reload.
+  const webhook = recall("program", program.id);
   return (
     <Section
       title="Keys and secrets"
@@ -165,7 +163,8 @@ function Secrets({ program }: { program: Program }) {
             confirmLabel="Rotate"
             destructive
             onConfirm={async () => {
-              await ok(api.POST("/api/v1/programs/{id}/secrets/rotate", { params: { path: { id: program.id } } }));
+              const rotated = await ok(api.POST("/api/v1/programs/{id}/secrets/rotate", { params: { path: { id: program.id } } }));
+              remember("program", program.id, rotated.webhook_secret);
               await refresh();
             }}
           />
@@ -175,10 +174,16 @@ function Secrets({ program }: { program: Program }) {
       <Facts
         rows={[
           ["Public key", <code key="pk" className="break-all">{program.public_key}</code>],
-          ...rows.map(([label, value]): [string, React.ReactNode] => [
-            label,
-            value ? <code key={label} className="break-all">{shown ? value : "••••••••••••"}</code> : <span className="text-muted">Not set</span>,
-          ]),
+          [
+            "Webhook secret",
+            webhook ? (
+              <code key="wh" className="break-all">{shown ? webhook : "••••••••••••"}</code>
+            ) : (
+              <span key="wh" className="text-muted">Shown once on create or rotate. Rotate to get a new one.</span>
+            ),
+          ],
+          ["Stripe secret", <span key="st" className="text-muted">Write-only. Set it with Edit.</span>],
+          ["Paddle secret", <span key="pd" className="text-muted">Write-only. Set it with Edit.</span>],
         ]}
       />
     </Section>

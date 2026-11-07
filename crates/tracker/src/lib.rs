@@ -37,6 +37,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
+use bf_core::secrets::Vault;
 use event::{clip, ip_hash, normalize_ua, referrer_host, url_path, with_click};
 use geo::Geo;
 use proxy::Trust;
@@ -84,12 +85,13 @@ pub async fn start(
     spool: SpoolConfig,
     ip_salt: &str,
     geo: Geo,
+    vault: Arc<Vault>,
 ) -> Result<Tracker, Error> {
     let spool = SpoolWriter::open(spool).await?;
     let checkpoint = writer::replay(&pool, &spool).await?;
     metrics::SPOOL_BYTES.max(checkpoint);
     metrics::SPOOL_CHECKPOINT.set(checkpoint);
-    let (snapshot, watcher) = snapshot::load_and_watch(pool.clone()).await?;
+    let (snapshot, watcher) = snapshot::load_and_watch(pool.clone(), vault).await?;
     let (queue, rx) = mpsc::channel(QUEUE_CAPACITY);
     let writer = writer::spawn(pool.clone(), spool.clone(), rx, checkpoint);
     let state = AppState {
@@ -269,6 +271,9 @@ async fn conversion(
 ) -> StatusCode {
     let snap = s.snapshot.load_full();
     let Some(program) = snap.programs.get(key) else {
+        if snap.broken.contains(key) {
+            return StatusCode::SERVICE_UNAVAILABLE;
+        }
         return StatusCode::NOT_FOUND;
     };
     let Some(secret) = source.secret(program) else {

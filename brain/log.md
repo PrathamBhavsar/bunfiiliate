@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-07] Plan A: A01-A04 secrets at rest and TOTP core
+
+- **Creation**: `bf-core::secrets` (KeyRing, Vault), `bf-core::totp`; migration 0060; `api::secrets` (PROTECTED list, `reencrypt`, `check`); tracker snapshot decrypts once per reload, skips bad rows (503 for their key, `bf_snapshot_decrypt_fail_total`).
+- **Behaviour changes**: `BF_MASTER_KEYS` required by api, worker and tracker (or `BF_ALLOW_PLAINTEXT_SECRETS=1`); program and endpoint secrets are never returned by GET/PATCH, only once on create/rotate; web keeps them in memory per tab; Stripe/Paddle secrets are write-only.
+- **Validation**: `make ci` and `make e2e` pass with sealed secrets end to end.
+
 ## [2026-11-07] Plan v2 specs A/B/C
 
 - **Creation**: `docs/plan/` holds three design specs (A auth/security/tracker, B product parity/billing/payouts, C ops/tenant/UI/bench). Specs only, nothing implemented; their reviews are still open.

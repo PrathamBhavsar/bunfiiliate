@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatTime, ok, refresh, required, toPage } from "@/lib/admin";
 import { api } from "@/lib/api";
+import { recall, remember } from "@/lib/revealed";
 import type { components } from "@bunfiiliate/sdk";
 import type { ListFn } from "@/lib/use-resource";
 
@@ -99,6 +100,7 @@ function Deliveries({ endpointId }: { endpointId: string }) {
 
 function Detail({ e }: { e: Endpoint }) {
   const [shown, setShown] = useState(false);
+  const secret = recall("endpoint", e.id);
   return (
     <div className="grid gap-4">
       <Section
@@ -133,11 +135,17 @@ function Detail({ e }: { e: Endpoint }) {
             [
               "Signing secret",
               <span key="k" className="inline-flex items-center gap-2">
-                <code className="break-all">{shown ? e.secret : "••••••••••••"}</code>
-                <Button size="sm" aria-pressed={shown} onClick={() => setShown((s) => !s)}>
-                  {shown ? <EyeOff /> : <Eye />}
-                  {shown ? "Hide" : "Reveal"}
-                </Button>
+                {secret ? (
+                  <>
+                    <code className="break-all">{shown ? secret : "••••••••••••"}</code>
+                    <Button size="sm" aria-pressed={shown} onClick={() => setShown((s) => !s)}>
+                      {shown ? <EyeOff /> : <Eye />}
+                      {shown ? "Hide" : "Reveal"}
+                    </Button>
+                  </>
+                ) : (
+                  <span className="text-muted">Shown once, when the endpoint was created.</span>
+                )}
               </span>,
             ],
           ]}
@@ -186,7 +194,8 @@ const config: ResourceConfig<Endpoint> = {
       fields={[urlField, eventsField]}
       submitLabel="Create"
       onSubmit={async (v) => {
-        await ok(api.POST("/api/v1/webhooks/endpoints", { body: { url: checkUrl(v.url ?? ""), events: parseEvents(v.events ?? "") } }));
+        const created = await ok(api.POST("/api/v1/webhooks/endpoints", { body: { url: checkUrl(v.url ?? ""), events: parseEvents(v.events ?? "") } }));
+        remember("endpoint", created.id, created.secret);
         await refresh();
       }}
     />
