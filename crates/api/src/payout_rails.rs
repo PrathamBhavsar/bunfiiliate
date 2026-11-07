@@ -492,8 +492,9 @@ pub async fn load_client(
             .bind(rail.as_str())
             .fetch_optional(pool)
             .await?;
-            let (id, sandbox, stored) =
-                row.ok_or(AppError::Unprocessable("payout rail is not configured"))?;
+            let (id, sandbox, stored) = row.ok_or(AppError::Unprocessable(
+                "payout rail is not configured".into(),
+            ))?;
             let plain = vault
                 .open_col(CRED_TABLE, "creds", id, &stored)
                 .map_err(|e| {
@@ -510,7 +511,7 @@ pub async fn load_client(
                 _ => WiseClient::new(http, sandbox, &creds).map(RailClient::Wise),
             };
             client.ok_or(AppError::Unprocessable(
-                "payout rail credentials are incomplete",
+                "payout rail credentials are incomplete".into(),
             ))
         }
     }

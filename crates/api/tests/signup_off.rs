@@ -16,6 +16,7 @@ async fn signup_disabled_by_default(pool: PgPool) {
         pool: pool.clone(),
         jwt_keys: api::auth::JwtKeys::single("test-secret").into(),
         version_cache: Default::default(),
+        tracker_url: Default::default(),
         vault: std::sync::Arc::new(Vault::new(ring)),
         secure_cookies: true,
         limiter: Default::default(),

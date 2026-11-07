@@ -22,8 +22,6 @@ pub enum AppError {
     /// The request is well formed but cannot be served (for example an unconfigured provider).
     Unprocessable(String),
     Conflict(&'static str),
-    /// Well-formed request the server cannot act on (e.g. a payout rail with no credentials).
-    Unprocessable(&'static str),
     TooManyRequests,
     PayloadTooLarge,
     /// An internal upstream (the tracker) did not answer.
@@ -57,7 +55,6 @@ impl IntoResponse for AppError {
             Self::PaymentRequired(m) => (StatusCode::PAYMENT_REQUIRED, "plan_limit", m),
             Self::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, "unprocessable", m),
             Self::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.into()),
-            Self::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, "unprocessable", m.into()),
             Self::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "payload_too_large",

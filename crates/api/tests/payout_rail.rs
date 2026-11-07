@@ -30,6 +30,7 @@ impl Api {
             pool: pool.clone(),
             jwt_keys: api::auth::JwtKeys::single(SECRET).into(),
             version_cache: Default::default(),
+            tracker_url: Default::default(),
             vault: vault(),
             secure_cookies: true,
             limiter: Default::default(),

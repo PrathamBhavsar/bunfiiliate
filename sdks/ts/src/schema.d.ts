@@ -365,6 +365,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a plan change. `mock` switches the plan at once; `lemonsqueezy` returns a hosted checkout. */
+        post: operations["checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Providers with a webhook secret configured. The secret itself is never returned. */
+        get: operations["list_providers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/providers/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a provider's webhook secret (sealed at rest). Enables the provider. */
+        put: operations["set_provider"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's plan, status and usage against its limits. */
+        get: operations["subscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contact-requests": {
         parameters: {
             query?: never;
@@ -1266,6 +1334,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhooks/billing/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Provider subscription webhook. Public; authenticated by the HMAC of the raw body. */
+        post: operations["webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/webhooks/deliveries": {
         parameters: {
             query?: never;
@@ -1529,6 +1614,17 @@ export interface components {
             status: string;
             /** Format: int64 */
             total_cents: number;
+        };
+        CheckoutRequest: {
+            plan_key: string;
+            /** @description `mock` or `lemonsqueezy`; default `mock` when configured, else `lemonsqueezy`. */
+            provider?: string | null;
+        };
+        CheckoutResponse: {
+            /** @description `true` when the plan is already active (mock). */
+            activated: boolean;
+            /** @description Hosted checkout to send the admin to. */
+            url?: string | null;
         };
         CodeRequest: {
             /** @description Six-digit authenticator code. */
@@ -2590,6 +2686,19 @@ export interface components {
         PlanDuration: "one_month" | "x_months" | "lifetime";
         /** @enum {string} */
         PlanKind: "percent" | "flat";
+        PlanView: {
+            currency: string;
+            key: string;
+            /** Format: int32 */
+            max_affiliates?: number | null;
+            /** Format: int64 */
+            max_monthly_clicks?: number | null;
+            /** Format: int32 */
+            max_programs?: number | null;
+            name: string;
+            /** Format: int64 */
+            price_cents: number;
+        };
         Point: components["schemas"]["Metrics"] & {
             /** @description `YYYY-MM-DD` (UTC). */
             day: string;
@@ -2628,6 +2737,11 @@ export interface components {
             /** Format: int32 */
             hold_days?: number | null;
             name?: string | null;
+        };
+        ProviderView: {
+            provider: string;
+            /** @description The webhook secret is write-only; this only says one is stored. */
+            webhook_secret_set: boolean;
         };
         PutCredentials: {
             /** @description `paypal_payouts`: `client_id`, `client_secret`. `wise`: `api_token`, `profile_id`. */
@@ -2705,6 +2819,9 @@ export interface components {
             new_password: string;
             token: string;
         };
+        SetSecret: {
+            webhook_secret: string;
+        };
         SignupRequest: {
             admin_email: string;
             admin_password: string;
@@ -2716,6 +2833,14 @@ export interface components {
         Slice: components["schemas"]["Metrics"] & {
             /** @description Value of the dimension; empty = unknown. */
             dim_value: string;
+        };
+        SubscriptionView: {
+            /** Format: date-time */
+            current_period_end?: string | null;
+            plan: components["schemas"]["PlanView"];
+            provider: string;
+            status: string;
+            usage: components["schemas"]["UsageView"];
         };
         Summary: components["schemas"]["Metrics"] & {
             /** @description Top 200 values of `dim` by clicks; their sums equal the totals when there are fewer. */
@@ -2750,6 +2875,14 @@ export interface components {
             /** Format: int64 */
             recovery_codes_remaining: number;
         };
+        UsageView: {
+            /** Format: int64 */
+            affiliates: number;
+            /** Format: int64 */
+            monthly_clicks: number;
+            /** Format: int64 */
+            programs: number;
+        };
         UserView: {
             email: string;
             /** Format: uuid */
@@ -2758,6 +2891,10 @@ export interface components {
             role: string;
             /** Format: uuid */
             workspace_id?: string | null;
+        };
+        WebhookAck: {
+            /** @description `applied`, `duplicate`, or `ignored` (stale event or unknown workspace). */
+            result: string;
         };
         /**
          * @description One endpoint x outbox row. `next_attempt_at` set = still pending; unset with a 2xx
@@ -3613,6 +3750,133 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderView"][];
+                };
+            };
+        };
+    };
+    set_provider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description mock or lemonsqueezy */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSecret"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    subscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionView"];
                 };
             };
         };
@@ -6221,6 +6485,44 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description mock or lemonsqueezy */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
