@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-07] C34 + C90 final gate
+
+- **Merged**: C34 e2e growth (5 suites, 26+ tests, coverage table), admin payout-request UI, `scripts/final-gate.sh`, `push-guard.sh`, `hygiene-check.sh`, `docs/ops/release-checklist.md`.
+- **Gate run** (`.gate/report.md`, head b70723a): ci, sql-lint, migrations, tenant-matrix, spool-disk-full, alerts, backup-drill, e2e x2, bench-quick, bench-numbers all ok. `ocr` failed: no LLM endpoint configured (needs `ocr config provider` or `OCR_LLM_*`). Brain validator and hygiene pass when run by hand.
+- **Lessons**: `pnpm install` prompts without a TTY unless `CI=true`; the drill needs `PG_BIN` matching the server major (PATH had pg_dump 18 against a 16 server: `transaction_timeout`). Five early commits carry attribution trailers; the owner accepted them (`docs/audit/hygiene-exceptions.txt`); no new ones.
+- **Open**: run `ocr` on `prod..HEAD`, triage findings into `docs/audit/findings.md`, re-run the gate.
+
 ## [2026-11-07] C34 e2e growth + payout request admin UI (tribe #41)
 
 - **Done**: e2e split into six files (39 tests) over `e2e/fixtures/seed.ts`; each file seeds its own workspace through the API (`seedWorld`), so it passes alone and in any order; `E2E_GREP` / `E2E_SHARD` in `scripts/e2e.sh`; `docs/ui/e2e-plan.md` page-to-test table guarded by `scripts/e2e-plan.test.mjs` (runs in `make ci` via `js-test`); tenant UI tests (WS A admin and affiliate vs WS B code pages); code stats Playwright cases; "Payout requests" section on admin `/payouts` (approve confirm, reject with required reason, 409 shown) with e2e.
