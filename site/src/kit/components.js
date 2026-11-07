@@ -48,7 +48,7 @@ define("x-hero", class extends HTMLElement {
       <div class="wrap hero-inner">
         <h1 class="display">${brand.headline}</h1>
         <p class="lede">${brand.sub}</p>
-        <x-copy cmd="${esc(brand.heroCmdPre)}"></x-copy>
+        <x-copy cmd="${esc(brand.heroCmdPre ?? brand.heroCmd)}"></x-copy>
         <div class="cta">
           <a class="btn primary" href="${base}docs/#/quickstart">Get started ${icon("arrow")}</a>
           <a class="btn" href="https://github.com/${brand.repo}">${icon("github")} Star on GitHub</a>
