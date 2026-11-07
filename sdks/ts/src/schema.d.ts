@@ -826,6 +826,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/referral-codes/{code}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats of one of the signed-in affiliate's own referral codes. */
+        get: operations["me_code_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/tax-form": {
         parameters: {
             query?: never;
@@ -1357,6 +1374,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/referral-codes/{code}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats of one referral code in the workspace (live from clicks and conversions). */
+        get: operations["code_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/1099-style.csv": {
         parameters: {
             query?: never;
@@ -1781,10 +1815,58 @@ export interface components {
             /** @description Hosted checkout to send the admin to. */
             url?: string | null;
         };
+        CodeCountry: {
+            /** Format: int64 */
+            clicks: number;
+            country: string;
+        };
+        CodeDay: {
+            /** Format: int64 */
+            clicks: number;
+            /** Format: int64 */
+            commission_cents: number;
+            /** Format: int64 */
+            conversions: number;
+            /** @description `YYYY-MM-DD` (UTC); every day of the range is present. */
+            day: string;
+        };
+        CodeReferrer: {
+            /** Format: int64 */
+            clicks: number;
+            host: string;
+        };
         CodeRequest: {
             /** @description Six-digit authenticator code. */
             code: string;
             current_password: string;
+        };
+        CodeStats: {
+            code: string;
+            /** @description The program's currency; amounts are integer minor units. */
+            currency: string;
+            from: string;
+            series: components["schemas"]["CodeDay"][];
+            to: string;
+            /** @description Top 10 by clicks. */
+            top_countries: components["schemas"]["CodeCountry"][];
+            /** @description Top 10 by clicks. */
+            top_referrers: components["schemas"]["CodeReferrer"][];
+            totals: components["schemas"]["CodeTotals"];
+        };
+        CodeTotals: {
+            /** Format: int64 */
+            clicks: number;
+            /** Format: int64 */
+            commission_cents: number;
+            /** Format: int64 */
+            conversions: number;
+            /**
+             * Format: int64
+             * @description Clicks the tracker flagged (a subset of `clicks`).
+             */
+            flagged_clicks: number;
+            /** Format: int64 */
+            revenue_cents: number;
         };
         ContactPatch: {
             /** @description `new`, `read` or `closed`. */
@@ -1951,6 +2033,8 @@ export interface components {
             code: string;
             message: string;
         };
+        /** @enum {string} */
+        Granularity: "day";
         /** @description A received provider/generic delivery, as stored. `processed_at` unset = still queued. */
         InboundEventRow: {
             error?: string | null;
@@ -5171,6 +5255,52 @@ export interface operations {
             };
         };
     };
+    me_code_stats: {
+        parameters: {
+            query?: {
+                /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
+                from?: string;
+                /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
+                to?: string;
+                /** @description Series bucket; only `day` is supported. */
+                granularity?: components["schemas"]["Granularity"];
+            };
+            header?: never;
+            path: {
+                /** @description Referral code */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStats"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown code or not the caller's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     me_get: {
         parameters: {
             query?: never;
@@ -6706,6 +6836,52 @@ export interface operations {
                 };
                 content?: never;
             };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    code_stats: {
+        parameters: {
+            query?: {
+                /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
+                from?: string;
+                /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
+                to?: string;
+                /** @description Series bucket; only `day` is supported. */
+                granularity?: components["schemas"]["Granularity"];
+            };
+            header?: never;
+            path: {
+                /** @description Referral code */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStats"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown code or code of another workspace */
             404: {
                 headers: {
                     [name: string]: unknown;

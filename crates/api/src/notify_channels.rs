@@ -82,6 +82,12 @@ pub struct Channels {
     vault: Arc<Vault>,
 }
 
+/// A transport error as text, without the request URL: channel URLs carry the secret (bot token,
+/// webhook token) and the text ends up in logs.
+fn redact(e: reqwest::Error) -> String {
+    e.without_url().to_string()
+}
+
 impl Channels {
     pub fn new(http: reqwest::Client, vault: Arc<Vault>) -> Self {
         Self { http, vault }
@@ -97,7 +103,7 @@ impl Channels {
             .body(ch.body(text).to_string())
             .send()
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(redact)?;
         if res.status().is_success() {
             Ok(())
         } else {
@@ -364,4 +370,18 @@ pub async fn test_channel(
             AppError::Unprocessable("the channel did not accept the message".into())
         })?;
     Ok(Json(TestResult { sent: true }))
+}
+
+#[cfg(test)]
+mod redact_tests {
+    #[tokio::test]
+    async fn transport_errors_do_not_carry_the_url() {
+        let url = "http://127.0.0.1:1/bot123:SECRET-TOKEN/sendMessage";
+        let e = reqwest::Client::new().post(url).send().await.unwrap_err();
+        assert!(
+            e.to_string().contains("SECRET-TOKEN"),
+            "premise: raw error has the url"
+        );
+        assert!(!super::redact(e).contains("SECRET-TOKEN"));
+    }
 }

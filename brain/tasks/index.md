@@ -75,4 +75,9 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | B07+B11 | feat/b-notify-billing-ui | done, merged (0076 notify channels; billing UI) |
 | C20+C21+C22 | feat/c-partitions | done, merged (0080 clicks partitioning, partition upkeep) |
 | C10-C13 | feat/c-ops | done, merged (backup drill, spool disk-full shedding, alerts, HA docs) |
+| C32 | feat/c30-code-stats | done (ADR-0006 query-string detail routes, `docs/ui/routes.md`, `scripts/check-static-export.sh` in `make web`) |
+| C30 | feat/c30-code-stats | done (`/referral-codes/{code}/stats`, `/me/...`; live clicks with ts bounds, no rollup dependency) |
+| C31 | feat/c30-code-stats | done (`/referral-codes/detail?code=`, `/me/links/detail?code=`; Playwright cases are C34) |
 | billing-variant | feat/billing-variant-plan | done, merged (0082; plan from purchased variant, store check) |
+| C30+C31+C32 | feat/c30-code-stats | done, merged (per-code stats API + pages, routing ADR 0006) |
+| notify-redact | fix/notify-redact-url | done, merged (reqwest errors stripped of channel URL) |
