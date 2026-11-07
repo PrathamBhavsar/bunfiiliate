@@ -20,6 +20,8 @@ pub enum AppError {
     Conflict(&'static str),
     TooManyRequests,
     PayloadTooLarge,
+    /// An internal upstream (the tracker) did not answer.
+    BadGateway,
     Internal,
 }
 
@@ -56,6 +58,11 @@ impl IntoResponse for AppError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "too_many_requests",
                 "too many requests, try again later".into(),
+            ),
+            Self::BadGateway => (
+                StatusCode::BAD_GATEWAY,
+                "bad_gateway",
+                "upstream unreachable".into(),
             ),
             Self::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,

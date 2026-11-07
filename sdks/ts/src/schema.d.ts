@@ -1265,6 +1265,64 @@ export interface paths {
         patch: operations["update_endpoint"];
         trace?: never;
     };
+    "/api/v1/webhooks/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Received deliveries (newest first) with their processing outcome. */
+        get: operations["list_inbound"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/inbound/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a stored delivery through the worker again. The signature is not re-checked: it
+         *     passed when the event was stored. Duplicate sales still dedupe on the external id.
+         */
+        post: operations["replay_inbound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign `payload` with the program's own secret for `source` and deliver it to the tracker's
+         *     real inbound endpoint, returning the tracker's raw answer. Lets an admin check a secret
+         *     end to end without a provider account.
+         */
+        post: operations["test_webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -1557,6 +1615,21 @@ export interface components {
         ErrorDetail: {
             code: string;
             message: string;
+        };
+        /** @description A received provider/generic delivery, as stored. `processed_at` unset = still queued. */
+        InboundEventRow: {
+            error?: string | null;
+            external_id: string;
+            /** Format: uuid */
+            id: string;
+            payload: unknown;
+            /** Format: date-time */
+            processed_at?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            /** Format: date-time */
+            received_at: string;
+            source: string;
         };
         IssuedToken: {
             /** Format: date-time */
@@ -2056,6 +2129,31 @@ export interface components {
              */
             total: number;
         };
+        Paged_InboundEventRow: {
+            items: {
+                error?: string | null;
+                external_id: string;
+                /** Format: uuid */
+                id: string;
+                payload: unknown;
+                /** Format: date-time */
+                processed_at?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                /** Format: date-time */
+                received_at: string;
+                source: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_Member: {
             items: {
                 email: string;
@@ -2467,6 +2565,23 @@ export interface components {
         TemplatePatch: {
             body?: string | null;
             subject?: string | null;
+        };
+        TestWebhook: {
+            /** @description The event body to deliver. */
+            payload: unknown;
+            /** Format: uuid */
+            program_id: string;
+            /** @description `generic`, `stripe` or `paddle`. */
+            source: string;
+        };
+        TestWebhookResult: {
+            /** @description The tracker's response body (first 4 KiB). */
+            body: string;
+            /**
+             * Format: int32
+             * @description The tracker's HTTP status.
+             */
+            status: number;
         };
         TotpStatus: {
             enrolled: boolean;
@@ -5980,6 +6095,136 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_inbound: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `generic`, `stripe` or `paddle`. */
+                source?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_InboundEventRow"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    replay_inbound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Inbound event id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundEventRow"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Still queued */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    test_webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestWebhook"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestWebhookResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Tracker unreachable */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

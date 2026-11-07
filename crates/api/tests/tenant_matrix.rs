@@ -34,6 +34,7 @@ impl Api {
             vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
             secure_cookies: true,
             limiter: Default::default(),
+            tracker_url: Default::default(),
         };
         Self(app(state))
     }
@@ -102,6 +103,7 @@ struct Ws {
     request: Uuid,
     endpoint: Uuid,
     delivery: Uuid,
+    inbound: Uuid,
     template: Uuid,
     notification: Uuid,
     contact: Uuid,
@@ -269,6 +271,9 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
             .unwrap();
     sqlx::query("INSERT INTO webhook_deliveries (id, endpoint_id, outbox_id, status_code) VALUES ($1, $2, $3, 500)")
         .bind(delivery).bind(endpoint).bind(outbox).execute(pool).await.unwrap();
+    let inbound = Uuid::now_v7();
+    sqlx::query("INSERT INTO inbound_events (id, program_id, source, external_id, payload, processed_at, error) VALUES ($1, $2, 'generic', $3, $4, now(), 'seeded')")
+        .bind(inbound).bind(program).bind(format!("{secret}-ext")).bind(json!({"note": secret})).execute(pool).await.unwrap();
     sqlx::query("INSERT INTO email_templates (id, workspace_id, key, subject, body) VALUES ($1, $2, 'welcome', $3, 'body')")
         .bind(template).bind(ws).bind(format!("{secret}-subject")).execute(pool).await.unwrap();
     sqlx::query("INSERT INTO notifications (id, user_id, kind, body) VALUES ($1, $2, 'k', $3)")
@@ -299,6 +304,7 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
         request,
         endpoint,
         delivery,
+        inbound,
         template,
         notification,
         contact,
@@ -418,6 +424,7 @@ fn resource_for(prefix: &str, ids: &Ws) -> String {
         ("/api/v1/users", ids.aff_user),
         ("/api/v1/webhooks/deliveries", ids.delivery),
         ("/api/v1/webhooks/endpoints", ids.endpoint),
+        ("/api/v1/webhooks/inbound", ids.inbound),
     ];
     tbl.iter()
         .filter(|(p, _)| prefix.starts_with(p))
@@ -459,6 +466,9 @@ fn body(m: &str, path: &str, f: &Ws) -> Option<Value> {
             json!({"affiliate_id": f.affiliate, "program_id": f.program, "code": "XTENANT2"})
         }
         ("put", "/api/v1/settings") => json!({}),
+        ("post", "/api/v1/webhooks/test") => {
+            json!({"program_id": f.program, "source": "generic", "payload": {}})
+        }
         ("post", "/api/v1/webhooks/endpoints") => json!({"url": "https://evil.example.com/h"}),
         ("patch", "/api/v1/webhooks/endpoints/{id}") => json!({"active": false}),
         ("post", "/api/v1/programs") => json!({"name": "x", "currency": "USD"}),
@@ -670,6 +680,7 @@ async fn run_matrix(pool: &PgPool, check_snapshot: bool) -> Run {
             b.template,
             b.contact,
             b.endpoint,
+            b.inbound,
         ];
         if !is_denied(st) && foreign.iter().any(|id| text.contains(&id.to_string())) {
             why.push("body contains a B row id".into());

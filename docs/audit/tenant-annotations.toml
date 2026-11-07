@@ -904,3 +904,27 @@ source = "tracker"
 kind = "public"
 role = "none"
 reason = "published contract, no tenant data"
+
+[[route]]
+method = "get"
+path = "/api/v1/webhooks/inbound"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; joins programs on workspace_id"
+
+[[route]]
+method = "post"
+path = "/api/v1/webhooks/inbound/{id}/replay"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; event must belong to a program of the workspace"
+
+[[route]]
+method = "post"
+path = "/api/v1/webhooks/test"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "program looked up by workspace id from the session before anything is signed or sent"

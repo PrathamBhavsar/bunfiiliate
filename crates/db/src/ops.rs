@@ -526,3 +526,92 @@ pub async fn list_audit(
         .await?;
     Ok((items, total))
 }
+
+// ---- inbound events (webhook tester)
+
+/// A received provider/generic delivery, as stored. `processed_at` unset = still queued.
+#[derive(Debug, Clone, sqlx::FromRow, Serialize, ToSchema)]
+pub struct InboundEventRow {
+    pub id: Uuid,
+    pub program_id: Uuid,
+    pub source: String,
+    pub external_id: String,
+    pub payload: serde_json::Value,
+    pub received_at: DateTime<Utc>,
+    pub processed_at: Option<DateTime<Utc>>,
+    pub error: Option<String>,
+}
+
+pub async fn list_inbound(
+    pool: &PgPool,
+    workspace_id: Uuid,
+    program_id: Option<Uuid>,
+    source: Option<&str>,
+    limit: i64,
+    offset: i64,
+) -> Result<(Vec<InboundEventRow>, i64), sqlx::Error> {
+    let items = sqlx::query_as(
+        "SELECT e.id, e.program_id, e.source::text AS source, e.external_id, e.payload, \
+                e.received_at, e.processed_at, e.error \
+         FROM inbound_events e JOIN programs p ON p.id = e.program_id \
+         WHERE p.workspace_id = $1 AND ($2::uuid IS NULL OR e.program_id = $2) \
+           AND ($3::text IS NULL OR e.source::text = $3) \
+         ORDER BY e.received_at DESC, e.id DESC LIMIT $4 OFFSET $5",
+    )
+    .bind(workspace_id)
+    .bind(program_id)
+    .bind(source)
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(pool)
+    .await?;
+    let total = sqlx::query_scalar(
+        "SELECT count(*) FROM inbound_events e JOIN programs p ON p.id = e.program_id \
+         WHERE p.workspace_id = $1 AND ($2::uuid IS NULL OR e.program_id = $2) \
+           AND ($3::text IS NULL OR e.source::text = $3)",
+    )
+    .bind(workspace_id)
+    .bind(program_id)
+    .bind(source)
+    .fetch_one(pool)
+    .await?;
+    Ok((items, total))
+}
+
+pub async fn get_inbound(
+    db: impl PgExecutor<'_>,
+    workspace_id: Uuid,
+    id: Uuid,
+) -> Result<Option<InboundEventRow>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT e.id, e.program_id, e.source::text AS source, e.external_id, e.payload, \
+                e.received_at, e.processed_at, e.error \
+         FROM inbound_events e JOIN programs p ON p.id = e.program_id \
+         WHERE e.id = $1 AND p.workspace_id = $2",
+    )
+    .bind(id)
+    .bind(workspace_id)
+    .fetch_optional(db)
+    .await
+}
+
+/// Queue a processed event for another pass through the worker (no signature re-check: it
+/// passed when the event was stored). Returns false if it is not in this workspace or is
+/// still queued.
+pub async fn requeue_inbound(
+    db: impl PgExecutor<'_>,
+    workspace_id: Uuid,
+    id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    let n = sqlx::query(
+        "UPDATE inbound_events e SET processed_at = NULL, error = NULL, attempts = 0, retry_at = NULL \
+         WHERE e.id = $1 AND e.processed_at IS NOT NULL \
+           AND e.program_id IN (SELECT id FROM programs WHERE workspace_id = $2)",
+    )
+    .bind(id)
+    .bind(workspace_id)
+    .execute(db)
+    .await?
+    .rows_affected();
+    Ok(n == 1)
+}

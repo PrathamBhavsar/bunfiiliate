@@ -47,6 +47,23 @@ pub struct AppState {
     pub secure_cookies: bool,
     /// Rate limits for the public routes; per process, shared by every clone of the state.
     pub limiter: Arc<limit::Limiter>,
+    /// Base URL of the tracker's inbound endpoints (`TRACKER_INTERNAL_URL`).
+    pub tracker_url: TrackerUrl,
+}
+
+/// Where the API reaches the tracker over the internal network. Default reads
+/// `TRACKER_INTERNAL_URL`, falling back to `http://127.0.0.1:8081`.
+#[derive(Clone, Debug)]
+pub struct TrackerUrl(pub Arc<str>);
+
+impl Default for TrackerUrl {
+    fn default() -> Self {
+        let url = std::env::var("TRACKER_INTERNAL_URL")
+            .ok()
+            .filter(|u| !u.trim().is_empty())
+            .unwrap_or_else(|| "http://127.0.0.1:8081".into());
+        Self(url.trim_end_matches('/').into())
+    }
 }
 
 /// Largest request body any API route accepts.

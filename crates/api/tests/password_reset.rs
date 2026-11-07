@@ -26,6 +26,7 @@ fn app(pool: PgPool) -> Router {
         vault: Arc::new(Vault::new(ring)),
         secure_cookies: true,
         limiter: Default::default(),
+        tracker_url: Default::default(),
     };
     build(routes::routes(), state)
 }

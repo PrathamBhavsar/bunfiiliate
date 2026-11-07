@@ -1,0 +1,2 @@
+{"id": "evt_refund_9", "type": "charge.refunded",
+ "data": {"object": {"id": "ch_1", "invoice": "in_1", "payment_intent": "pi_1", "refunded": true}}}

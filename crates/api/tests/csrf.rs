@@ -21,6 +21,7 @@ fn app(pool: PgPool) -> Router {
         vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
         secure_cookies: true,
         limiter: Default::default(),
+        tracker_url: Default::default(),
     };
     build(routes::routes(), state)
 }
