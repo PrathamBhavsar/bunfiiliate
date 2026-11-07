@@ -1,0 +1,5 @@
+{
+  "rps_min_ratio": 0.80,
+  "p99_max_ratio": 1.50,
+  "errors_max": 0
+}

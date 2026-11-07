@@ -18,6 +18,19 @@ fi
 
 echo "=== Verifying site/index.html benchmark numbers against bench/results/*.json ==="
 
+# New schema (bench/run.sh, schema_version 1): check the latest full result via gen_docs.py.
+LATEST="$(python3 -I "$ROOT_DIR/bench/gen_docs.py" --latest || true)"
+if [ -n "$LATEST" ]; then
+  echo "Using $LATEST"
+  if python3 -I "$ROOT_DIR/bench/gen_docs.py" --check "$LATEST" "$SITE_HTML"; then
+    echo "All benchmark numbers in site/index.html match $(basename "$LATEST")."
+    exit 0
+  fi
+  echo "Benchmark verification failed: site/index.html drifted from $(basename "$LATEST"). Run bench/run.sh --write-docs." >&2
+  exit 1
+fi
+echo "No schema_version=1 result found; falling back to legacy per-file results."
+
 python3 - "$ROOT_DIR" << 'EOF'
 import json
 import os

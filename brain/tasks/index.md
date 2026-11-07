@@ -76,3 +76,4 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | C20+C21+C22 | feat/c-partitions | done, merged (0080 clicks partitioning, partition upkeep) |
 | C10-C13 | feat/c-ops | done, merged (backup drill, spool disk-full shedding, alerts, HA docs) |
 | billing-variant | feat/billing-variant-plan | done, merged (0082; plan from purchased variant, store check) |
+| C40+C41+C42 | feat/c40-42-bench | done on branch; reproducible `bench/run.sh` (schema v1, pinned oha, median of repeats), `bench/compare.py` + thresholds + nightly workflow, benchmark publishing rules + `gen_docs.py` |
