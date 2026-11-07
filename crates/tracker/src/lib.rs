@@ -6,6 +6,7 @@ pub mod geo;
 pub mod metrics;
 pub mod proxy;
 pub mod snapshot;
+pub mod v2;
 pub mod webhook;
 pub mod writer;
 
@@ -42,6 +43,7 @@ use event::{clip, ip_hash, normalize_ua, referrer_host, url_path, with_click};
 use geo::Geo;
 use proxy::Trust;
 use snapshot::{CodeEntry, Snapshot};
+use v2::ApiError;
 use webhook::Source;
 use writer::{Error, Queued, Record};
 
@@ -51,6 +53,7 @@ const QUEUE_CAPACITY: usize = 10_000;
 /// Paddle deliveries get 503 (they retry, but late conversions delay payouts).
 const EVENT_RESERVE_DIVISOR: usize = 10;
 const MAX_BODY: usize = 8 * 1024;
+const V2_MAX_BEACON: usize = 4 * 1024;
 const MAX_EVENT_BODY: usize = 256 * 1024;
 
 static TRACKER_JS_ETAG: LazyLock<String> = LazyLock::new(|| {
@@ -113,6 +116,21 @@ pub async fn start(
 
 pub fn router(state: AppState) -> Router {
     // Conversion payloads (Stripe events especially) outgrow the click body limit.
+    let v2_events = Router::new()
+        .route("/v2/events/{key}", post(v2_event))
+        .route("/v2/webhooks/stripe/{key}", post(v2_stripe))
+        .route("/v2/webhooks/paddle/{key}", post(v2_paddle))
+        .layer(DefaultBodyLimit::max(MAX_EVENT_BODY))
+        .layer(map_response(v2::json_errors));
+    let v2_beacon = Router::new()
+        .route(
+            "/v2/c",
+            post(v2_beacon)
+                .options(preflight)
+                .layer(map_response(cors))
+                .layer(map_response(v2::json_errors)),
+        )
+        .layer(DefaultBodyLimit::max(V2_MAX_BEACON));
     let events = Router::new()
         .route("/v1/events/{key}", post(generic_event))
         .route("/v1/webhooks/stripe/{key}", post(stripe_webhook))
@@ -129,6 +147,8 @@ pub fn router(state: AppState) -> Router {
         .route("/readyz", get(readyz))
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .merge(events)
+        .merge(v2_events)
+        .merge(v2_beacon)
         .with_state(state)
 }
 
@@ -305,6 +325,140 @@ async fn conversion(
         Ok(()) => source.accepted(),
         Err(status) => status,
     }
+}
+
+async fn v2_beacon(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    ext: Extensions,
+    body: Bytes,
+) -> Result<StatusCode, ApiError> {
+    let b = v2::parse_beacon(&body)?;
+    // A click id alone was recorded by `/r`: recording again would double count.
+    let Some(code) = b.code.as_deref() else {
+        return Ok(StatusCode::NO_CONTENT);
+    };
+    let snap = s.snapshot.load_full();
+    let Some(entry) = snap.codes.get(code) else {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "unknown_code",
+            "unknown referral code",
+        ));
+    };
+    let click = s.click(
+        code,
+        entry,
+        Some(&b.vid),
+        b.referrer.as_deref(),
+        &b.url,
+        &headers,
+        &ext,
+    );
+    ingest(s, Record::Click(click))
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
+        .map_err(ApiError::from_status)
+}
+
+async fn v2_event(
+    State(s): State<AppState>,
+    Path(key): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiError> {
+    v2_conversion(Source::GenericV2, s, &key, &headers, &body).await
+}
+
+async fn v2_stripe(
+    State(s): State<AppState>,
+    Path(key): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiError> {
+    v2_conversion(Source::Stripe, s, &key, &headers, &body).await
+}
+
+async fn v2_paddle(
+    State(s): State<AppState>,
+    Path(key): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiError> {
+    v2_conversion(Source::Paddle, s, &key, &headers, &body).await
+}
+
+/// `/v2` ingest. Order: program (404), Idempotency-Key shape (400), signature (401), body
+/// validation (400). Nothing is spooled unless every check passes. Duplicate detection is
+/// A12b: a repeated key is still collapsed by the DB unique key.
+async fn v2_conversion(
+    source: Source,
+    s: AppState,
+    key: &str,
+    headers: &HeaderMap,
+    body: &[u8],
+) -> Result<Response, ApiError> {
+    let snap = s.snapshot.load_full();
+    let program = if v2::valid_program_key(key) {
+        snap.programs.get(key)
+    } else {
+        None
+    };
+    let Some(program) = program else {
+        return Err(if snap.broken.contains(key) {
+            ApiError::from_status(StatusCode::SERVICE_UNAVAILABLE)
+        } else {
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                "unknown_program",
+                "unknown program key",
+            )
+        });
+    };
+    if source == Source::GenericV2 {
+        let ok = v2::header(headers, "idempotency-key").is_some_and(v2::valid_idempotency_key);
+        if !ok {
+            return Err(ApiError::invalid(
+                "Idempotency-Key required, [A-Za-z0-9_-]{1,64}",
+            ));
+        }
+    }
+    let Some(secret) = source.secret(program) else {
+        return Err(ApiError::invalid("no secret configured for this source"));
+    };
+    if let Err(e) = source.verify(headers, body, secret) {
+        tracing::debug!(error = ?e, source = source.name(), "v2 webhook rejected");
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "invalid_signature",
+            "signature missing, malformed, wrong or expired",
+        ));
+    }
+    let payload = if source == Source::GenericV2 {
+        v2::parse_event(body)?.payload
+    } else {
+        if v2::has_nul(body) {
+            return Err(ApiError::invalid("NUL character in body"));
+        }
+        serde_json::from_slice::<Value>(body).map_err(|e| ApiError::invalid(e.to_string()))?
+    };
+    let Some(external_id) = source.external_id(headers, &payload) else {
+        return Err(ApiError::invalid("missing event id"));
+    };
+    let id = Uuid::now_v7();
+    let event = InboundEvent {
+        id,
+        program_id: program.program_id,
+        source: source.name().to_owned(),
+        external_id,
+        payload,
+        received_ms: now_ms(),
+    };
+    ingest(s, Record::Event(event))
+        .await
+        .map_err(ApiError::from_status)?;
+    let body = axum::Json(serde_json::json!({"status": "accepted", "id": id}));
+    Ok((source.accepted(), body).into_response())
 }
 
 async fn preflight(headers: HeaderMap) -> impl IntoResponse {
