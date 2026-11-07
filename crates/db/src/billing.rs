@@ -91,6 +91,17 @@ pub async fn usage_at(
     })
 }
 
+/// Every plan, cheapest first.
+pub async fn list_plans(db: impl PgExecutor<'_>) -> Result<Vec<Plan>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, key, name, price_cents, currency::text AS currency, max_programs, \
+                max_affiliates, max_monthly_clicks, is_default \
+         FROM billing_plans ORDER BY price_cents, key",
+    )
+    .fetch_all(db)
+    .await
+}
+
 /// A plan by its key.
 pub async fn plan_by_key(db: impl PgExecutor<'_>, key: &str) -> Result<Option<Plan>, sqlx::Error> {
     sqlx::query_as(

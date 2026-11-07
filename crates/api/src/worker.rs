@@ -43,8 +43,9 @@ const APPROVE_LOCK: i64 = 0x6266_6170;
 /// Run the loops until the task is dropped. Webhook delivery has its own loop, polled beside the
 /// others, so a slow endpoint never delays ingest, approval or the outbox.
 pub async fn run(pool: PgPool, mailer: Mailer, vault: Arc<Vault>) {
+    let channels = crate::notify_channels::Channels::new(dispatch::http_client(), vault.clone());
     tokio::join!(
-        main_loop(&pool, &mailer),
+        main_loop(&pool, &mailer, &channels),
         deliver_loop(&pool, &vault),
         fx_loop(&pool)
     );
@@ -81,7 +82,7 @@ async fn deliver_loop(pool: &PgPool, vault: &Arc<Vault>) {
     }
 }
 
-async fn main_loop(pool: &PgPool, mailer: &Mailer) {
+async fn main_loop(pool: &PgPool, mailer: &Mailer, channels: &crate::notify_channels::Channels) {
     let mut ingest = tokio::time::interval(INGEST_EVERY);
     let mut approve = tokio::time::interval(APPROVE_EVERY);
     let mut rollup = tokio::time::interval(ROLLUP_EVERY);
@@ -105,7 +106,7 @@ async fn main_loop(pool: &PgPool, mailer: &Mailer) {
                 tracing::error!(error = %e, "rollup tick failed");
             },
             _ = dispatch.tick() => {
-                match dispatch::dispatch_outbox(pool, mailer).await {
+                match dispatch::dispatch_outbox_notify(pool, mailer, channels).await {
                     Ok(0) => {}
                     Ok(n) => tracing::info!(rows = n, "outbox dispatched"),
                     Err(e) => tracing::error!(error = %e, "dispatch tick failed"),

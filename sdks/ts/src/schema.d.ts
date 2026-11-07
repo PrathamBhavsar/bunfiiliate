@@ -402,6 +402,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace. */
+        get: operations["list_billing_plans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/providers": {
         parameters: {
             query?: never;
@@ -1372,6 +1389,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/notify-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which notification channels are configured. URLs are never returned. */
+        get: operations["get_channels"];
+        /** Set or clear the Telegram and Discord webhook URLs (sealed at rest). */
+        put: operations["put_channels"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/test-notify-channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test message to a configured channel now, independent of the outbox. */
+        post: operations["test_channel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/signup": {
         parameters: {
             query?: never;
@@ -1686,6 +1738,11 @@ export interface components {
             status: string;
             /** Format: int64 */
             total_cents: number;
+        };
+        ChannelsView: {
+            discord_set: boolean;
+            /** @description The URL itself is write-only. */
+            telegram_set: boolean;
         };
         CheckoutRequest: {
             plan_key: string;
@@ -2815,6 +2872,11 @@ export interface components {
             /** @description The webhook secret is write-only; this only says one is stored. */
             webhook_secret_set: boolean;
         };
+        PutChannels: {
+            discord_url?: string | null;
+            /** @description Absent: unchanged. `null` or empty: cleared. */
+            telegram_url?: string | null;
+        };
         PutCredentials: {
             /** @description `paypal_payouts`: `client_id`, `client_secret`. `wise`: `api_token`, `profile_id`. */
             credentials: {
@@ -2958,6 +3020,13 @@ export interface components {
         TemplatePatch: {
             body?: string | null;
             subject?: string | null;
+        };
+        TestRequest: {
+            /** @description `telegram` or `discord`. */
+            channel: string;
+        };
+        TestResult: {
+            sent: boolean;
         };
         TestWebhook: {
             /** @description The event body to deliver. */
@@ -3956,6 +4025,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_billing_plans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanView"][];
                 };
             };
         };
@@ -6686,6 +6774,103 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_channels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelsView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    put_channels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutChannels"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelsView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    test_channel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
