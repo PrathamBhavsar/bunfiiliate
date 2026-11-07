@@ -106,6 +106,7 @@ struct Ws {
     contact: Uuid,
     #[allow(dead_code)]
     admin_user: Uuid,
+    aff_user: Uuid,
 }
 
 async fn user(pool: &PgPool, ws: Uuid, role: UserRole, email: &str) -> (Uuid, String) {
@@ -288,6 +289,7 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
         template,
         notification,
         contact,
+        aff_user,
         admin_user,
     }
 }
@@ -399,6 +401,7 @@ fn resource_for(prefix: &str, ids: &Ws) -> String {
         ("/api/v1/notifications", ids.notification),
         ("/api/v1/payouts/batches", ids.batch),
         ("/api/v1/programs", ids.program),
+        ("/api/v1/users", ids.aff_user),
         ("/api/v1/webhooks/deliveries", ids.delivery),
         ("/api/v1/webhooks/endpoints", ids.endpoint),
     ];
