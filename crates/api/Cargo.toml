@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
+repository.workspace = true
 
 [dependencies]
 argon2 = "0.5"
@@ -31,3 +32,6 @@ uuid = { workspace = true, features = ["serde"] }
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 proptest.workspace = true
+
+[package.metadata.dist]
+dist = true
