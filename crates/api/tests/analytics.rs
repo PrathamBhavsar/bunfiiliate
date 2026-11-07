@@ -182,7 +182,8 @@ impl Api {
     fn new(pool: &PgPool) -> Self {
         Self(app(AppState {
             pool: pool.clone(),
-            jwt_secret: SECRET.into(),
+            jwt_keys: api::auth::JwtKeys::single(SECRET).into(),
+            version_cache: Default::default(),
             vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
             secure_cookies: true,
             limiter: Default::default(),

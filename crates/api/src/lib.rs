@@ -33,7 +33,9 @@ use sqlx::PgPool;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    pub jwt_secret: Arc<str>,
+    pub jwt_keys: Arc<auth::JwtKeys>,
+    /// Per-instance cache of `users.token_version`.
+    pub version_cache: Arc<auth::VersionCache>,
     /// Master keys for secrets at rest.
     pub vault: Arc<bf_core::secrets::Vault>,
     /// Add `Secure` to cookies; turn off only for plain-http local dev.

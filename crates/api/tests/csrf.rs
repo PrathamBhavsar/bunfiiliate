@@ -16,7 +16,8 @@ const TOKEN: &str = "tok-123";
 fn app(pool: PgPool) -> Router {
     let state = AppState {
         pool,
-        jwt_secret: "test-secret".into(),
+        jwt_keys: api::auth::JwtKeys::single("test-secret").into(),
+        version_cache: Default::default(),
         vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
         secure_cookies: true,
         limiter: Default::default(),

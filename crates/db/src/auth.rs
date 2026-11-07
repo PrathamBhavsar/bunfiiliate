@@ -85,6 +85,23 @@ pub async fn user_by_id(db: impl PgExecutor<'_>, id: Uuid) -> Result<Option<User
         .await
 }
 
+/// Current `token_version` of a user; `None` if the user is gone.
+pub async fn token_version(db: impl PgExecutor<'_>, id: Uuid) -> Result<Option<i32>, sqlx::Error> {
+    sqlx::query_scalar("SELECT token_version FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_optional(db)
+        .await
+}
+
+/// Invalidate every access token issued so far for the user.
+pub async fn bump_token_version(db: impl PgExecutor<'_>, id: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET token_version = token_version + 1 WHERE id = $1")
+        .bind(id)
+        .execute(db)
+        .await
+        .map(|_| ())
+}
+
 /// Start a new refresh-token family.
 pub async fn issue_refresh(
     db: impl PgExecutor<'_>,
