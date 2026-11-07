@@ -239,10 +239,12 @@ fn public_routes_allowlist() {
         "api post /api/v1/auth/refresh",
         "api post /api/v1/auth/logout",
         "api get /api/v1/auth/csrf",
+        "api post /api/v1/auth/password/reset",
         "api post /api/v1/contact-requests",
         "tracker get /t.js",
         "tracker get /r/{code}",
         "tracker post /c",
+        "tracker post /v2/c",
         "tracker get /healthz",
         "tracker get /readyz",
     ]
