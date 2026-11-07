@@ -7,6 +7,7 @@ pub mod auth;
 pub mod bootstrap;
 pub mod dispatch;
 pub mod error;
+pub mod headers;
 pub mod limit;
 pub mod mail;
 pub mod metrics;
@@ -44,10 +45,12 @@ pub struct AppState {
 /// Largest request body any API route accepts.
 const MAX_BODY_BYTES: usize = 64 * 1024;
 
-/// Wrap routes with the Origin check, the body limit and state.
+/// Wrap routes with security headers, the Origin check, the CSRF check, the body limit and state.
 pub fn build(routes: Router<AppState>, state: AppState) -> Router {
     routes
+        .layer(from_fn(auth::check_csrf))
         .layer(from_fn(auth::check_origin))
+        .layer(from_fn(headers::security_headers))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .with_state(state)
 }

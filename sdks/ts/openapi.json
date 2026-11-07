@@ -686,6 +686,27 @@
         ]
       }
     },
+    "/api/v1/auth/csrf": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "CSRF token for the double-submit check; sets the `bf_csrf` cookie if missing.\nSend the token back as `X-CSRF-Token` on every mutating request, login included.",
+        "operationId": "csrf",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CsrfToken"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/login": {
       "post": {
         "tags": [
@@ -5354,6 +5375,17 @@
           "program_id": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "CsrfToken": {
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
           }
         }
       },

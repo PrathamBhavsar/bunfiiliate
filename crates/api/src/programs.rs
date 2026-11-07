@@ -217,7 +217,7 @@ pub async fn create_program(
         webhook_secret: &sealed_secret,
     };
     let mut tx = s.pool.begin().await?;
-    let mut program = bf_db::programs::insert_program(&mut *tx, &new).await?;
+    let program = bf_db::programs::insert_program(&mut *tx, &new).await?;
     let diff = json!({ "name": program.name, "currency": program.currency });
     audit::record(
         &mut *tx,
@@ -402,7 +402,7 @@ pub async fn rotate_secrets(
     let secret = format!("whsec_{}", random_hex(32));
     let mut tx = s.pool.begin().await?;
     let sealed = s.vault.seal_col("programs", "webhook_secret", id, &secret);
-    let mut program = bf_db::programs::set_webhook_secret(&mut *tx, ws, id, &sealed)
+    let program = bf_db::programs::set_webhook_secret(&mut *tx, ws, id, &sealed)
         .await?
         .ok_or_else(not_found)?;
     audit::record(

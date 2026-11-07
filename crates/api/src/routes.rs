@@ -16,8 +16,9 @@ use uuid::Uuid;
 use crate::AppState;
 use crate::audit;
 use crate::auth::{
-    ACCESS_COOKIE, ACCESS_TTL_SECS, Any, Auth, Principal, REFRESH_COOKIE, REFRESH_TTL_SECS, cookie,
-    dummy_hash, hash_refresh_token, issue_access, new_refresh_token, verify_password_bounded,
+    ACCESS_COOKIE, ACCESS_TTL_SECS, Any, Auth, CSRF_COOKIE, Principal, REFRESH_COOKIE,
+    REFRESH_TTL_SECS, cookie, csrf_set_cookie, dummy_hash, hash_refresh_token, issue_access,
+    new_csrf_token, new_refresh_token, verify_password_bounded,
 };
 use crate::error::{AppError, ErrorBody, ErrorDetail};
 use crate::limit;
@@ -41,7 +42,7 @@ impl Modify for CookieAuth {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        login, refresh, logout, me,
+        login, refresh, logout, me, csrf,
         workspaces::create_workspace, workspaces::list_workspaces,
         workspaces::invite_member, workspaces::list_members,
         programs::create_program, programs::list_programs, programs::get_program,
@@ -88,6 +89,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/v1/auth/refresh", post(refresh))
         .route("/api/v1/auth/logout", post(logout))
         .route("/api/v1/auth/me", get(me))
+        .route("/api/v1/auth/csrf", get(csrf))
         .merge(workspaces::routes())
         .merge(programs::routes())
         .merge(affiliates::routes())
@@ -158,6 +160,10 @@ fn session_cookies(s: &AppState, access: &str, refresh: &str) -> HeaderMap {
             REFRESH_TTL_SECS,
             s.secure_cookies,
         ),
+    );
+    h.append(
+        SET_COOKIE,
+        csrf_set_cookie(&new_csrf_token(), s.secure_cookies),
     );
     h
 }
@@ -270,6 +276,32 @@ async fn refresh(
         .ok_or(AppError::Unauthorized("invalid refresh token"))?;
     let access = issue_access(&s.jwt_secret, &Principal::from(&user))?;
     Ok((session_cookies(&s, &access, &new), Json(user.into())))
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CsrfToken {
+    token: String,
+}
+
+/// CSRF token for the double-submit check; sets the `bf_csrf` cookie if missing.
+/// Send the token back as `X-CSRF-Token` on every mutating request, login included.
+#[utoipa::path(
+    get,
+    path = "/api/v1/auth/csrf",
+    tag = "auth",
+    responses((status = 200, body = CsrfToken))
+)]
+async fn csrf(State(s): State<AppState>, headers: HeaderMap) -> (HeaderMap, Json<CsrfToken>) {
+    let mut out = HeaderMap::new();
+    let token = match cookie(&headers, CSRF_COOKIE).filter(|t| !t.is_empty()) {
+        Some(t) => t.to_string(),
+        None => {
+            let t = new_csrf_token();
+            out.append(SET_COOKIE, csrf_set_cookie(&t, s.secure_cookies));
+            t
+        }
+    };
+    (out, Json(CsrfToken { token }))
 }
 
 /// Revoke the refresh-token family and clear both cookies.
