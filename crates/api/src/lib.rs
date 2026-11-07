@@ -1,5 +1,6 @@
 //! bunfiiliate API: auth, roles, OpenAPI.
 
+pub mod admin_reset;
 pub mod affiliates;
 pub mod analytics;
 pub mod audit;
@@ -12,6 +13,7 @@ pub mod limit;
 pub mod mail;
 pub mod metrics;
 pub mod money;
+pub mod notify;
 pub mod ops;
 pub mod page;
 pub mod password_reset;

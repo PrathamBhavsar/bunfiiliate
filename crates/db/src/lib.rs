@@ -6,6 +6,8 @@ pub mod ledger;
 pub mod ops;
 pub mod payouts;
 pub mod programs;
+pub mod reset_tokens;
+pub mod throttle;
 pub mod totp;
 pub mod tracker;
 pub mod workspaces;

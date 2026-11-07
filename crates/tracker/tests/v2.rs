@@ -231,19 +231,12 @@ async fn v2_multi_v1_rotation_ok(pool: PgPool) {
     let (app, dir) = app(&pool).await;
     let t = now();
     let (old, new) = (sig(OLD_SECRET, t, "k", SALE), sig(SECRET, t, "k", SALE));
-    for header in [
-        format!("t={t},v1={old},v1={new}"),
-        format!("t={t},v1={new},v1={old}"),
+    // both orders verify; the same key and body is then a duplicate (200)
+    for (header, want) in [
+        (format!("t={t},v1={old},v1={new}"), StatusCode::ACCEPTED),
+        (format!("t={t},v1={new},v1={old}"), StatusCode::OK),
     ] {
-        let key = if header.contains(&format!("v1={old},")) {
-            "k"
-        } else {
-            "k"
-        };
-        assert_eq!(
-            send(&app, v2_with(&header, key, SALE)).await.status(),
-            StatusCode::ACCEPTED
-        );
+        assert_eq!(send(&app, v2_with(&header, "k", SALE)).await.status(), want);
     }
     let only_old = format!("t={t},v1={old}");
     rejected_after(
@@ -498,6 +491,7 @@ async fn v2_queue_full_503_with_retry_after(pool: PgPool) {
         trust: Default::default(),
         geo: Arc::new(Geo::disabled()),
         fraud: bf_core::default_rules().into(),
+        idem: Default::default(),
     };
     let app = router(state);
     assert_eq!(

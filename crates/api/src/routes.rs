@@ -23,8 +23,8 @@ use crate::auth::{
 use crate::error::{AppError, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    affiliates, analytics, mail, money, ops, password_reset, payouts, programs, totp, webhooks,
-    workspaces,
+    admin_reset, affiliates, analytics, mail, money, ops, password_reset, payouts, programs, totp,
+    webhooks, workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -47,6 +47,8 @@ impl Modify for CookieAuth {
     paths(
         login, refresh, logout, me, csrf,
         password_reset::reset,
+        admin_reset::issue,
+        admin_reset::reset_with_token,
         totp::enrol, totp::confirm, totp::regenerate, totp::disable, totp::status,
         workspaces::create_workspace, workspaces::list_workspaces,
         workspaces::invite_member, workspaces::list_members,
@@ -80,7 +82,7 @@ impl Modify for CookieAuth {
         payouts::me_payouts,
     ),
     components(schemas(
-        LoginRequest, UserView, password_reset::ResetRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
+        LoginRequest, UserView, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account
     )),
     modifiers(&CookieAuth),
@@ -97,6 +99,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/v1/auth/me", get(me))
         .route("/api/v1/auth/csrf", get(csrf))
         .merge(password_reset::routes())
+        .merge(admin_reset::routes())
         .merge(totp::routes())
         .merge(workspaces::routes())
         .merge(programs::routes())
@@ -252,10 +255,34 @@ async fn login(
         .as_ref()
         .map_or_else(|| dummy_hash().to_string(), |u| u.password_hash.clone());
     let ok = verify_password_bounded(req.password, hash).await;
-    let user = match user {
-        Some(u) if ok => u,
-        _ => return Err(AppError::Unauthorized("invalid credentials")),
+    // Backoff is per (email, address) so it slows a guesser without locking the account out. A
+    // backed-off address gets the same 401 as a wrong password, even for the right one.
+    let throttle_key = limit::client_ip(&headers)
+        .map(|ip| format!("{}|{ip}", req.email.trim().to_ascii_lowercase()));
+    let now = Utc::now();
+    let backed_off = match &throttle_key {
+        Some(k) => bf_db::throttle::is_locked(&s.pool, bf_db::throttle::LOGIN_IP, k, now).await?,
+        None => false,
     };
+    let user = match user {
+        Some(u) if ok && !backed_off => u,
+        _ => {
+            if let Some(k) = &throttle_key {
+                bf_db::throttle::record_failure(
+                    &s.pool,
+                    bf_db::throttle::LOGIN_IP,
+                    k,
+                    now,
+                    &bf_core::throttle::LOGIN,
+                )
+                .await?;
+            }
+            return Err(AppError::Unauthorized("invalid credentials"));
+        }
+    };
+    if let Some(k) = &throttle_key {
+        bf_db::throttle::clear(&s.pool, bf_db::throttle::LOGIN_IP, k).await?;
+    }
     let principal = Principal::from(&user);
     let ver = bf_db::auth::token_version(&s.pool, user.id)
         .await?
