@@ -918,3 +918,74 @@ fn vault() -> std::sync::Arc<bf_core::secrets::Vault> {
     let ring = KeyRing::from_pairs("t1", &[("t1", [9u8; 32])]).unwrap();
     std::sync::Arc::new(Vault::new(ring))
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn ops_webhook_api_version_defaults_v1_and_v2_is_opt_in(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let (url1, seen1) = receiver(&[]).await;
+    let (url2, seen2) = receiver(&[]).await;
+    let v1 = endpoint(&api, &t, &url1, json!([])).await;
+    let v2 = endpoint(&api, &t, &url2, json!([])).await;
+    let ver: String = sqlx::query_scalar("SELECT api_version FROM webhook_endpoints WHERE id = $1")
+        .bind(Uuid::parse_str(v1["id"].as_str().unwrap()).unwrap())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(ver, "v1", "default");
+    sqlx::query("UPDATE webhook_endpoints SET api_version = 'v2' WHERE id = $1")
+        .bind(Uuid::parse_str(v2["id"].as_str().unwrap()).unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let payload = conversion_payload(&t, Uuid::now_v7());
+    let id = outbox(&pool, "conversion.approved", payload.clone()).await;
+    assert_eq!(dispatch_outbox(&pool, &Mailer::Log).await.unwrap(), 1);
+    assert_eq!(
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
+        2
+    );
+
+    // v1: body and headers unchanged
+    let s1 = seen1.lock().unwrap();
+    let (h1, b1) = &s1[0];
+    assert_eq!(
+        serde_json::from_str::<Value>(b1).unwrap(),
+        json!({ "id": id, "topic": "conversion.approved", "data": payload })
+    );
+    assert!(h1.get("bf-api-version").is_none() && h1.get("bf-event-id").is_none());
+
+    // v2: envelope, new headers, same signature scheme
+    let s2 = seen2.lock().unwrap();
+    let (h2, b2) = &s2[0];
+    let b: Value = serde_json::from_str(b2).unwrap();
+    let evt = b["id"].as_str().unwrap();
+    assert!(evt.starts_with("evt_") && evt.len() == 40, "{evt}");
+    assert_eq!(b["api_version"], "2");
+    assert_eq!(b["type"], "conversion.approved");
+    assert_eq!(b["data"], payload);
+    assert!(
+        chrono::DateTime::parse_from_rfc3339(b["created_at"].as_str().unwrap()).is_ok(),
+        "{b}"
+    );
+    assert!(b.get("topic").is_none());
+    assert_eq!(h2["bf-api-version"], "2");
+    assert_eq!(h2["bf-event-id"], evt);
+    assert_eq!(h2["bf-event-type"], "conversion.approved");
+    assert_eq!(h2["bf-signature"], h2["x-bf-signature"]);
+    assert_signed(h2, b2, v2["secret"].as_str().unwrap());
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn ops_webhook_api_version_rejects_unknown_value(pool: PgPool) {
+    let _ = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let (url, _) = receiver(&[]).await;
+    let api = Api::new(&pool);
+    let e = endpoint(&api, &t, &url, json!([])).await;
+    let r = sqlx::query("UPDATE webhook_endpoints SET api_version = 'v3' WHERE id = $1")
+        .bind(Uuid::parse_str(e["id"].as_str().unwrap()).unwrap())
+        .execute(&pool)
+        .await;
+    assert!(r.is_err());
+}

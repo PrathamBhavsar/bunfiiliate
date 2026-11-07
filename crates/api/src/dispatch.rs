@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bf_core::secrets::Vault;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac};
 use serde_json::{Value, json};
 use sha2::Sha256;
@@ -242,9 +242,11 @@ struct Due {
     endpoint_id: Uuid,
     url: String,
     secret: String,
+    api_version: String,
     outbox_id: i64,
     topic: String,
     payload: Value,
+    available_at: DateTime<Utc>,
 }
 
 /// Claim up to [`DELIVER_PER_TICK`] due deliveries by pushing their next attempt [`LEASE_SECS`]
@@ -259,7 +261,7 @@ async fn lease_due(pool: &PgPool) -> Result<Vec<Due>, sqlx::Error> {
          leased AS ( \
              UPDATE webhook_deliveries d SET next_attempt_at = now() + $2 * interval '1 second' \
              FROM due WHERE d.id = due.id RETURNING d.id, d.attempt, d.endpoint_id, d.outbox_id) \
-         SELECT l.id, l.attempt, l.endpoint_id, e.url, e.secret, o.id AS outbox_id, o.topic, o.payload \
+         SELECT l.id, l.attempt, l.endpoint_id, e.url, e.secret, e.api_version, o.id AS outbox_id, o.topic, o.payload, o.available_at \
          FROM leased l JOIN webhook_endpoints e ON e.id = l.endpoint_id \
          JOIN outbox o ON o.id = l.outbox_id",
     )
@@ -269,6 +271,27 @@ async fn lease_due(pool: &PgPool) -> Result<Vec<Due>, sqlx::Error> {
     .await
 }
 
+/// Stable per outbox row, so a retry carries the same event id (`evt_<uuid>`).
+fn event_id(outbox_id: i64) -> String {
+    format!("evt_{}", Uuid::from_u64_pair(0, outbox_id as u64))
+}
+
+/// The v2 body (schema `outbound-envelope`): `{id, api_version, type, created_at, data}`.
+fn envelope_v2(d: &Due) -> Value {
+    let data = if d.payload.is_object() {
+        d.payload.clone()
+    } else {
+        json!({ "value": d.payload })
+    };
+    json!({
+        "id": event_id(d.outbox_id),
+        "api_version": "2",
+        "type": d.topic,
+        "created_at": d.available_at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        "data": data,
+    })
+}
+
 /// POST one leased delivery and record the outcome.
 async fn send_one(
     pool: &PgPool,
@@ -276,22 +299,36 @@ async fn send_one(
     vault: &Vault,
     d: Due,
 ) -> Result<(), sqlx::Error> {
-    let body = json!({ "id": d.outbox_id, "topic": d.topic, "data": d.payload }).to_string();
+    let v2 = d.api_version == "v2";
+    let body = if v2 {
+        envelope_v2(&d)
+    } else {
+        json!({ "id": d.outbox_id, "topic": d.topic, "data": d.payload })
+    }
+    .to_string();
     let ts = Utc::now().timestamp();
     let secret = vault.open_col("webhook_endpoints", "secret", d.endpoint_id, &d.secret);
     let sent = match (ssrf::check_literal_host(&d.url), secret) {
         (Err(_), _) => Err("url points at a private address".to_string()),
         (Ok(()), Err(e)) => Err(format!("cannot open endpoint secret: {e}")),
-        (Ok(()), Ok(secret)) => http
-            .post(&d.url)
-            .header("content-type", "application/json")
-            .header("x-bf-event", &d.topic)
-            .header("x-bf-delivery", d.id.to_string())
-            .header("x-bf-signature", signature(&secret, ts, &body))
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| e.to_string()),
+        (Ok(()), Ok(secret)) => {
+            let sig = signature(&secret, ts, &body);
+            let mut req = http
+                .post(&d.url)
+                .header("content-type", "application/json")
+                .header("x-bf-event", &d.topic)
+                .header("x-bf-delivery", d.id.to_string())
+                .header("x-bf-signature", &sig);
+            if v2 {
+                // v2 endpoints get the new headers next to the legacy ones (dual headers).
+                req = req
+                    .header("bf-signature", &sig)
+                    .header("bf-event-id", event_id(d.outbox_id))
+                    .header("bf-event-type", &d.topic)
+                    .header("bf-api-version", "2");
+            }
+            req.body(body).send().await.map_err(|e| e.to_string())
+        }
     };
     let (status, delivered) = match &sent {
         Ok(r) => (

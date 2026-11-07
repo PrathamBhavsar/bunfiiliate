@@ -176,6 +176,7 @@ async fn undrained(
         trust: Default::default(),
         geo: Arc::new(Geo::disabled()),
         fraud: bf_core::default_rules().into(),
+        idem: Default::default(),
     };
     (state, rx)
 }
