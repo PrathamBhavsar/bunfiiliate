@@ -21,7 +21,7 @@ describe('auth pages', () => {
     await expect(screen.getByRole('heading', 'Security')).toBeVisible();
     await screen.getByRole('button', 'Set up').tap();
     // Left unconfirmed: the admin keeps password-only login for the other suites.
-    await expect(browser.getByTestId('totp-secret')).toBeVisible();
+    await expect(browser.locator('[data-testid="totp-secret"]')).toBeVisible();
   });
 
   test('reset page rejects a bad token', async ({ app, screen }) => {
