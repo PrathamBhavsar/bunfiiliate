@@ -55,9 +55,8 @@ customElements.define("x-docs", class extends HTMLElement {
     const i = Math.max(0, pages.findIndex((p) => p.slug === slug));
     const p = pages[i];
     document.title = `${p.title} · ${brand.name} docs`;
-    const crumb = `<p class="crumb">${esc(p.group)}</p>`;
     const prev = pages[i - 1], next = pages[i + 1];
-    this.article.innerHTML = `${crumb}${html(p.body)}<div class="pn">${prev ? `<a href="#/${prev.slug}"><span>Previous</span>${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a class="next" href="#/${next.slug}"><span>Next</span>${esc(next.title)}</a>` : ""}</div>`;
+    this.article.innerHTML = `${html(p.body)}<div class="pn">${prev ? `<a href="#/${prev.slug}"><span>Previous</span>${esc(prev.title)}</a>` : "<span></span>"}${next ? `<a class="next" href="#/${next.slug}"><span>Next</span>${esc(next.title)}</a>` : ""}</div>`;
     this.querySelectorAll(".side a").forEach((a) => (a.toggleAttribute("aria-current", a.dataset.slug === p.slug), a.dataset.slug === p.slug && a.setAttribute("aria-current", "page")));
     this.querySelector(".toc").innerHTML = p.heads.length ? `<h2>On this page</h2><ul>${p.heads.map((h) => `<li class="d${h.depth}"><a href="#${h.id}" data-id="${h.id}">${esc(h.text)}</a></li>`).join("")}</ul>` : "";
     this.querySelector(".side").removeAttribute("data-open");

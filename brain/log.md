@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-07] S1 marketing + docs site (feat/site)
+
+- **Done**: `site/` Vite (vanilla JS, custom-element components) landing + docs. Geist Pixel Square display, Satoshi body, Geist Mono code, Hugeicons. `<x-ascii>` canvas with the `rain` scene (clicks land in a ledger that sums to 0.00). Docs from `site/content/docs/*.md`, hash routed, search on `/`, `llms.txt` generated at build. `.github/workflows/site.yml` builds, smoke-tests (`site/scripts/smoke.mjs`) and deploys to Pages from `prod`.
+- **Decision**: kit (`site/src/kit`) is canonical here and copied to sendesk and learnpuppy with `site/scripts/sync-kit.sh`. Copy states only verified facts: "sub-millisecond" is quoted as 0.4 ms p50 with `BF_FSYNC=off` and 13 ms with `always`, per `docs/benchmarks.md`. No usage claims; the stats block reads live GitHub numbers.
+- **Lessons**: README says payouts are CSV only but `docs/self-hosting.md` documents PayPal and Wise rails (Wise unverified); check code and docs, not one README. `docs/self-hosting.md` clones `github.com/bunfiiliate/bunfiiliate`, which is not the real remote.
+- **Open**: Satoshi (Fontshare licence) is committed as woff2; confirm redistribution terms before the repo is promoted.
+
 ## [2026-11-07] C34 + C90 final gate
 
 - **Merged**: C34 e2e growth (5 suites, 26+ tests, coverage table), admin payout-request UI, `scripts/final-gate.sh`, `push-guard.sh`, `hygiene-check.sh`, `docs/ops/release-checklist.md`.

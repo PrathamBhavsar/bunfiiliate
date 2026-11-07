@@ -1,7 +1,7 @@
 // Landing components. Light DOM custom elements (shared CSS), content from ../brand.js.
 import brand from "../brand.js";
 import { icon } from "./icons.js";
-import { base, esc, md, copyText, ghFacts } from "./util.js";
+import { base, esc, md, wbr, copyText, ghFacts } from "./util.js";
 
 const define = (name, cls) => customElements.define(name, cls);
 const facts = ghFacts(brand.repo); // one fetch shared by every component
@@ -16,7 +16,7 @@ define("x-nav", class extends HTMLElement {
       ${mark()}
       <nav class="nav-links" aria-label="Primary">${links.map(([t, h]) => `<a href="${h}"${t === "Docs" && here === "docs" ? " aria-current='page'" : ""}>${t}</a>`).join("")}</nav>
       <div class="nav-end">
-        <a class="btn" href="https://github.com/${brand.repo}">${icon("github")}<span>GitHub</span><span class="stars" data-stars></span></a>
+        <a class="btn" href="https://github.com/${brand.repo}">${icon("github")}<span>GitHub</span><span class="stars" data-stars hidden>${icon("star")}<b></b></span></a>
         <a class="btn primary" href="${base}docs/#/quickstart">Get started</a>
       </div>
       <button class="nav-toggle" aria-expanded="false" aria-label="Menu">${icon("menu")}</button>
@@ -24,14 +24,14 @@ define("x-nav", class extends HTMLElement {
     const nav = this.querySelector(".nav"), tg = this.querySelector(".nav-toggle");
     tg.onclick = () => { const o = nav.toggleAttribute("data-open"); tg.setAttribute("aria-expanded", o); };
     nav.addEventListener("click", (e) => { if (e.target.closest(".nav-links a")) { nav.removeAttribute("data-open"); tg.setAttribute("aria-expanded", false); } });
-    facts.then((f) => { if (f) this.querySelector("[data-stars]").textContent = "★ " + f.stars; });
+    facts.then((f) => { if (f?.stars > 0) { const st = this.querySelector("[data-stars]"); st.querySelector("b").textContent = f.stars; st.hidden = false; } });
   }
 });
 
 define("x-copy", class extends HTMLElement {
   connectedCallback() {
     const cmd = this.getAttribute("cmd");
-    this.innerHTML = `<code>${esc(cmd)}</code><button type="button" aria-label="Copy install command">${icon("copy")}</button>`;
+    this.innerHTML = `<code>${wbr(cmd)}</code><button type="button" aria-label="Copy install command">${icon("copy")}</button>`;
     const b = this.querySelector("button");
     b.onclick = async () => {
       if (!(await copyText(cmd))) return;
@@ -48,7 +48,7 @@ define("x-hero", class extends HTMLElement {
       <div class="wrap hero-inner">
         <h1 class="display">${brand.headline}</h1>
         <p class="lede">${brand.sub}</p>
-        <x-copy cmd="${esc(brand.heroCmd)}"></x-copy>
+        <x-copy cmd="${esc(brand.heroCmdPre)}"></x-copy>
         <div class="cta">
           <a class="btn primary" href="${base}docs/#/quickstart">Get started ${icon("arrow")}</a>
           <a class="btn" href="https://github.com/${brand.repo}">${icon("github")} Star on GitHub</a>
@@ -56,7 +56,7 @@ define("x-hero", class extends HTMLElement {
         <p class="hero-meta"><span data-tag>${esc(brand.status)}</span><span>${esc(brand.license)}</span><span>${esc(brand.stack)}</span></p>
       </div>
     </section>`;
-    facts.then((f) => { if (f?.tag) this.querySelector("[data-tag]").textContent = f.tag + (f.pre ? " (pre-release)" : ""); });
+    facts.then((f) => { if (!f?.tag) return; this.querySelector("[data-tag]").textContent = f.tag + (f.pre ? " (pre-release)" : ""); this.querySelector("x-copy").setAttribute("cmd", brand.heroCmd); this.querySelector("x-copy").connectedCallback(); });
   }
 });
 
@@ -64,11 +64,14 @@ define("x-live", class extends HTMLElement {
   connectedCallback() {
     const row = (k, v) => `<li><span class="k">${esc(k)}</span><span class="dots"></span><span class="v">${v}</span></li>`;
     const draw = (f) => {
-      const live = f ? [
-        row("GitHub stars", f.stars),
-        row("Releases", f.releases ? `<a href="https://github.com/${brand.repo}/releases">${f.releases}${f.tag ? " · " + esc(f.tag) : ""}</a>` : "none yet (pre-release)"),
-        row("Release downloads", f.downloads),
-      ] : [row("Source", `<a href="https://github.com/${brand.repo}">github.com/${esc(brand.repo)}</a>`)];
+      const live = [];
+      if (f) {
+        if (f.stars > 0) live.push(row("GitHub stars", f.stars));
+        if (f.releases > 0) live.push(row("Releases", `<a href="https://github.com/${brand.repo}/releases">${f.releases} · ${esc(f.tag)}</a>`));
+        if (f.downloads > 0) live.push(row("Release downloads", f.downloads));
+        live.push(row("Last push", esc(f.pushed.slice(0, 10))));
+      }
+      live.push(row("Source", `<a href="https://github.com/${brand.repo}">github.com/${esc(brand.repo)}</a>`));
       this.querySelector(".receipt").innerHTML = live.concat(brand.facts.map(([k, v]) => row(k, md(v)))).join("");
     };
     this.innerHTML = `<div class="wrap live">
@@ -99,7 +102,7 @@ define("x-steps", class extends HTMLElement {
     this.innerHTML = `<div class="wrap">
       <h2 class="display sec-head">${brand.howTitle}</h2>
       <p class="sec-lede">${md(brand.howLede)}</p>
-      <ol class="flow">${brand.steps.map(([t, d]) => `<li><span class="node"></span><h3>${esc(t)}</h3><p>${md(d)}</p></li>`).join("")}</ol>
+      <ol class="flow">${brand.steps.map(([t, d]) => `<li><span class="node"></span><h3>${md(t)}</h3><p>${md(d)}</p></li>`).join("")}</ol>
     </div>`;
   }
 });
@@ -122,13 +125,13 @@ define("x-install", class extends HTMLElement {
     </div>`;
     const pre = this.querySelector("pre"), note = this.querySelector(".tab-note"), box = this.querySelector(".code");
     const btns = [...this.querySelectorAll("[role=tab]")];
-    let cur = tabs[0];
+    let cur = tabs[0], released = false;
     const show = (i, focus) => {
       cur = tabs[i];
       btns.forEach((b, j) => { b.setAttribute("aria-selected", j === i); b.tabIndex = j === i ? 0 : -1; });
-      pre.innerHTML = cur.cmds.map((c) => c.startsWith("#") ? `<span class="c">${esc(c)}</span>` : `<span class="p">$ </span>${esc(c)}`).join("\n");
+      pre.innerHTML = cur.cmds.map((c) => c.startsWith("#") ? `<span class="c">${esc(c)}</span>` : `<span class="p">$ </span>${wbr(c)}`).join("\n");
       pre.parentElement.setAttribute("aria-labelledby", "tab-" + cur.id);
-      note.innerHTML = md(cur.note || "");
+      note.innerHTML = md(cur.note || "") + (cur.pending && !released ? ` <strong>${md(cur.pending)}</strong>` : "");
       if (focus) btns[i].focus();
     };
     btns.forEach((b, i) => { b.onclick = () => show(i); });
@@ -144,6 +147,7 @@ define("x-install", class extends HTMLElement {
       setTimeout(() => { box.removeAttribute("data-done"); cb.innerHTML = icon("copy"); }, 1600);
     };
     show(0);
+    facts.then((f) => { if (f?.releases > 0) { released = true; show(btns.findIndex((b) => b.getAttribute("aria-selected") === "true")); } });
   }
 });
 

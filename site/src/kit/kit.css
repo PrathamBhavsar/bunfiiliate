@@ -48,7 +48,10 @@ x-nav { display: block; position: sticky; top: 0; z-index: 50; background: var(-
 .nav-links a:hover, .nav-links a[aria-current] { color: var(--fg); }
 .nav-end { margin-left: auto; display: flex; align-items: center; gap: 12px; }
 .nav-end .btn { height: 40px; padding-inline: 14px; font-size: 0.875rem; }
-.stars { color: var(--fg-dim); font-family: var(--font-mono); font-size: 0.8125rem; }
+.stars { display: inline-flex; align-items: center; gap: 4px; color: var(--accent); font-family: var(--font-mono); font-size: 0.8125rem; }
+.stars[hidden] { display: none; }
+.stars b { font-weight: 400; }
+.stars .icon { width: 14px; height: 14px; }
 .nav-toggle { display: none; width: 44px; height: 44px; align-items: center; justify-content: center; margin-left: auto; border: 1px solid var(--line-2); }
 @media (max-width: 760px) {
   .nav-links, .nav-end .btn:not(.primary) { display: none; }

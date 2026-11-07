@@ -1,6 +1,8 @@
 export const base = import.meta.env.BASE_URL; // "/" locally, "/<repo>/" on Pages
 export const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 // brand text may contain `code` spans
+// break opportunity after slashes so long URLs wrap at path boundaries, not mid-word
+export const wbr = (s) => esc(s).replaceAll("/", "/<wbr>");
 export const md = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
 
 export async function copyText(text) {

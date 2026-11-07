@@ -15,7 +15,6 @@ kbd { font-size: 0.75rem; padding: 1px 7px; border: 1px solid var(--line-2); col
 .docs-menu { display: none; }
 
 .doc { min-width: 0; max-width: 78ch; outline: none; }
-.crumb { font-family: var(--font-display); color: var(--accent); font-size: 0.9375rem; margin-bottom: 8px; }
 .doc h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(2.25rem, 4vw, 3.25rem); line-height: 1.08; text-wrap: balance; margin-bottom: 24px; }
 .doc h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.75rem; line-height: 1.15; margin: 56px 0 14px; padding-top: 28px; border-top: 1px solid var(--line); }
 .doc h3 { font-size: 1.1875rem; font-weight: 700; margin: 36px 0 8px; }

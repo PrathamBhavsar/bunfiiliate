@@ -9,14 +9,17 @@ export default {
   status: "pre-release",
   headline: "Affiliate tracking that <em>adds up.</em>",
   sub: "Open-source tracking and commission engine in Rust. Clicks never touch the database on the hot path. Money lives in an <strong>append-only double-entry ledger</strong> in integer cents.",
+  heroCmdPre: "git clone https://github.com/PrathamBhavsar/bunfiiliate && cd bunfiiliate",
   heroCmd: "curl -LsSf https://github.com/PrathamBhavsar/bunfiiliate/releases/latest/download/api-installer.sh | sh",
 
   liveTitle: "Built in the open.",
-  liveNote: "Every number here is read live from GitHub, or from a file in the repo. Benchmarks are from one laptop, see `docs/benchmarks.md` before quoting them.",
+  liveNote: "Live GitHub facts appear here as they exist. The rest comes from files in the repo. Benchmarks are from one laptop: read `docs/benchmarks.md` before quoting them.",
   facts: [
+    ["Workspace", "6 crates · 2 binaries"],
     ["Tracker p50, fsync off", "0.4 ms · 27.6k req/s"],
     ["Tracker p50, fsync always", "13 ms · 1.5k req/s"],
     ["tracker.js", "under 2 KB minified"],
+    ["Ledger", "append-only, enforced by Postgres"],
     ["License", "AGPL-3.0, clean-room"],
   ],
 
@@ -75,12 +78,6 @@ export default {
   installTitle: "Install in one line.",
   installLede: "Download a release binary, run the image, or build from source. Checksums are published with every release.",
   install: [
-    { id: "binary", label: "Binary", cmds: [
-      "curl -LsSf https://github.com/PrathamBhavsar/bunfiiliate/releases/latest/download/api-installer.sh | sh",
-      "curl -LsSf https://github.com/PrathamBhavsar/bunfiiliate/releases/latest/download/tracker-installer.sh | sh",
-      "api bootstrap --email you@example.com --workspace \"Acme\"",
-      "api serve --with-worker & tracker",
-    ], note: "Needs PostgreSQL 16 and `DATABASE_URL`. macOS and Linux, x86_64 and arm64." },
     { id: "docker", label: "Docker", cmds: [
       "git clone https://github.com/PrathamBhavsar/bunfiiliate && cd bunfiiliate",
       "cp .env.example .env   # set JWT_SECRET, BF_IP_SALT, BF_MASTER_KEYS, SITE_ADDRESS",
@@ -91,6 +88,12 @@ export default {
       "cargo build --release -p api -p tracker",
       "cargo run -p api -- serve --with-worker",
     ], note: "Rust 1.80+ and PostgreSQL 16. See the quickstart for the first admin and a demo seed." },
+    { id: "binary", label: "Binary", cmds: [
+      "curl -LsSf https://github.com/PrathamBhavsar/bunfiiliate/releases/latest/download/api-installer.sh | sh",
+      "curl -LsSf https://github.com/PrathamBhavsar/bunfiiliate/releases/latest/download/tracker-installer.sh | sh",
+      "api bootstrap --email you@example.com --workspace \"Acme\"",
+      "api serve --with-worker & tracker",
+    ], note: "Needs PostgreSQL 16 and `DATABASE_URL`. macOS and Linux, x86_64 and arm64.", pending: "No release is tagged yet: these URLs work from the first release. Use Docker or source today." },
   ],
 
   faq: [
