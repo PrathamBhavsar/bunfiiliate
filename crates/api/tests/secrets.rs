@@ -33,6 +33,7 @@ impl Api {
             vault: vault(),
             secure_cookies: true,
             limiter: Default::default(),
+            tracker_url: Default::default(),
         }))
     }
 

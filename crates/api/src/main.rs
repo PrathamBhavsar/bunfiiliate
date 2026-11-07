@@ -132,6 +132,7 @@ async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
         vault,
         secure_cookies: !matches!(std::env::var("COOKIE_SECURE").as_deref(), Ok("0" | "false")),
         limiter: Default::default(),
+        tracker_url: Default::default(),
     };
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", cfg.api_port)).await?;
     tracing::info!(port = cfg.api_port, "api listening");

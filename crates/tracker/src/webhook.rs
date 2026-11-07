@@ -2,9 +2,9 @@
 //! HMAC-SHA256 only (no vendor SDKs); tags are compared in constant time.
 
 use axum::http::HeaderMap;
-use hmac::{Hmac, Mac};
+use bf_core::webhook_sign::mac;
+use hmac::Mac;
 use serde_json::Value;
-use sha2::Sha256;
 
 use crate::snapshot::ProgramSecrets;
 
@@ -149,15 +149,6 @@ fn timestamped(
         return Err(VerifyError::Stale);
     }
     Ok(())
-}
-
-fn mac(secret: &str, parts: &[&[u8]]) -> Hmac<Sha256> {
-    let mut mac =
-        Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("hmac accepts any key length");
-    for p in parts {
-        mac.update(p);
-    }
-    mac
 }
 
 fn header<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
@@ -343,6 +334,29 @@ mod tests {
             Source::Generic.verify_at(&headers(&h), GENERIC_BODY, "whsec_generic", GENERIC_TS),
             Err(VerifyError::Mismatch)
         );
+    }
+
+    // The API's webhook tester signs with bf_core::webhook_sign; every layout must verify here.
+    #[test]
+    fn tester_signatures_verify() {
+        use bf_core::webhook_sign::{Layout, sign};
+        let now = 1_700_000_000;
+        for (layout, source) in [
+            (Layout::Generic, Source::Generic),
+            (Layout::Stripe, Source::Stripe),
+            (Layout::Paddle, Source::Paddle),
+        ] {
+            let pairs: Vec<(&'static str, String)> = sign(layout, "sek", "test-1", b"{}", now);
+            let h: HeaderMap = pairs
+                .iter()
+                .map(|(k, v)| ((*k).parse().unwrap(), v.parse().unwrap()))
+                .collect();
+            assert_eq!(source.verify_at(&h, b"{}", "sek", now), Ok(()));
+            assert_eq!(
+                source.verify_at(&h, b"{ }", "sek", now),
+                Err(VerifyError::Mismatch)
+            );
+        }
     }
 
     #[test]
