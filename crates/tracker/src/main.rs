@@ -5,6 +5,10 @@ use bf_spool::{FsyncMode, SpoolConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if std::env::args().nth(1).as_deref() == Some("openapi") {
+        println!("{}", tracker::openapi::json());
+        return Ok(());
+    }
     bf_rt::init_tracing();
     let cfg = Config::from_env()?;
     let fsync = match std::env::var("BF_FSYNC").as_deref() {

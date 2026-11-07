@@ -1,11 +1,11 @@
-.PHONY: pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test
+.PHONY: pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test tracker-openapi-check
 
 ci:
 	cargo fmt --check
 	cargo clippy --workspace -- -D warnings
 	cargo test --workspace
 	cargo deny check
-	$(MAKE) web openapi-check js-test
+	$(MAKE) web openapi-check tracker-openapi-check js-test
 
 fmt:
 	cargo fmt
@@ -51,3 +51,7 @@ js-test:
 
 pentest:
 	scripts/pentest.sh
+
+tracker-openapi-check:
+	cargo run -q -p tracker -- openapi > /tmp/bf-tracker-openapi.json
+	diff -u docs/openapi/tracker-v2.json /tmp/bf-tracker-openapi.json || { echo "tracker openapi drift: cargo run -q -p tracker -- openapi > docs/openapi/tracker-v2.json"; exit 1; }
