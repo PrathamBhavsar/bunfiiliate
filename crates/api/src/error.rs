@@ -18,6 +18,8 @@ pub enum AppError {
     Csrf,
     NotFound(&'static str),
     Conflict(&'static str),
+    /// Well-formed request the server cannot act on (e.g. a payout rail with no credentials).
+    Unprocessable(&'static str),
     TooManyRequests,
     PayloadTooLarge,
     Internal,
@@ -47,6 +49,7 @@ impl IntoResponse for AppError {
             ),
             Self::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.into()),
             Self::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.into()),
+            Self::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, "unprocessable", m.into()),
             Self::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
                 "payload_too_large",

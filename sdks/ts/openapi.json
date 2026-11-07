@@ -3660,8 +3660,103 @@
         "tags": [
           "payouts"
         ],
-        "summary": "`approved -> paid`: posts payable -> cash per payout.",
+        "summary": "`approved -> paid`: posts payable -> cash per payout. With no body (or `manual_csv`) it\nmarks the whole batch paid by hand. With `{rail}` it sends each line through that provider\nand posts the ledger only for lines the provider confirms paid; the response then carries an\n`outcome`, and the batch stays `approved` until every line is paid (call again to retry\nfailures, or `reconcile` to collect pending ones).",
         "operationId": "mark_paid_route",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "BatchView id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Optional rail",
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/MarkPaidRail"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RailResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Rail not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/batches/{id}/reconcile": {
+      "post": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "Ask providers about submitted payout lines and settle the confirmed ones.",
+        "operationId": "reconcile_route",
         "parameters": [
           {
             "name": "id",
@@ -3680,7 +3775,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/BatchDetail"
+                  "$ref": "#/components/schemas/RailResult"
                 }
               }
             }
@@ -3695,8 +3790,131 @@
               }
             }
           },
-          "409": {
-            "description": "Not approved",
+          "422": {
+            "description": "A rail lost its credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/rails": {
+      "get": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "Payout rails and whether each is usable. Credentials are never returned.",
+        "operationId": "list_rails",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RailView"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/rails/credentials": {
+      "put": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "Store (sealed) the workspace's credentials for a provider rail, replacing any existing.",
+        "operationId": "put_credentials",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RailView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "Remove the workspace's credentials for a provider rail.",
+        "operationId": "delete_credentials",
+        "parameters": [
+          {
+            "name": "rail",
+            "in": "query",
+            "description": "`paypal_payouts` or `wise`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "404": {
+            "description": "",
             "content": {
               "application/json": {
                 "schema": {
@@ -6535,6 +6753,19 @@
           }
         }
       },
+      "MarkPaidRail": {
+        "type": "object",
+        "description": "Body of `mark-paid` when a provider rail is chosen.",
+        "required": [
+          "rail"
+        ],
+        "properties": {
+          "rail": {
+            "type": "string",
+            "description": "`manual_csv` (default), `paypal_payouts`, `wise` or `mock`."
+          }
+        }
+      },
       "Member": {
         "type": "object",
         "required": [
@@ -7001,6 +7232,40 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "Outcome": {
+        "type": "object",
+        "description": "What a dispatch or reconcile pass did.",
+        "required": [
+          "paid",
+          "submitted",
+          "failed",
+          "batch_paid"
+        ],
+        "properties": {
+          "batch_paid": {
+            "type": "boolean",
+            "description": "The whole batch is now paid."
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines the provider refused.",
+            "minimum": 0
+          },
+          "paid": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines confirmed paid (ledger posted) in this pass.",
+            "minimum": 0
+          },
+          "submitted": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Lines left at the provider, not yet confirmed.",
+            "minimum": 0
           }
         }
       },
@@ -8610,7 +8875,8 @@
           "affiliate_id",
           "email",
           "amount_cents",
-          "status"
+          "status",
+          "rail"
         ],
         "properties": {
           "affiliate_id": {
@@ -8636,6 +8902,30 @@
             ],
             "format": "uuid",
             "description": "The `AffPayable -> Cash` ledger txn, once paid."
+          },
+          "rail": {
+            "type": "string",
+            "description": "`manual_csv`, `paypal_payouts`, `wise` or `mock`."
+          },
+          "rail_error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rail_state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Provider dispatch: `pending`, `submitted`, `paid` or `failed`; null on the manual rail."
+          },
+          "rail_status": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's last reported status."
           },
           "status": {
             "type": "string",
@@ -8867,6 +9157,83 @@
           "name": {
             "type": [
               "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "PutCredentials": {
+        "type": "object",
+        "required": [
+          "rail",
+          "credentials"
+        ],
+        "properties": {
+          "credentials": {
+            "type": "object",
+            "description": "`paypal_payouts`: `client_id`, `client_secret`. `wise`: `api_token`, `profile_id`.",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "rail": {
+            "type": "string",
+            "description": "`paypal_payouts` or `wise`."
+          },
+          "sandbox": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Use the provider sandbox (default true)."
+          }
+        }
+      },
+      "RailResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BatchDetail"
+          },
+          {
+            "type": "object",
+            "required": [
+              "outcome"
+            ],
+            "properties": {
+              "outcome": {
+                "$ref": "#/components/schemas/Outcome"
+              }
+            }
+          }
+        ],
+        "description": "A batch dispatched or reconciled, with what this pass did."
+      },
+      "RailView": {
+        "type": "object",
+        "description": "Redacted view of a rail: whether it can be selected, never its credentials.",
+        "required": [
+          "rail",
+          "available",
+          "configured"
+        ],
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "description": "Can be chosen for `mark-paid`."
+          },
+          "configured": {
+            "type": "boolean",
+            "description": "Credentials are stored (they are never returned)."
+          },
+          "rail": {
+            "type": "string"
+          },
+          "sandbox": {
+            "type": [
+              "boolean",
               "null"
             ]
           }

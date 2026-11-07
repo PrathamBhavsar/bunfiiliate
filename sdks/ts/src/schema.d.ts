@@ -902,9 +902,67 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** `approved -> paid`: posts payable -> cash per payout. */
+        /**
+         * `approved -> paid`: posts payable -> cash per payout. With no body (or `manual_csv`) it
+         *     marks the whole batch paid by hand. With `{rail}` it sends each line through that provider
+         *     and posts the ledger only for lines the provider confirms paid; the response then carries an
+         *     `outcome`, and the batch stays `approved` until every line is paid (call again to retry
+         *     failures, or `reconcile` to collect pending ones).
+         */
         post: operations["mark_paid_route"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask providers about submitted payout lines and settle the confirmed ones. */
+        post: operations["reconcile_route"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/rails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payout rails and whether each is usable. Credentials are never returned. */
+        get: operations["list_rails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/rails/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Store (sealed) the workspace's credentials for a provider rail, replacing any existing. */
+        put: operations["put_credentials"];
+        post?: never;
+        /** Remove the workspace's credentials for a provider rail. */
+        delete: operations["delete_credentials"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1568,6 +1626,11 @@ export interface components {
             email: string;
             password: string;
         };
+        /** @description Body of `mark-paid` when a provider rail is chosen. */
+        MarkPaidRail: {
+            /** @description `manual_csv` (default), `paypal_payouts`, `wise` or `mock`. */
+            rail: string;
+        };
         Member: {
             email: string;
             /** Format: uuid */
@@ -1735,6 +1798,26 @@ export interface components {
             kind: string;
             /** Format: date-time */
             read_at?: string | null;
+        };
+        /** @description What a dispatch or reconcile pass did. */
+        Outcome: {
+            /** @description The whole batch is now paid. */
+            batch_paid: boolean;
+            /**
+             * Format: int32
+             * @description Lines the provider refused.
+             */
+            failed: number;
+            /**
+             * Format: int32
+             * @description Lines confirmed paid (ledger posted) in this pass.
+             */
+            paid: number;
+            /**
+             * Format: int32
+             * @description Lines left at the provider, not yet confirmed.
+             */
+            submitted: number;
         };
         Paged_Affiliate: {
             items: {
@@ -2326,6 +2409,13 @@ export interface components {
              * @description The `AffPayable -> Cash` ledger txn, once paid.
              */
             ledger_txn_id?: string | null;
+            /** @description `manual_csv`, `paypal_payouts`, `wise` or `mock`. */
+            rail: string;
+            rail_error?: string | null;
+            /** @description Provider dispatch: `pending`, `submitted`, `paid` or `failed`; null on the manual rail. */
+            rail_state?: string | null;
+            /** @description The provider's last reported status. */
+            rail_status?: string | null;
             /** @description `draft`, `approved`, `paid` or `cancelled`. */
             status: string;
         };
@@ -2396,6 +2486,29 @@ export interface components {
             /** Format: int32 */
             hold_days?: number | null;
             name?: string | null;
+        };
+        PutCredentials: {
+            /** @description `paypal_payouts`: `client_id`, `client_secret`. `wise`: `api_token`, `profile_id`. */
+            credentials: {
+                [key: string]: string;
+            };
+            /** @description `paypal_payouts` or `wise`. */
+            rail: string;
+            /** @description Use the provider sandbox (default true). */
+            sandbox?: boolean | null;
+        };
+        /** @description A batch dispatched or reconciled, with what this pass did. */
+        RailResult: components["schemas"]["BatchDetail"] & {
+            outcome: components["schemas"]["Outcome"];
+        };
+        /** @description Redacted view of a rail: whether it can be selected, never its credentials. */
+        RailView: {
+            /** @description Can be chosen for `mark-paid`. */
+            available: boolean;
+            /** @description Credentials are stored (they are never returned). */
+            configured: boolean;
+            rail: string;
+            sandbox?: boolean | null;
         };
         RecoveryCodes: {
             /** @description Shown once; only salted hashes are stored. */
@@ -4794,14 +4907,27 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        /** @description Optional rail */
+        requestBody?: {
+            content: {
+                "application/json": null | components["schemas"]["MarkPaidRail"];
+            };
+        };
         responses: {
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BatchDetail"];
+                    "application/json": components["schemas"]["RailResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {
@@ -4814,6 +4940,140 @@ export interface operations {
             };
             /** @description Not approved */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Rail not configured */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reconcile_route: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description BatchView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailResult"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A rail lost its credentials */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_rails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailView"][];
+                };
+            };
+        };
+    };
+    put_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutCredentials"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_credentials: {
+        parameters: {
+            query: {
+                /** @description `paypal_payouts` or `wise`. */
+                rail: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
