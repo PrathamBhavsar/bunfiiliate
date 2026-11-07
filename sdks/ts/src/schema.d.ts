@@ -2265,7 +2265,7 @@ export interface components {
         };
         Register: {
             email: string;
-            /** @description Min 12 characters. */
+            /** @description Min 8 characters. */
             password: string;
             payout_email?: string | null;
             /** @description Slug of the workspace to join. */
