@@ -1,0 +1,3 @@
+# xfail list for tenant_matrix.rs: one `METHOD /path` per line, optional `# reason`.
+# Suffixes `[unauth]`, `[affiliate]`, `[admin]`, `[random]` scope an entry to a role-escalation or random-id test.
+# C02 (this matrix) found no real leaks on staging dffda66, so the list is empty. C04 keeps it empty.
