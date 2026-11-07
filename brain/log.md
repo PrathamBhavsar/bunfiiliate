@@ -1,5 +1,12 @@
 # Changelog
 
+## [2026-11-07] Plan v2 wave 6 (tribe)
+
+- **Merged**: B00, B01, B02, B04, B08, B10. Migrations 0070, 0071, 0073, 0078, 0079.
+- **Lessons**: parallel workers collide on shared files (`routes.rs`, `secrets.rs` PROTECTED, `tenant-annotations.toml`, `checksums.txt`, `Cargo.toml`, `AppState`, `AppError`): the coordinator resolves and regenerates, then runs the full gate. Two workers adding the same enum variant with different payload types is the usual semantic clash. A worker on an account that hits its 5-hour limit exits with no commits; reset its board status to pending and relaunch after the reset time.
+- **Known limits**: B04 in-flight reversal shrink and web rail selector not done; B01/B02 web UI not done.
+- **Validation**: `make ci` and `make e2e` pass before merge.
+
 ## [2026-11-07] Plan v2 waves 4-5 (tribe)
 
 - **Merged**: A10, A13, A15, web auth pages, B09, B03, C03, C04, C14, C15, C16. Migrations 0072, 0077. New gates in `make ci`: `sql-lint`, `migrations-check`, `tracker-openapi-check`, `js-test`.

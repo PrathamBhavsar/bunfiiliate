@@ -65,4 +65,10 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | B03 | feat/b-payout-requests | done, merged (0072; web UI still open) |
 | C03+C04 | feat/c-sql-lint-guard | done, merged (`make sql-lint` in ci) |
 | C14+C15+C16 | feat/c-migrations-ops | done, merged (migration checksums, api /healthz /readyz) |
+| B00 | feat/b-signup-contact | done, merged (0070, SIGNUP_ENABLED default off) |
+| B01 | feat/b-webhook-chargeback | done, merged (TRACKER_INTERNAL_URL) |
+| B02 | feat/b-webhook-chargeback | done, merged (0071; matching was already on staging, fixtures added) |
+| B04 | feat/b-payout-providers | done, merged (0073; mock/paypal/wise; web rail selector and Wise live test open) |
+| B08 | feat/b-signup-contact | done, merged (0079) |
+| B10 | feat/b-billing-trait | done, merged (0078; mock + lemonsqueezy) |
 
