@@ -7,9 +7,9 @@ use argon2::Argon2;
 use argon2::password_hash::rand_core::{OsRng, RngCore};
 use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
 use axum::extract::{FromRequestParts, Request};
-use axum::http::header::{COOKIE, HOST, ORIGIN};
+use axum::http::header::{AUTHORIZATION, COOKIE, HOST, ORIGIN};
 use axum::http::request::Parts;
-use axum::http::{HeaderMap, Method};
+use axum::http::{HeaderMap, HeaderValue, Method};
 use axum::middleware::Next;
 use axum::response::Response;
 use base64::Engine;
@@ -18,6 +18,7 @@ use bf_db::auth::{User, UserRole};
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use subtle::ConstantTimeEq;
 use tokio::sync::Semaphore;
 use uuid::Uuid;
 
@@ -26,6 +27,8 @@ use crate::error::AppError;
 
 pub const ACCESS_COOKIE: &str = "bf_at";
 pub const REFRESH_COOKIE: &str = "bf_rt";
+pub const CSRF_COOKIE: &str = "bf_csrf";
+pub const CSRF_HEADER: &str = "x-csrf-token";
 pub const ACCESS_TTL_SECS: i64 = 15 * 60;
 pub const REFRESH_TTL_SECS: i64 = 30 * 24 * 60 * 60;
 
@@ -275,6 +278,56 @@ pub async fn check_origin(req: Request, next: Next) -> Result<Response, AppError
         };
         if !same {
             return Err(AppError::Forbidden("origin mismatch"));
+        }
+    }
+    Ok(next.run(req).await)
+}
+
+/// 256 random bits, base64url, for the `bf_csrf` double-submit cookie.
+pub fn new_csrf_token() -> String {
+    let mut b = [0u8; 32];
+    OsRng.fill_bytes(&mut b);
+    URL_SAFE_NO_PAD.encode(b)
+}
+
+/// `Set-Cookie` for `bf_csrf`: readable by JS (not HttpOnly) so the web client can echo it.
+pub fn csrf_set_cookie(token: &str, secure: bool) -> HeaderValue {
+    let secure = if secure { "; Secure" } else { "" };
+    let c =
+        format!("{CSRF_COOKIE}={token}; SameSite=Lax; Path=/; Max-Age={REFRESH_TTL_SECS}{secure}");
+    HeaderValue::from_str(&c).expect("cookie is ascii")
+}
+
+fn csrf_exempt(req: &Request) -> bool {
+    let h = req.headers();
+    // Bearer / API-key callers carry no ambient browser credentials.
+    h.contains_key(AUTHORIZATION)
+        || h.contains_key("x-api-key")
+        || req.uri().path() == "/api/openapi.json"
+}
+
+/// Middleware (runs after `check_origin`): double-submit CSRF for cookie-authenticated
+/// mutating requests. `X-CSRF-Token` must equal the `bf_csrf` cookie, else 403 `csrf`.
+/// Applies to any request carrying a session or CSRF cookie, and to `/api/v1/auth/*`
+/// (login CSRF). Requests authenticated by `Authorization` or API key are exempt.
+pub async fn check_csrf(req: Request, next: Next) -> Result<Response, AppError> {
+    if !matches!(*req.method(), Method::GET | Method::HEAD | Method::OPTIONS) && !csrf_exempt(&req)
+    {
+        let h = req.headers();
+        let cookie_auth = [ACCESS_COOKIE, REFRESH_COOKIE, CSRF_COOKIE]
+            .iter()
+            .any(|n| cookie(h, n).is_some())
+            || req.uri().path().starts_with("/api/v1/auth/");
+        if cookie_auth {
+            let sent = h.get(CSRF_HEADER).map(|v| v.as_bytes());
+            let want = cookie(h, CSRF_COOKIE).map(str::as_bytes);
+            let ok = match (sent, want) {
+                (Some(a), Some(b)) if !b.is_empty() => a.len() == b.len() && bool::from(a.ct_eq(b)),
+                _ => false,
+            };
+            if !ok {
+                return Err(AppError::Csrf);
+            }
         }
     }
     Ok(next.run(req).await)

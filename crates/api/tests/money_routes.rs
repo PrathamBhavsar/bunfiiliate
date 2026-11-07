@@ -50,9 +50,10 @@ impl Api {
             .method(method)
             .uri(uri)
             .header(HOST, "bf.test")
-            .header(ORIGIN, "https://bf.test");
+            .header(ORIGIN, "https://bf.test")
+            .header("x-csrf-token", "t");
         if let Some(c) = cookie {
-            b = b.header(COOKIE, c);
+            b = b.header(COOKIE, format!("{c}; bf_csrf=t"));
         }
         let body = body.map_or_else(Body::empty, |v| {
             b = std::mem::take(&mut b).header(CONTENT_TYPE, "application/json");

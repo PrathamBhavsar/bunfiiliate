@@ -22,14 +22,39 @@ function refreshSession() {
   return refreshing;
 }
 
+const CSRF_COOKIE = "bf_csrf";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+function csrfCookie(): string | undefined {
+  return document.cookie
+    .split("; ")
+    .find((c) => c.startsWith(`${CSRF_COOKIE}=`))
+    ?.slice(CSRF_COOKIE.length + 1);
+}
+
+// Double-submit CSRF: echo the readable bf_csrf cookie as X-CSRF-Token on every mutation.
+// Without a cookie yet (first login), GET /auth/csrf sets one.
+async function withCsrf(request: Request): Promise<Request> {
+  if (SAFE_METHODS.has(request.method)) return request;
+  let token = csrfCookie();
+  if (!token) {
+    const res = await fetch("/api/v1/auth/csrf", { credentials: "include" });
+    token = ((await res.json()) as { token: string }).token;
+  }
+  const next = new Request(request);
+  next.headers.set("X-CSRF-Token", token);
+  return next;
+}
+
 // On a 401 from a non-auth call, refresh once and replay the request. A failed refresh ends the session.
-async function fetchWithRefresh(request: Request) {
+async function fetchWithRefresh(input: Request) {
+  const request = await withCsrf(input);
   const replay = request.clone();
   const response = await fetch(request);
   if (response.status !== 401 || new URL(request.url).pathname.startsWith(AUTH_PREFIX)) {
     return response;
   }
-  if (await refreshSession()) return fetch(replay);
+  if (await refreshSession()) return fetch(await withCsrf(replay));
   clearUserData(meKey);
   queryClient.setQueryData(meKey, null);
   return response;

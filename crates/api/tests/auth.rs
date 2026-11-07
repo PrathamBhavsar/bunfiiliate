@@ -99,8 +99,13 @@ async fn send(app: &Router, r: Req) -> Response<Body> {
     if let Some(o) = r.origin {
         b = b.header(ORIGIN, o);
     }
-    if !r.cookies.is_empty() {
-        b = b.header(COOKIE, r.cookies.join("; "));
+    let mut cookies = r.cookies.clone();
+    if r.method != "GET" {
+        cookies.push("bf_csrf=t".into());
+        b = b.header("x-csrf-token", "t");
+    }
+    if !cookies.is_empty() {
+        b = b.header(COOKIE, cookies.join("; "));
     }
     let body = match r.body {
         Some(v) => {

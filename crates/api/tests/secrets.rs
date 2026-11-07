@@ -46,9 +46,11 @@ impl Api {
             .method(method.clone())
             .uri(uri)
             .header(HOST, "bf.test")
-            .header(COOKIE, cookie);
+            .header(COOKIE, format!("{cookie}; bf_csrf=t"));
         if method != Method::GET {
-            b = b.header(ORIGIN, "https://bf.test");
+            b = b
+                .header(ORIGIN, "https://bf.test")
+                .header("x-csrf-token", "t");
         }
         let body = match body {
             Some(v) => {

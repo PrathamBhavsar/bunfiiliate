@@ -14,6 +14,8 @@ pub enum AppError {
     BadRequest(String),
     Unauthorized(&'static str),
     Forbidden(&'static str),
+    /// Missing or mismatched `X-CSRF-Token`.
+    Csrf,
     NotFound(&'static str),
     Conflict(&'static str),
     TooManyRequests,
@@ -38,6 +40,11 @@ impl IntoResponse for AppError {
             Self::BadRequest(m) => (StatusCode::BAD_REQUEST, "bad_request", m),
             Self::Unauthorized(m) => (StatusCode::UNAUTHORIZED, "unauthorized", m.into()),
             Self::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m.into()),
+            Self::Csrf => (
+                StatusCode::FORBIDDEN,
+                "csrf",
+                "csrf token missing or invalid".into(),
+            ),
             Self::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.into()),
             Self::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.into()),
             Self::PayloadTooLarge => (
