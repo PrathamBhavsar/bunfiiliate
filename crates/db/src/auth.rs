@@ -275,3 +275,43 @@ pub async fn insert_audit(db: impl PgExecutor<'_>, e: &AuditEntry<'_>) -> Result
     .await?;
     Ok(())
 }
+
+/// Replace the password hash of a user.
+pub async fn set_password_hash(
+    db: impl PgExecutor<'_>,
+    id: Uuid,
+    hash: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+        .bind(id)
+        .bind(hash)
+        .execute(db)
+        .await
+        .map(|_| ())
+}
+
+/// Delete every refresh token of a user (all sessions).
+pub async fn delete_refresh_tokens(db: impl PgExecutor<'_>, id: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+        .bind(id)
+        .execute(db)
+        .await
+        .map(|_| ())
+}
+
+/// In-app notification for a user.
+pub async fn insert_notification(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    kind: &str,
+    body: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO notifications (id, user_id, kind, body) VALUES ($1, $2, $3, $4)")
+        .bind(Uuid::now_v7())
+        .bind(user_id)
+        .bind(kind)
+        .bind(body)
+        .execute(db)
+        .await
+        .map(|_| ())
+}

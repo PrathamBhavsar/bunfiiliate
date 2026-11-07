@@ -53,6 +53,9 @@ export default function LoginPage() {
           {login.isPending ? "Signing in…" : "Sign in"}
         </Button>
         <p className="text-xs text-muted">
+          <Link href="/forgot-password" className="underline">Forgot password?</Link>
+        </p>
+        <p className="text-xs text-muted">
           New affiliate? <Link href="/register" className="underline">Create an account</Link>
         </p>
       </form>
