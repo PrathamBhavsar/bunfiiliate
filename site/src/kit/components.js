@@ -114,7 +114,7 @@ define("x-install", class extends HTMLElement {
     this.innerHTML = `<div class="wrap install-grid">
       <div>
         <h2 class="display sec-head">${brand.installTitle}</h2>
-        <p class="sec-lede">${md(brand.installLede)}</p>
+        <p class="sec-lede" data-lede>${md(brand.installLedePending ?? brand.installLede)}</p>
         <div class="cta"><a class="btn ink" href="${base}docs/#/install">Full install guide ${icon("arrow")}</a><a class="btn ink" href="https://github.com/${brand.repo}/releases">${icon("download")} Releases</a></div>
       </div>
       <div>
@@ -147,7 +147,7 @@ define("x-install", class extends HTMLElement {
       setTimeout(() => { box.removeAttribute("data-done"); cb.innerHTML = icon("copy"); }, 1600);
     };
     show(0);
-    facts.then((f) => { if (f?.releases > 0) { released = true; show(btns.findIndex((b) => b.getAttribute("aria-selected") === "true")); } });
+    facts.then((f) => { if (f?.releases > 0) { released = true; this.querySelector("[data-lede]").innerHTML = md(brand.installLede); show(btns.findIndex((b) => b.getAttribute("aria-selected") === "true")); } });
   }
 });
 

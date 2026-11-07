@@ -27,15 +27,9 @@ registerScene("rain", ({ cols, rows, rand }) => {
     step(t, dt, ptr, put) {
       const text = (r, s, tone, a) => { for (let i = 0; i < s.length; i++) put(x0 + i, r, s[i], tone, a, true); };
 
-      // the sheet: rows k and k+1 share an amount with opposite signs, so any pair sums to zero
-      if (wide) {
-        const k0 = Math.floor(t / 650);
-        for (let r = 0; r < top - 1; r++) {
-          const k = k0 + r, amt = 100 + (hash(k >> 1) % 9900);
-          text(r, fmt(k & 1 ? -amt : amt).padStart(lw), 0, 0.16 + 0.1 * (r / top));
-        }
-      }
-
+      // drops first, collected so the sheet can skip cells a drop occupies (no overprinted amounts)
+      const cells = [], taken = new Set();
+      const mark = (c, r, ch, tone, a) => { cells.push([c, r, ch, tone, a]); taken.add(c * 1000 + r); };
       acc += dt * cols * 0.00014;
       while (acc >= 1) { spawn(); acc -= 1; }
       for (let i = drops.length - 1; i >= 0; i--) {
@@ -53,14 +47,32 @@ registerScene("rain", ({ cols, rows, rand }) => {
           continue;
         }
         const r = Math.floor(d.y);
-        put(c, r, "*", 2, 1);
-        for (let k = 1; k < d.len; k++) put(c, r - k, k < 3 ? "+" : k < 5 ? ":" : ".", k < 3 ? 1 : 0, 0.95 - k / (d.len + 1));
+        mark(c, r, "*", 2, 1);
+        for (let k = 1; k < d.len; k++) mark(c, r - k, k < 3 ? "+" : k < 5 ? ":" : ".", k < 3 ? 1 : 0, 0.95 - k / (d.len + 1));
       }
       for (let i = splashes.length - 1; i >= 0; i--) {
         const s = splashes[i]; s.life -= dt * 0.0016;
         if (s.life <= 0) { splashes.splice(i, 1); continue; }
-        put(s.c, s.r, s.hot ? "*" : ".", s.hot ? 2 : 0, s.life);
+        mark(s.c, s.r, s.hot ? "*" : ".", s.hot ? 2 : 0, s.life);
       }
+
+      // the sheet: columns of figures scrolling at their own pace. Rows k and k+1 of a column share an
+      // amount with opposite signs, so every pair cancels.
+      if (wide) {
+        const colW = 11, start = Math.floor(cols * 0.58), n = Math.floor((cols - start - 1) / colW);
+        for (let j = 0; j < n; j++) {
+          const k0 = Math.floor(t / (520 + j * 140)) + j * 37;
+          for (let r = 0; r < top; r++) {
+            const k = k0 + r, amt = 100 + (hash((k >> 1) + j * 977) % 9900);
+            const sx = fmt(k & 1 ? -amt : amt).padStart(colW - 2);
+            for (let i = 0; i < sx.length; i++) {
+              const c = start + j * colW + i;
+              if (!taken.has(c * 1000 + r)) put(c, r, sx[i], 0, 0.2 + 0.14 * (r / top), true);
+            }
+          }
+        }
+      }
+      cells.forEach(([c, r, ch, tone, a]) => put(c, r, ch, tone, a));
 
       // the ledger itself
       const out = [["LEDGER", `txn ${id}`, 0]];

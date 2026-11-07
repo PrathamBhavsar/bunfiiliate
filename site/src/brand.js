@@ -77,6 +77,7 @@ export default {
 
   installTitle: "Install in one line.",
   installLede: "Download a release binary, run the image, or build from source. Checksums are published with every release.",
+  installLedePending: "Run it with Docker Compose or build from source. Release binaries and checksums arrive with the first tagged release.",
   install: [
     { id: "docker", label: "Docker", cmds: [
       "git clone https://github.com/PrathamBhavsar/bunfiiliate && cd bunfiiliate",
