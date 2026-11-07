@@ -7,6 +7,7 @@ pub mod ops;
 pub mod payouts;
 pub mod programs;
 pub mod throttle;
+pub mod reset_tokens;
 pub mod totp;
 pub mod tracker;
 pub mod workspaces;
