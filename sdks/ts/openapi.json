@@ -852,6 +852,60 @@
         }
       }
     },
+    "/api/v1/auth/password/reset-with-token": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Set a new password with an admin-issued token.",
+        "operationId": "reset_with_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetWithTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed; every session revoked"
+          },
+          "400": {
+            "description": "New password too short or too long",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Reset failed (same body for every cause)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/refresh": {
       "post": {
         "tags": [
@@ -4776,6 +4830,64 @@
         ]
       }
     },
+    "/api/v1/users/{id}/password-reset-token": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Issue a one-hour password reset token for a user.",
+        "operationId": "issue",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "User id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssuedToken"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/webhooks/deliveries": {
       "get": {
         "tags": [
@@ -5996,6 +6108,23 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "IssuedToken": {
+        "type": "object",
+        "required": [
+          "token",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "token": {
+            "type": "string",
+            "description": "Shown once."
           }
         }
       },
@@ -8328,6 +8457,22 @@
           "new_password": {
             "type": "string",
             "description": "12 to 256 characters."
+          }
+        }
+      },
+      "ResetWithTokenRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "new_password"
+        ],
+        "properties": {
+          "new_password": {
+            "type": "string",
+            "description": "12 to 256 characters."
+          },
+          "token": {
+            "type": "string"
           }
         }
       },
