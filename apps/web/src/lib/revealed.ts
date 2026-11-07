@@ -8,4 +8,6 @@ export const remember = (kind: string, id: string, secret: string | null | undef
   if (secret) store.set(`${kind}:${id}`, secret);
 };
 
-export const recall = (kind: string, id: string): string | undefined => store.get(`${kind}:${id}`);
+export const forget = (kind: string, id: string) => store.delete(`${kind}:${id}`);
+
+export const recall =(kind: string, id: string): string | undefined => store.get(`${kind}:${id}`);
