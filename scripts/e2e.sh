@@ -79,6 +79,8 @@ psql "$BASE_URL" -c "CREATE DATABASE $DB_NAME;" >/dev/null
 export DATABASE_URL="$SCRATCH_URL"
 export API_PORT TRACKER_PORT JWT_SECRET BF_IP_SALT BF_MASTER_KEYS SPOOL_DIR
 export COOKIE_SECURE=0
+# The webhook tester posts to the tracker over loopback; the e2e tracker is not on the default port.
+export TRACKER_INTERNAL_URL="http://127.0.0.1:$TRACKER_PORT"
 # The suite is not about disk pressure (crates/spool/tests/disk_full.rs is): keep a busy dev host from shedding.
 export BF_SPOOL_HIGH_WATER_PCT=99 BF_SPOOL_LOW_WATER_PCT=98 BF_SPOOL_MIN_FREE_BYTES=1048576
 

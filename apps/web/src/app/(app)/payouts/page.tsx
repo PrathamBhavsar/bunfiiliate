@@ -94,8 +94,93 @@ function CsvButton({ id }: { id: string }) {
   );
 }
 
+const RAIL_LABELS: Record<string, string> = {
+  manual_csv: "Manual (CSV, you send the money)",
+  paypal_payouts: "PayPal Payouts",
+  wise: "Wise",
+  mock: "Mock (testing)",
+};
+
+/** Rails the workspace can pick; `manual_csv` is always there. Credentials never reach the browser. */
+function useRails() {
+  return useQuery({
+    queryKey: ["payout-rails"],
+    queryFn: ({ signal }) => ok(api.GET("/api/v1/payouts/rails", { signal })),
+  });
+}
+
+type Outcome = { paid: number; submitted: number; failed: number; batch_paid: boolean };
+
+function outcomeText(o: Outcome) {
+  return `${o.paid} paid, ${o.submitted} submitted, ${o.failed} failed${o.batch_paid ? ". Batch is now paid." : "."}`;
+}
+
+/** Mark paid with a rail: manual keeps the old confirm-and-flip; a provider rail sends each line. */
+function MarkPaidDialog({ batch: b, onDone }: { batch: Batch; onDone: (o: Outcome) => void }) {
+  const rails = useRails();
+  const options = (rails.data ?? [{ rail: "manual_csv", available: true }])
+    .filter((r) => r.available)
+    .map((r) => ({ value: r.rail, label: RAIL_LABELS[r.rail] ?? r.rail }));
+  return (
+    <FormDialog
+      trigger={
+        <Button size="sm" variant="primary">
+          {ACTIONS["mark-paid"].label}
+        </Button>
+      }
+      title="Mark paid?"
+      description={`${ACTIONS["mark-paid"].describe(b)} Choosing a provider rail sends each payout through it first; the ledger posts only when the provider confirms.`}
+      fields={[{ name: "rail", label: "Payout rail", type: "select", options }]}
+      initial={{ rail: "manual_csv" }}
+      submitLabel="Mark paid"
+      onSubmit={async (v) => {
+        const rail = v.rail || "manual_csv";
+        const res = await ok(
+          api.POST("/api/v1/payouts/batches/{id}/mark-paid", { params: { path: { id: b.id } }, body: { rail } as never }),
+        );
+        onDone((res as { outcome: Outcome }).outcome);
+        await refresh();
+      }}
+    />
+  );
+}
+
+function ReconcileButton({ id, onDone }: { id: string; onDone: (o: Outcome) => void }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <>
+      <Button
+        size="sm"
+        disabled={pending}
+        onClick={async () => {
+          setPending(true);
+          setError(null);
+          try {
+            const res = await ok(api.POST("/api/v1/payouts/batches/{id}/reconcile", { params: { path: { id } } }));
+            onDone((res as { outcome: Outcome }).outcome);
+            await refresh();
+          } catch (e) {
+            setError(errorMessage(e));
+          } finally {
+            setPending(false);
+          }
+        }}
+      >
+        {pending ? "Checking…" : "Reconcile"}
+      </Button>
+      {error && (
+        <p role="alert" className="basis-full text-xs text-danger">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 function BatchPanel({ batch: b }: { batch: Batch }) {
   const { programName } = useLookups();
+  const [outcome, setOutcome] = useState<string | null>(null);
   const payouts = useQuery({
     queryKey: ["payout-batch", b.id],
     queryFn: ({ signal }) => ok(api.GET("/api/v1/payouts/batches/{id}", { signal, params: { path: { id: b.id } } })),
@@ -120,7 +205,10 @@ function BatchPanel({ batch: b }: { batch: Batch }) {
       </Section>
       <Section title="Actions">
         <div className="flex flex-wrap gap-2">
-          {allowed(b.status).map((action) => (
+          {allowed(b.status).map((action) =>
+            action === "mark-paid" ? (
+              <MarkPaidDialog key={action} batch={b} onDone={(o) => setOutcome(outcomeText(o))} />
+            ) : (
             <ConfirmDialog
               key={action}
               trigger={
@@ -137,9 +225,16 @@ function BatchPanel({ batch: b }: { batch: Batch }) {
                 await refresh();
               }}
             />
-          ))}
+            ),
+          )}
+          {b.status === "approved" && <ReconcileButton id={b.id} onDone={(o) => setOutcome(outcomeText(o))} />}
           <CsvButton id={b.id} />
         </div>
+        {outcome && (
+          <p role="status" data-testid="rail-outcome" className="text-xs">
+            {outcome}
+          </p>
+        )}
       </Section>
       <Section title="Payouts">
         <ListState query={payouts} empty="This batch has no payout lines.">

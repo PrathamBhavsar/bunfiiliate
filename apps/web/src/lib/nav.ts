@@ -59,7 +59,8 @@ export const homeFor = (role: Role) => (isAdmin(role) ? "/dashboard" : "/me");
 
 export function canAccess(role: Role, pathname: string) {
   const path = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
-  return navFor(role).some((item) => item.href === path);
+  // A page under a nav item (`/webhooks/test`, `/referral-codes/detail`) is reachable with its parent.
+  return navFor(role).some((item) => item.href === path || path.startsWith(`${item.href}/`));
 }
 
 /** Detail pages are query-string routes (ADR-0006): the static export has no runtime path segments. */

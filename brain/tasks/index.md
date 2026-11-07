@@ -81,3 +81,4 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | billing-variant | feat/billing-variant-plan | done, merged (0082; plan from purchased variant, store check) |
 | C30+C31+C32 | feat/c30-code-stats | done, merged (per-code stats API + pages, routing ADR 0006) |
 | notify-redact | fix/notify-redact-url | done, merged (reqwest errors stripped of channel URL) |
+| C33 | feat/c33-ui-states-a11y | done (shared `state.tsx`, 403 "No access", table labels, axe smoke; web UI for B01 `/webhooks/test`, B03 `/me/payouts` request, B04 rail selector + reconcile; admin payout-request approve/reject UI still open) |

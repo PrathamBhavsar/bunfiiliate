@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-07] C33 states and a11y, B01/B03/B04 web UI (tribe #38)
+
+- **Done**: `components/state.tsx` (`EmptyState`, `ErrorState`, `LoadingRows`), `ApiError` keeps the HTTP status so a 403 shows "No access" without Retry, `DataTable` takes a required accessible `label`, `ResourceView` takes `headingLevel` for a second list on a page. New pages: `/webhooks/test` (tester + inbound replay), payout request dialog and request list on `/me/payouts`, rail select on Mark paid plus Reconcile in the batch sheet. No new API routes.
+- **Lessons**: see `wisdom/time-traps.md` (e2e runner is not Playwright).
+- **Known limits**: admin approve/reject UI for payout requests is not built; axe runs through `axe-core` injected by `evaluate` (no `@axe-core/playwright`: the runner has no Playwright Page).
+
 ## [2026-11-07] Plan v2 wave 8a (tribe)
 
 - **Merged**: C30, C31, C32, notify channel URL redaction (webhook/bot tokens no longer reach logs via reqwest errors; use `Error::without_url`).
