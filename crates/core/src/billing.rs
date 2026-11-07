@@ -67,8 +67,13 @@ pub struct SubscriptionEvent {
     pub workspace_id: Uuid,
     pub provider_subscription_id: Option<String>,
     pub status: SubStatus,
-    /// From the checkout's `custom_data.plan_key`; absent keeps the current plan.
+    /// From the checkout's `custom_data.plan_key`. A claim, not proof: providers that report the
+    /// purchased variant must resolve the plan from `variant_id` and only cross-check this.
     pub plan_key: Option<String>,
+    /// The purchased variant (`data.attributes.variant_id`), the source of truth for the plan.
+    pub variant_id: Option<String>,
+    /// The seller's store (`data.attributes.store_id`), checked against configuration.
+    pub store_id: Option<String>,
     /// The provider's `updated_at`; events are applied in this order.
     pub updated_at: DateTime<Utc>,
     pub current_period_end: Option<DateTime<Utc>>,
