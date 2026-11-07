@@ -79,6 +79,8 @@ psql "$BASE_URL" -c "CREATE DATABASE $DB_NAME;" >/dev/null
 export DATABASE_URL="$SCRATCH_URL"
 export API_PORT TRACKER_PORT JWT_SECRET BF_IP_SALT BF_MASTER_KEYS SPOOL_DIR
 export COOKIE_SECURE=0
+# tenant-ui.e2e.ts signs up a second workspace.
+export SIGNUP_ENABLED=1
 # The webhook tester posts to the tracker over loopback; the e2e tracker is not on the default port.
 export TRACKER_INTERNAL_URL="http://127.0.0.1:$TRACKER_PORT"
 # The suite is not about disk pressure (crates/spool/tests/disk_full.rs is): keep a busy dev host from shedding.
@@ -108,11 +110,13 @@ echo "=== Running e2e ==="
 set +e
 (
   cd "$ROOT_DIR/e2e"
+  # E2E_GREP narrows by title regex, E2E_SHARD (i/n) slices; files are self-seeding, so any subset passes alone.
   E2E_APP_URL="http://localhost:$WEB_PORT" \
+  E2E_API_URL="http://127.0.0.1:$API_PORT" \
   E2E_ADMIN_EMAIL="$ADMIN_EMAIL" \
   E2E_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   E2E_WORKSPACE="$WORKSPACE_SLUG" \
-  npx e2e run
+  npx e2e run ${E2E_GREP:+--grep "$E2E_GREP"} ${E2E_SHARD:+--shard "$E2E_SHARD"}
 )
 status=$?
 set -e

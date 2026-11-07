@@ -64,7 +64,8 @@ describe('states and a11y', { serial: true }, () => {
       await browser.route(listUrl(page.api), (route) => route.fulfill({ json: { items: [], total: 0 } }));
       await app.open(page.path);
       await expect(screen.getByRole('heading', page.title)).toBeVisible();
-      await expect(browser.locator('[data-testid="empty-state"]')).toBeVisible();
+      // Payouts also lists payout requests (a second list, empty here too).
+      await expect(browser.locator('[data-testid="empty-state"]').first()).toBeVisible();
     }
     await browser.unrouteAll();
   });
