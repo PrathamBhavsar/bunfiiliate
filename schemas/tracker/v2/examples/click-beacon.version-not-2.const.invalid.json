@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "pk": "pub_xxx",
+  "code": "AFF123",
+  "click": "01JABC",
+  "vid": "vid_abcdef123456",
+  "url": "https://shop.example/pricing?x=1",
+  "ref": "https://google.com/",
+  "ts": 1767225600000
+}

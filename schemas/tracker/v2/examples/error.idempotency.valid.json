@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "idempotency_conflict",
+    "message": "key reused with a different body",
+    "request_id": "req_1"
+  }
+}
