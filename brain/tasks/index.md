@@ -88,3 +88,4 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | C33 | feat/c33-ui-states-a11y | done (shared `state.tsx`, 403 "No access", table labels, axe smoke; web UI for B01 `/webhooks/test`, B03 `/me/payouts` request, B04 rail selector + reconcile) |
 | C34 | feat/c34-e2e-coverage | done (e2e split into admin-core, money, portal, code-stats, states-a11y, tenant-ui; `e2e/fixtures/seed.ts` seeds a workspace per world via API; `docs/ui/e2e-plan.md` + `scripts/e2e-plan.test.mjs`; admin payout-request approve/reject UI on `/payouts`; 39 tests, `make e2e` twice green) |
 | C90 | feat/c90-final-gate | scripts done (`final-gate.sh`, `push-guard.sh`, `hygiene-check.sh`, release checklist); gate passes every step except `ocr` (no LLM endpoint configured) |
+| R1 | feat/release | done, not merged (release.yml, web-asset.yml, docker.yml, docs/releasing.md) |
