@@ -701,6 +701,14 @@ role = "Admin"
 reason = "workspace id from the session; db fns filter on it"
 
 [[route]]
+method = "post"
+path = "/api/v1/signup"
+source = "api"
+kind = "public"
+role = "none"
+reason = "self-serve signup creates a new workspace; off unless SIGNUP_ENABLED"
+
+[[route]]
 method = "get"
 path = "/api/v1/workspaces"
 source = "api"

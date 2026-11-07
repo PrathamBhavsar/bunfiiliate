@@ -49,7 +49,7 @@ impl Modify for CookieAuth {
         admin_reset::issue,
         admin_reset::reset_with_token,
         totp::enrol, totp::confirm, totp::regenerate, totp::disable, totp::status,
-        workspaces::create_workspace, workspaces::list_workspaces,
+        workspaces::create_workspace, workspaces::list_workspaces, workspaces::signup,
         workspaces::invite_member, workspaces::list_members,
         programs::create_program, programs::list_programs, programs::get_program,
         programs::update_program, programs::delete_program, programs::rotate_secrets,
@@ -89,7 +89,7 @@ impl Modify for CookieAuth {
         billing::set_provider, billing::webhook,
     ),
     components(schemas(
-        LoginRequest, UserView, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
+        LoginRequest, UserView, workspaces::SignupRequest, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account,
         billing::CheckoutRequest, billing::CheckoutResponse, billing::SubscriptionView,
         billing::PlanView, billing::UsageView, billing::ProviderView, billing::SetSecret,
@@ -295,7 +295,13 @@ async fn login(
     if let Some(k) = &throttle_key {
         bf_db::throttle::clear(&s.pool, bf_db::throttle::LOGIN_IP, k).await?;
     }
-    let principal = Principal::from(&user);
+    let cookies = start_session(&s, &user).await?;
+    Ok((cookies, Json(user.into())))
+}
+
+/// Issue the access + refresh cookies for `user` and audit the login. Shared by login and signup.
+pub(crate) async fn start_session(s: &AppState, user: &User) -> Result<HeaderMap, AppError> {
+    let principal = Principal::from(user);
     let ver = bf_db::auth::token_version(&s.pool, user.id)
         .await?
         .unwrap_or_default();
@@ -309,7 +315,7 @@ async fn login(
     )
     .await?;
     audit::record(&s.pool, &principal, "auth.login", "user", user.id, None).await?;
-    Ok((session_cookies(&s, &access, &refresh), Json(user.into())))
+    Ok(session_cookies(s, &access, &refresh))
 }
 
 /// Exchange the `bf_rt` cookie for a fresh pair. Reusing an old token revokes the family.

@@ -372,7 +372,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List contact requests, newest first, optionally by status. */
+        /** List contact requests, newest first, optionally by status and kind. */
         get: operations["list_contacts"];
         put?: never;
         /** Public contact form: stores a `new` request for the workspace's admins. */
@@ -1232,6 +1232,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Self-serve signup: a new workspace with its first `admin`, signed in. 404 unless enabled. */
+        post: operations["signup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{id}/password-reset-token": {
         parameters: {
             query?: never;
@@ -1523,11 +1540,20 @@ export interface components {
             status: string;
         };
         ContactRequest: {
+            /**
+             * Format: int64
+             * @description Disputed amount in cents; set together with `currency`.
+             */
+            amount_cents?: number | null;
             /** Format: date-time */
             created_at: string;
+            /** @description ISO 4217 code, upper case. */
+            currency?: string | null;
             email: string;
             /** Format: uuid */
             id: string;
+            /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+            kind: string;
             message: string;
             name: string;
             /** Format: uuid */
@@ -1757,7 +1783,16 @@ export interface components {
             program_id: string;
         };
         NewContact: {
+            /**
+             * Format: int64
+             * @description Disputed amount in cents; requires `currency`.
+             */
+            amount_cents?: number | null;
+            /** @description ISO 4217 code; requires `amount_cents`. */
+            currency?: string | null;
             email: string;
+            /** @description `general_inquiry` (default), `technical_support`, `account_issue` or `payout_dispute`. */
+            kind?: string | null;
             message: string;
             name: string;
             /** Format: uuid */
@@ -2000,11 +2035,20 @@ export interface components {
         };
         Paged_ContactRequest: {
             items: {
+                /**
+                 * Format: int64
+                 * @description Disputed amount in cents; set together with `currency`.
+                 */
+                amount_cents?: number | null;
                 /** Format: date-time */
                 created_at: string;
+                /** @description ISO 4217 code, upper case. */
+                currency?: string | null;
                 email: string;
                 /** Format: uuid */
                 id: string;
+                /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+                kind: string;
                 message: string;
                 name: string;
                 /** Format: uuid */
@@ -2660,6 +2704,11 @@ export interface components {
             /** @description 12 to 256 characters. */
             new_password: string;
             token: string;
+        };
+        SignupRequest: {
+            admin_email: string;
+            admin_password: string;
+            workspace_name: string;
         };
         Site: {
             domain: string;
@@ -3573,6 +3622,8 @@ export interface operations {
             query?: {
                 /** @description `new`, `read` or `closed`. */
                 status?: string;
+                /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+                kind?: string;
                 /** @description 1-based page number (default 1). */
                 page?: number;
                 /** @description Items per page (default 50, max 200). */
@@ -3590,6 +3641,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Paged_ContactRequest"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             403: {
@@ -6074,6 +6133,64 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    signup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Workspace created, signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Signup disabled */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Email or slug taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
