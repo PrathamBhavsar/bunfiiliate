@@ -90,3 +90,192 @@ pub async fn usage_at(
         monthly_clicks,
     })
 }
+
+/// A plan by its key.
+pub async fn plan_by_key(db: impl PgExecutor<'_>, key: &str) -> Result<Option<Plan>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT id, key, name, price_cents, currency::text AS currency, max_programs, \
+                max_affiliates, max_monthly_clicks, is_default \
+         FROM billing_plans WHERE key = $1",
+    )
+    .bind(key)
+    .fetch_optional(db)
+    .await
+}
+
+/// The LemonSqueezy variant id mapped to a plan, if any.
+pub async fn lemonsqueezy_variant(
+    db: impl PgExecutor<'_>,
+    plan_id: Uuid,
+) -> Result<Option<String>, sqlx::Error> {
+    let v: Option<Option<String>> =
+        sqlx::query_scalar("SELECT lemonsqueezy_variant_id FROM billing_plans WHERE id = $1")
+            .bind(plan_id)
+            .fetch_optional(db)
+            .await?;
+    Ok(v.flatten())
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct Subscription {
+    pub plan_id: Uuid,
+    pub provider: String,
+    pub provider_subscription_id: Option<String>,
+    pub status: String,
+    pub current_period_end: Option<DateTime<Utc>>,
+}
+
+pub async fn subscription_for_workspace(
+    db: impl PgExecutor<'_>,
+    workspace_id: Uuid,
+) -> Result<Option<Subscription>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT plan_id, provider, provider_subscription_id, status::text AS status, \
+                current_period_end \
+         FROM subscriptions WHERE workspace_id = $1",
+    )
+    .bind(workspace_id)
+    .fetch_optional(db)
+    .await
+}
+
+/// Put the workspace on `plan_id` now (mock checkout), active, no provider ordering.
+pub async fn activate_plan(
+    db: impl PgExecutor<'_>,
+    workspace_id: Uuid,
+    plan_id: Uuid,
+    provider: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "INSERT INTO subscriptions (workspace_id, plan_id, provider, status) \
+         VALUES ($1, $2, $3, 'active') \
+         ON CONFLICT (workspace_id) DO UPDATE SET plan_id = EXCLUDED.plan_id, \
+           provider = EXCLUDED.provider, status = 'active', provider_subscription_id = NULL, \
+           updated_at = now()",
+    )
+    .bind(workspace_id)
+    .bind(plan_id)
+    .bind(provider)
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// Record a provider event id. `false` = already seen (a replay).
+pub async fn claim_event(
+    db: impl PgExecutor<'_>,
+    provider: &str,
+    event_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let r = sqlx::query(
+        "INSERT INTO billing_events (provider, event_id) VALUES ($1, $2) \
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(provider)
+    .bind(event_id)
+    .execute(db)
+    .await?;
+    Ok(r.rows_affected() == 1)
+}
+
+pub struct EventUpdate<'a> {
+    pub workspace_id: Uuid,
+    pub provider: &'a str,
+    pub provider_subscription_id: Option<&'a str>,
+    pub status: &'a str,
+    pub plan_key: Option<&'a str>,
+    pub event_at: DateTime<Utc>,
+    pub current_period_end: Option<DateTime<Utc>>,
+}
+
+/// Apply a provider event. `false` when the workspace does not exist or the stored subscription
+/// already reflects a newer event (events are ordered by the provider's `updated_at`).
+/// A canceled subscription drops back to the default plan.
+pub async fn apply_event(
+    db: impl PgExecutor<'_>,
+    e: &EventUpdate<'_>,
+) -> Result<bool, sqlx::Error> {
+    let r = sqlx::query(
+        "INSERT INTO subscriptions (workspace_id, plan_id, provider, provider_subscription_id, \
+                                    status, current_period_end, provider_event_at) \
+         SELECT w.id, \
+                CASE WHEN $4::subscription_status = 'canceled' \
+                     THEN (SELECT id FROM billing_plans WHERE is_default) \
+                     ELSE COALESCE((SELECT id FROM billing_plans WHERE key = $5), \
+                                   (SELECT plan_id FROM subscriptions WHERE workspace_id = w.id), \
+                                   (SELECT id FROM billing_plans WHERE is_default)) END, \
+                $2, $3, $4::subscription_status, $6, $7 \
+         FROM workspaces w WHERE w.id = $1 \
+         ON CONFLICT (workspace_id) DO UPDATE SET plan_id = EXCLUDED.plan_id, \
+           provider = EXCLUDED.provider, \
+           provider_subscription_id = EXCLUDED.provider_subscription_id, \
+           status = EXCLUDED.status, current_period_end = EXCLUDED.current_period_end, \
+           provider_event_at = EXCLUDED.provider_event_at, updated_at = now() \
+         WHERE subscriptions.provider_event_at IS NULL \
+            OR subscriptions.provider_event_at <= EXCLUDED.provider_event_at",
+    )
+    .bind(e.workspace_id)
+    .bind(e.provider)
+    .bind(e.provider_subscription_id)
+    .bind(e.status)
+    .bind(e.plan_key)
+    .bind(e.current_period_end)
+    .bind(e.event_at)
+    .execute(db)
+    .await?;
+    Ok(r.rows_affected() == 1)
+}
+
+/// The sealed webhook secret and its row id (the AAD binding).
+pub async fn provider_secret(
+    db: impl PgExecutor<'_>,
+    provider: &str,
+) -> Result<Option<(Uuid, String)>, sqlx::Error> {
+    sqlx::query_as("SELECT id, webhook_secret FROM billing_providers WHERE provider = $1")
+        .bind(provider)
+        .fetch_optional(db)
+        .await
+}
+
+/// Row id of a configured provider.
+pub async fn provider_id(
+    db: impl PgExecutor<'_>,
+    provider: &str,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    sqlx::query_scalar("SELECT id FROM billing_providers WHERE provider = $1")
+        .bind(provider)
+        .fetch_optional(db)
+        .await
+}
+
+/// Store a (sealed) webhook secret for `provider`. `id` is the row id the value was sealed to:
+/// an existing row's id, or a new one. `false` = lost a race against another first insert.
+pub async fn upsert_provider_secret(
+    db: impl PgExecutor<'_>,
+    id: Uuid,
+    provider: &str,
+    stored: &str,
+    sealed: bool,
+) -> Result<bool, sqlx::Error> {
+    let r = sqlx::query(
+        "INSERT INTO billing_providers (id, provider, webhook_secret, secret_enc_at) \
+         VALUES ($1, $2, $3, CASE WHEN $4 THEN now() END) \
+         ON CONFLICT (provider) DO UPDATE SET webhook_secret = EXCLUDED.webhook_secret, \
+           secret_enc_at = EXCLUDED.secret_enc_at, updated_at = now() \
+         WHERE billing_providers.id = EXCLUDED.id",
+    )
+    .bind(id)
+    .bind(provider)
+    .bind(stored)
+    .bind(sealed)
+    .execute(db)
+    .await?;
+    Ok(r.rows_affected() == 1)
+}
+
+/// Providers with a secret configured.
+pub async fn configured_providers(db: impl PgExecutor<'_>) -> Result<Vec<String>, sqlx::Error> {
+    sqlx::query_scalar("SELECT provider FROM billing_providers ORDER BY 1")
+        .fetch_all(db)
+        .await
+}

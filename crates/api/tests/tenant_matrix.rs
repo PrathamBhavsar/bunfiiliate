@@ -390,6 +390,7 @@ fn fill(path: &str, ids: &Ws) -> String {
         let v = match name {
             "id" => resource_for(prefix, ids),
             "code" => ids.code.clone(),
+            "provider" => "lemonsqueezy".to_string(),
             "domain" => ids.domain.clone(),
             "affiliate_id" => ids.affiliate.to_string(),
             "plan_id" => ids.plan.to_string(),

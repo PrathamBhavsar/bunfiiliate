@@ -1190,6 +1190,194 @@
         ]
       }
     },
+    "/api/v1/billing/checkout": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Start a plan change. `mock` switches the plan at once; `lemonsqueezy` returns a hosted checkout.",
+        "operationId": "checkout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/providers": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Providers with a webhook secret configured. The secret itself is never returned.",
+        "operationId": "list_providers",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderView"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/providers/{provider}": {
+      "put": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Set a provider's webhook secret (sealed at rest). Enables the provider.",
+        "operationId": "set_provider",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "mock or lemonsqueezy",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetSecret"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/billing/subscription": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "The workspace's plan, status and usage against its limits.",
+        "operationId": "subscription",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionView"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/contact-requests": {
       "get": {
         "tags": [
@@ -5237,6 +5425,58 @@
         ]
       }
     },
+    "/api/v1/webhooks/billing/{provider}": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Provider subscription webhook. Public; authenticated by the HMAC of the raw body.",
+        "operationId": "webhook",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "mock or lemonsqueezy",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookAck"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/webhooks/deliveries": {
       "get": {
         "tags": [
@@ -6010,6 +6250,43 @@
           "total_cents": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "required": [
+          "plan_key"
+        ],
+        "properties": {
+          "plan_key": {
+            "type": "string"
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`mock` or `lemonsqueezy`; default `mock` when configured, else `lemonsqueezy`."
+          }
+        }
+      },
+      "CheckoutResponse": {
+        "type": "object",
+        "required": [
+          "activated"
+        ],
+        "properties": {
+          "activated": {
+            "type": "boolean",
+            "description": "`true` when the plan is already active (mock)."
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hosted checkout to send the admin to."
           }
         }
       },
@@ -8731,6 +9008,51 @@
           "flat"
         ]
       },
+      "PlanView": {
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "price_cents",
+          "currency"
+        ],
+        "properties": {
+          "currency": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "max_affiliates": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "max_monthly_clicks": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "max_programs": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "price_cents": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "Point": {
         "allOf": [
           {
@@ -8869,6 +9191,22 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "ProviderView": {
+        "type": "object",
+        "required": [
+          "provider",
+          "webhook_secret_set"
+        ],
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "webhook_secret_set": {
+            "type": "boolean",
+            "description": "The webhook secret is write-only; this only says one is stored."
           }
         }
       },
@@ -9046,6 +9384,17 @@
           }
         }
       },
+      "SetSecret": {
+        "type": "object",
+        "required": [
+          "webhook_secret"
+        ],
+        "properties": {
+          "webhook_secret": {
+            "type": "string"
+          }
+        }
+      },
       "Site": {
         "type": "object",
         "required": [
@@ -9075,6 +9424,36 @@
             }
           }
         ]
+      },
+      "SubscriptionView": {
+        "type": "object",
+        "required": [
+          "plan",
+          "usage",
+          "provider",
+          "status"
+        ],
+        "properties": {
+          "current_period_end": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/PlanView"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/UsageView"
+          }
+        }
       },
       "Summary": {
         "allOf": [
@@ -9149,6 +9528,28 @@
           }
         }
       },
+      "UsageView": {
+        "type": "object",
+        "required": [
+          "programs",
+          "affiliates",
+          "monthly_clicks"
+        ],
+        "properties": {
+          "affiliates": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "monthly_clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "programs": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
       "UserView": {
         "type": "object",
         "required": [
@@ -9174,6 +9575,18 @@
               "null"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "WebhookAck": {
+        "type": "object",
+        "required": [
+          "result"
+        ],
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "`applied`, `duplicate`, or `ignored` (stale event or unknown workspace)."
           }
         }
       },

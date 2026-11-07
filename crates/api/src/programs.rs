@@ -183,6 +183,7 @@ pub async fn create_program(
     AppJson(req): AppJson<NewProgramRequest>,
 ) -> Result<(StatusCode, Json<Program>), AppError> {
     let ws = auth.principal.workspace_scope(None)?;
+    crate::billing::enforce(&s.pool, ws, bf_core::billing::Limit::Programs).await?;
     let name = check_name(&req.name)?;
     let currency = Currency::new(&req.currency.to_ascii_uppercase())
         .filter(|c| CURRENCIES.contains(&c.as_str()))

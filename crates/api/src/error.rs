@@ -17,6 +17,10 @@ pub enum AppError {
     /// Missing or mismatched `X-CSRF-Token`.
     Csrf,
     NotFound(&'static str),
+    /// A plan limit is hit; the message names it.
+    PaymentRequired(String),
+    /// The request is well formed but cannot be served (for example an unconfigured provider).
+    Unprocessable(String),
     Conflict(&'static str),
     TooManyRequests,
     PayloadTooLarge,
@@ -46,6 +50,8 @@ impl IntoResponse for AppError {
                 "csrf token missing or invalid".into(),
             ),
             Self::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.into()),
+            Self::PaymentRequired(m) => (StatusCode::PAYMENT_REQUIRED, "plan_limit", m),
+            Self::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, "unprocessable", m),
             Self::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.into()),
             Self::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
