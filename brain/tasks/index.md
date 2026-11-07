@@ -85,3 +85,4 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | C24 | feat/c24-c05-a16-closeout | done (drill verifies per-partition click counts; `restore.sh --force` wipes schema, `--clean` failed on partitions) |
 | C05 | feat/c24-c05-a16-closeout | done (ADR-0004: RLS not enabled; disabled spike + `#[ignore]` tests pass on PG16) |
 | A16 | feat/c24-c05-a16-closeout | done (ADRs 0007-0009, secrets page, anti-patterns 32-39, README/SECURITY/self-hosting) |
+| C33 | feat/c33-ui-states-a11y | done (shared `state.tsx`, 403 "No access", table labels, axe smoke; web UI for B01 `/webhooks/test`, B03 `/me/payouts` request, B04 rail selector + reconcile; admin payout-request approve/reject UI still open) |

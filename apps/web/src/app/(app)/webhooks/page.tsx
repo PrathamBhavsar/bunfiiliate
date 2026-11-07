@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff, Pencil, Plus } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Facts, ListState, Section } from "@/components/admin-ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -183,6 +184,10 @@ const config: ResourceConfig<Endpoint> = {
     { id: "status", header: "Status", cell: (e) => <StatusBadge status={e.active ? "active" : "paused"} tone={e.active ? undefined : "neutral"} /> },
   ],
   actions: (
+    <div className="flex items-center gap-2">
+    <Link href="/webhooks/test" className="text-xs underline underline-offset-2">
+      Test and replay
+    </Link>
     <FormDialog
       trigger={
         <Button variant="primary">
@@ -199,6 +204,7 @@ const config: ResourceConfig<Endpoint> = {
         await refresh();
       }}
     />
+    </div>
   ),
   detailTitle: (e) => e.url,
   detail: (e) => <Detail e={e} />,
