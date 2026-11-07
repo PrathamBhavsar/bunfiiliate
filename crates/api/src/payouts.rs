@@ -60,6 +60,39 @@ async fn lock(c: &mut PgConnection, id: Uuid) -> Result<Batch, AppError> {
     }
 }
 
+/// One payout line for an affiliate, claiming their approved, unclaimed conversions.
+pub(crate) async fn insert_payout(
+    tx: &mut PgConnection,
+    batch: Uuid,
+    program_id: Uuid,
+    affiliate_id: Uuid,
+    amount_cents: i64,
+) -> Result<Uuid, AppError> {
+    let payout = Uuid::now_v7();
+    // The payout email is copied now: changing it later cannot redirect an approved batch.
+    sqlx::query(
+        "INSERT INTO payouts (id, batch_id, affiliate_id, amount_cents, payout_email) \
+         SELECT $1, $2, a.id, $4, COALESCE(a.payout_email, u.email)::text \
+         FROM affiliates a JOIN users u ON u.id = a.user_id WHERE a.id = $3",
+    )
+    .bind(payout)
+    .bind(batch)
+    .bind(affiliate_id)
+    .bind(amount_cents)
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query(
+        "UPDATE conversions SET payout_id = $1 \
+         WHERE program_id = $2 AND affiliate_id = $3 AND status = 'approved' AND payout_id IS NULL",
+    )
+    .bind(payout)
+    .bind(program_id)
+    .bind(affiliate_id)
+    .execute(&mut *tx)
+    .await?;
+    Ok(payout)
+}
+
 /// Draft one payout per affiliate owed at least their minimum, and claim their approved
 /// conversions. `None` when nobody is owed.
 pub async fn create_batch(
@@ -87,28 +120,7 @@ pub async fn create_batch(
         .execute(&mut *tx)
         .await?;
     for o in owed {
-        let payout = Uuid::now_v7();
-        // The payout email is copied now: changing it later cannot redirect an approved batch.
-        sqlx::query(
-            "INSERT INTO payouts (id, batch_id, affiliate_id, amount_cents, payout_email) \
-             SELECT $1, $2, a.id, $4, COALESCE(a.payout_email, u.email)::text \
-             FROM affiliates a JOIN users u ON u.id = a.user_id WHERE a.id = $3",
-        )
-        .bind(payout)
-        .bind(batch)
-        .bind(o.affiliate_id)
-        .bind(o.amount_cents)
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query(
-            "UPDATE conversions SET payout_id = $1 \
-             WHERE program_id = $2 AND affiliate_id = $3 AND status = 'approved' AND payout_id IS NULL",
-        )
-        .bind(payout)
-        .bind(program_id)
-        .bind(o.affiliate_id)
-        .execute(&mut *tx)
-        .await?;
+        insert_payout(&mut tx, batch, program_id, o.affiliate_id, o.amount_cents).await?;
     }
     tx.commit().await?;
     Ok(Some(batch))
@@ -198,6 +210,13 @@ pub async fn mark_paid(pool: &PgPool, batch: Uuid) -> Result<(), AppError> {
         .execute(&mut *tx)
         .await?;
     }
+    sqlx::query(
+        "UPDATE payout_requests SET status = 'paid' WHERE status = 'approved' \
+         AND payout_id IN (SELECT id FROM payouts WHERE batch_id = $1)",
+    )
+    .bind(batch)
+    .execute(&mut *tx)
+    .await?;
     sqlx::query("UPDATE payout_batches SET status = 'paid', paid_at = now() WHERE id = $1")
         .bind(batch)
         .execute(&mut *tx)

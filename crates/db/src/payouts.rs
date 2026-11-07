@@ -57,3 +57,24 @@ pub async fn batch_rows(
     .fetch_all(conn)
     .await
 }
+
+/// What one affiliate could be paid right now: payable minus open (draft/approved) payouts.
+/// May be zero or negative (clawbacks); the caller applies the minimum. Active affiliates only.
+pub async fn owed_for(
+    conn: &mut PgConnection,
+    program_id: Uuid,
+    affiliate_id: Uuid,
+) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT b.payable_cents - COALESCE((SELECT sum(p.amount_cents) FROM payouts p \
+                JOIN payout_batches pb ON pb.id = p.batch_id \
+                WHERE p.affiliate_id = a.id AND pb.program_id = $1 \
+                  AND p.status IN ('draft', 'approved')), 0)::bigint \
+         FROM affiliate_balances b JOIN affiliates a ON a.id = b.affiliate_id \
+         WHERE b.program_id = $1 AND a.id = $2 AND a.status = 'active'",
+    )
+    .bind(program_id)
+    .bind(affiliate_id)
+    .fetch_optional(conn)
+    .await
+}
