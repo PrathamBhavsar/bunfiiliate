@@ -4,6 +4,8 @@ use bf_rt::metrics::{Counter, Gauge, Histogram, counter, gauge, histogram};
 
 /// Outbox rows not yet dispatched, sampled each dispatch tick.
 pub static OUTBOX_DEPTH: Gauge = Gauge::new();
+/// Rows in the `clicks_default` catch-all partition (should be 0), sampled by the worker.
+pub static CLICKS_DEFAULT_ROWS: Gauge = Gauge::new();
 /// Webhook deliveries that got a non-2xx answer or no answer.
 pub static WEBHOOK_FAILURES: Counter = Counter::new();
 /// Inbound events the worker claimed.
@@ -29,6 +31,12 @@ pub fn render() -> String {
         "bf_outbox_depth",
         "Outbox rows waiting for dispatch.",
         &OUTBOX_DEPTH,
+    );
+    gauge(
+        &mut out,
+        "bf_clicks_default_rows",
+        "Click rows in the catch-all partition; non-zero means a month partition is missing.",
+        &CLICKS_DEFAULT_ROWS,
     );
     counter(
         &mut out,
@@ -66,6 +74,7 @@ mod tests {
         let out = render();
         for name in [
             "bf_outbox_depth",
+            "bf_clicks_default_rows",
             "bf_webhook_delivery_failures_total",
             "bf_ingest_events_processed_total",
             "bf_rollup_tick_seconds_count",
