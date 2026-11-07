@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-07] R1 release automation
+
+- **Done**: cargo-dist 0.34.0 (`dist-workspace.toml`, `.github/workflows/release.yml`), `web-asset.yml` (pnpm build, uploads `bunfiiliate-web-static.tar.gz` to the release), `docker.yml` (GHCR multi-arch), `docs/releasing.md`. `repository` added to workspace package; `[package.metadata.dist] dist = true` on api and tracker.
+- **Lessons**: `publish = false` hides bins from dist until `dist = true`. GITHUB_TOKEN-created releases do not fire `release: published`, so web-asset triggers on the tag and polls. No sqlx `query!` macros, so no offline data needed.
+- **Unverified**: real tag run (never pushed).
+
 ## [2026-11-07] C34 + C90 final gate
 
 - **Merged**: C34 e2e growth (5 suites, 26+ tests, coverage table), admin payout-request UI, `scripts/final-gate.sh`, `push-guard.sh`, `hygiene-check.sh`, `docs/ops/release-checklist.md`.
