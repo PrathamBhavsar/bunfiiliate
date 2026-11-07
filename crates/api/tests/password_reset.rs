@@ -263,8 +263,15 @@ async fn unknown_email_and_no_totp_same_response_as_bad_code(pool: PgPool) {
 #[sqlx::test(migrations = "../db/migrations")]
 async fn totp_code_replay_rejected(pool: PgPool) {
     let (app, user, secret, _, _) = setup(pool.clone()).await;
-    // `setup` consumed the current step at confirm: the same code cannot reset.
-    let (status, _) = reset(&app, &user.email, &now_code(&secret), NEW_PASSWORD).await;
+    // `setup` consumed a step at confirm. Replay exactly that step's code (not "now", which may
+    // have rolled into the next step on a slow machine): it must not reset.
+    let step: i64 = sqlx::query_scalar("SELECT last_used_step FROM user_totp WHERE user_id = $1")
+        .bind(user.id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let replay = format!("{:06}", bf_core::totp::code_at(&secret, step * 30));
+    let (status, _) = reset(&app, &user.email, &replay, NEW_PASSWORD).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     assert!(login(&app, &user.email, PASSWORD).await.is_some());
 }
