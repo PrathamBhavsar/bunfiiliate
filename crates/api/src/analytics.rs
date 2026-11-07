@@ -7,7 +7,7 @@
 //! reversed conversions do not count. A status change older than the watermark window is
 //! not picked up. Days are UTC.
 
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::routing::get;
 use axum::{Json, Router};
@@ -18,7 +18,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::auth::{Admin, Any, Auth, Principal};
+use crate::auth::{Admin, Affiliate as AffiliateRole, Any, Auth, Principal};
 use crate::error::{AppError, ErrorBody};
 use crate::programs::{require_program, viewer};
 
@@ -147,6 +147,8 @@ pub fn routes() -> Router<AppState> {
         .route("/api/v1/analytics/summary-all", get(summary_all))
         .route("/api/v1/analytics/timeseries", get(timeseries))
         .route("/api/v1/reports/analytics.csv", get(report_csv))
+        .route("/api/v1/referral-codes/{code}/stats", get(code_stats))
+        .route("/api/v1/me/referral-codes/{code}/stats", get(me_code_stats))
 }
 
 #[derive(Clone, Copy, Deserialize, Serialize, ToSchema)]
@@ -658,4 +660,183 @@ pub async fn summary_all(
         commission_cents: clamp(commission)?,
         unconverted: left,
     }))
+}
+
+// ---- per-code stats (C30)
+
+#[derive(Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Granularity {
+    Day,
+}
+
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct CodeStatsQuery {
+    /// First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.
+    from: Option<String>,
+    /// Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.
+    to: Option<String>,
+    /// Series bucket; only `day` is supported.
+    granularity: Option<Granularity>,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CodeTotals {
+    clicks: i64,
+    /// Clicks the tracker flagged (a subset of `clicks`).
+    flagged_clicks: i64,
+    conversions: i64,
+    revenue_cents: i64,
+    commission_cents: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CodeDay {
+    /// `YYYY-MM-DD` (UTC); every day of the range is present.
+    day: String,
+    clicks: i64,
+    conversions: i64,
+    commission_cents: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CodeCountry {
+    country: String,
+    clicks: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CodeReferrer {
+    host: String,
+    clicks: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct CodeStats {
+    code: String,
+    from: String,
+    to: String,
+    /// The program's currency; amounts are integer minor units.
+    currency: String,
+    totals: CodeTotals,
+    series: Vec<CodeDay>,
+    /// Top 10 by clicks.
+    top_countries: Vec<CodeCountry>,
+    /// Top 10 by clicks.
+    top_referrers: Vec<CodeReferrer>,
+}
+
+async fn code_stats_for(
+    s: &AppState,
+    workspace: Uuid,
+    affiliate: Option<Uuid>,
+    code: String,
+    q: CodeStatsQuery,
+) -> Result<Json<CodeStats>, AppError> {
+    // Day is the only bucket today; this match stops compiling when another is added.
+    match q.granularity.unwrap_or(Granularity::Day) {
+        Granularity::Day => {}
+    }
+    let to =
+        q.to.as_deref()
+            .map_or_else(|| Ok(Utc::now().date_naive()), parse_day)?;
+    let from = q
+        .from
+        .as_deref()
+        .map_or_else(|| Ok(to - Duration::days(29)), parse_day)?;
+    if from > to || (to - from).num_days() >= MAX_RANGE_DAYS {
+        return Err(AppError::BadRequest(format!(
+            "from must not be after to, and the range is at most {MAX_RANGE_DAYS} days"
+        )));
+    }
+    let r = bf_db::code_stats::find_code(&s.pool, workspace, &code, affiliate)
+        .await?
+        .ok_or(AppError::NotFound("code not found"))?;
+    let st = bf_db::code_stats::code_stats(&s.pool, &code, &r, from, to).await?;
+    Ok(Json(CodeStats {
+        code,
+        from: from.to_string(),
+        to: to.to_string(),
+        currency: r.currency,
+        totals: CodeTotals {
+            clicks: st.totals.clicks,
+            flagged_clicks: st.totals.flagged_clicks,
+            conversions: st.totals.conversions,
+            revenue_cents: st.totals.revenue_cents,
+            commission_cents: st.totals.commission_cents,
+        },
+        series: st
+            .series
+            .into_iter()
+            .map(|d| CodeDay {
+                day: d.day.to_string(),
+                clicks: d.clicks,
+                conversions: d.conversions,
+                commission_cents: d.commission_cents,
+            })
+            .collect(),
+        top_countries: st
+            .top_countries
+            .into_iter()
+            .map(|c| CodeCountry {
+                country: c.country,
+                clicks: c.clicks,
+            })
+            .collect(),
+        top_referrers: st
+            .top_referrers
+            .into_iter()
+            .map(|c| CodeReferrer {
+                host: c.host,
+                clicks: c.clicks,
+            })
+            .collect(),
+    }))
+}
+
+/// Stats of one referral code in the workspace (live from clicks and conversions).
+#[utoipa::path(
+    get,
+    path = "/api/v1/referral-codes/{code}/stats",
+    tag = "analytics",
+    security(("cookie" = [])),
+    params(("code" = String, Path, description = "Referral code"), CodeStatsQuery),
+    responses(
+        (status = 200, body = CodeStats),
+        (status = 400, body = ErrorBody),
+        (status = 404, description = "Unknown code or code of another workspace", body = ErrorBody),
+    )
+)]
+pub async fn code_stats(
+    State(s): State<AppState>,
+    auth: Auth<Admin>,
+    Path(code): Path<String>,
+    Query(q): Query<CodeStatsQuery>,
+) -> Result<Json<CodeStats>, AppError> {
+    let ws = auth.principal.workspace_scope(None)?;
+    code_stats_for(&s, ws, None, code, q).await
+}
+
+/// Stats of one of the signed-in affiliate's own referral codes.
+#[utoipa::path(
+    get,
+    path = "/api/v1/me/referral-codes/{code}/stats",
+    tag = "me",
+    security(("cookie" = [])),
+    params(("code" = String, Path, description = "Referral code"), CodeStatsQuery),
+    responses(
+        (status = 200, body = CodeStats),
+        (status = 400, body = ErrorBody),
+        (status = 404, description = "Unknown code or not the caller's", body = ErrorBody),
+    )
+)]
+pub async fn me_code_stats(
+    State(s): State<AppState>,
+    auth: Auth<AffiliateRole>,
+    Path(code): Path<String>,
+    Query(q): Query<CodeStatsQuery>,
+) -> Result<Json<CodeStats>, AppError> {
+    let (ws, own) = viewer(&s, &auth.principal).await?;
+    code_stats_for(&s, ws, own, code, q).await
 }

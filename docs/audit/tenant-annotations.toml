@@ -1088,3 +1088,19 @@ source = "api"
 kind = "public"
 role = "none"
 reason = "Alertmanager sink: BF_ALERT_TOKEN bearer (constant-time), 404 when unset; notifies super admins only, no tenant data"
+
+[[route]]
+method = "get"
+path = "/api/v1/referral-codes/{code}/stats"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "code resolved through program into the session workspace"
+
+[[route]]
+method = "get"
+path = "/api/v1/me/referral-codes/{code}/stats"
+source = "api"
+kind = "self"
+role = "Affiliate"
+reason = "code must belong to the caller's affiliate row"

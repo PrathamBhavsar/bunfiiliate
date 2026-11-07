@@ -65,6 +65,7 @@ impl Modify for CookieAuth {
         affiliates::delete_code, affiliates::me_affiliate, affiliates::me_update,
         affiliates::me_create_code, affiliates::me_list_codes, affiliates::me_delete_code,
         analytics::summary, analytics::summary_all, analytics::timeseries, analytics::report_csv,
+        analytics::code_stats, analytics::me_code_stats,
         webhooks::create_endpoint, webhooks::list_endpoints, webhooks::get_endpoint,
         webhooks::update_endpoint, webhooks::delete_endpoint, webhooks::list_deliveries,
         webhooks::redeliver, webhooks::list_inbound, webhooks::replay_inbound,
@@ -96,7 +97,9 @@ impl Modify for CookieAuth {
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account,
         billing::CheckoutRequest, billing::CheckoutResponse, billing::SubscriptionView,
         billing::PlanView, billing::UsageView, billing::ProviderView, billing::SetSecret,
-        billing::WebhookAck, crate::alerts::AlertAck
+        billing::WebhookAck, crate::alerts::AlertAck,
+        analytics::CodeStats, analytics::CodeTotals, analytics::CodeDay, analytics::CodeCountry,
+        analytics::CodeReferrer, analytics::Granularity
     )),
     modifiers(&CookieAuth),
     info(title = "bunfiiliate API", version = "0.1.0")

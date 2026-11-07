@@ -3213,6 +3213,90 @@
         ]
       }
     },
+    "/api/v1/me/referral-codes/{code}/stats": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Stats of one of the signed-in affiliate's own referral codes.",
+        "operationId": "me_code_stats",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Referral code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "description": "Series bucket; only `day` is supported.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Granularity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown code or not the caller's",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/me/tax-form": {
       "get": {
         "tags": [
@@ -5725,6 +5809,90 @@
         ]
       }
     },
+    "/api/v1/referral-codes/{code}/stats": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Stats of one referral code in the workspace (live from clicks and conversions).",
+        "operationId": "code_stats",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "description": "Referral code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "description": "Series bucket; only `day` is supported.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Granularity"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeStats"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown code or code of another workspace",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/reports/1099-style.csv": {
       "get": {
         "tags": [
@@ -7332,6 +7500,65 @@
           }
         }
       },
+      "CodeCountry": {
+        "type": "object",
+        "required": [
+          "country",
+          "clicks"
+        ],
+        "properties": {
+          "clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "country": {
+            "type": "string"
+          }
+        }
+      },
+      "CodeDay": {
+        "type": "object",
+        "required": [
+          "day",
+          "clicks",
+          "conversions",
+          "commission_cents"
+        ],
+        "properties": {
+          "clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversions": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "day": {
+            "type": "string",
+            "description": "`YYYY-MM-DD` (UTC); every day of the range is present."
+          }
+        }
+      },
+      "CodeReferrer": {
+        "type": "object",
+        "required": [
+          "host",
+          "clicks"
+        ],
+        "properties": {
+          "clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "host": {
+            "type": "string"
+          }
+        }
+      },
       "CodeRequest": {
         "type": "object",
         "required": [
@@ -7345,6 +7572,90 @@
           },
           "current_password": {
             "type": "string"
+          }
+        }
+      },
+      "CodeStats": {
+        "type": "object",
+        "required": [
+          "code",
+          "from",
+          "to",
+          "currency",
+          "totals",
+          "series",
+          "top_countries",
+          "top_referrers"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string",
+            "description": "The program's currency; amounts are integer minor units."
+          },
+          "from": {
+            "type": "string"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeDay"
+            }
+          },
+          "to": {
+            "type": "string"
+          },
+          "top_countries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeCountry"
+            },
+            "description": "Top 10 by clicks."
+          },
+          "top_referrers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CodeReferrer"
+            },
+            "description": "Top 10 by clicks."
+          },
+          "totals": {
+            "$ref": "#/components/schemas/CodeTotals"
+          }
+        }
+      },
+      "CodeTotals": {
+        "type": "object",
+        "required": [
+          "clicks",
+          "flagged_clicks",
+          "conversions",
+          "revenue_cents",
+          "commission_cents"
+        ],
+        "properties": {
+          "clicks": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "conversions": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "flagged_clicks": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Clicks the tracker flagged (a subset of `clicks`)."
+          },
+          "revenue_cents": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
@@ -7841,6 +8152,12 @@
             "type": "string"
           }
         }
+      },
+      "Granularity": {
+        "type": "string",
+        "enum": [
+          "day"
+        ]
       },
       "InboundEventRow": {
         "type": "object",
