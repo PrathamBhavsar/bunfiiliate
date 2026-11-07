@@ -31,6 +31,8 @@ const APPROVE_EVERY: Duration = Duration::from_secs(60);
 const ROLLUP_EVERY: Duration = Duration::from_secs(60);
 const DISPATCH_EVERY: Duration = Duration::from_secs(1);
 const DELIVER_EVERY: Duration = Duration::from_secs(1);
+/// Exchange rates refresh once a day (the source publishes ECB rates on working days).
+const FX_EVERY: Duration = Duration::from_secs(24 * 60 * 60);
 /// Predicate on an `affiliates a` row: active and enrolled in program `$2`.
 const ELIGIBLE: &str = "a.status = 'active' \
      AND EXISTS (SELECT 1 FROM enrollments e WHERE e.affiliate_id = a.id AND e.program_id = $2)";
@@ -41,7 +43,27 @@ const APPROVE_LOCK: i64 = 0x6266_6170;
 /// Run the loops until the task is dropped. Webhook delivery has its own loop, polled beside the
 /// others, so a slow endpoint never delays ingest, approval or the outbox.
 pub async fn run(pool: PgPool, mailer: Mailer, vault: Arc<Vault>) {
-    tokio::join!(main_loop(&pool, &mailer), deliver_loop(&pool, &vault));
+    tokio::join!(
+        main_loop(&pool, &mailer),
+        deliver_loop(&pool, &vault),
+        fx_loop(&pool)
+    );
+}
+
+/// Refresh cached exchange rates: once a day, and once at start. Own loop so a slow source never
+/// delays the others. A failed fetch only logs; readers keep the last cached rates.
+async fn fx_loop(pool: &PgPool) {
+    let source = crate::fx::RateSource::frankfurter();
+    let mut every_day = tokio::time::interval(FX_EVERY);
+    every_day.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        every_day.tick().await;
+        match crate::fx::tick(pool, &source).await {
+            Ok(0) => {}
+            Ok(n) => tracing::info!(rates = n, "exchange rates refreshed"),
+            Err(e) => tracing::warn!(error = %e, "exchange rate tick failed; keeping cached rates"),
+        }
+    }
 }
 
 async fn deliver_loop(pool: &PgPool, vault: &Arc<Vault>) {

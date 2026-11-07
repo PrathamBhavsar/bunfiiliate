@@ -13,6 +13,77 @@ import { api, errorMessage } from "@/lib/api";
 
 // Not under "me": refresh() leaves the ["me"] session query alone by key prefix.
 const profileKey = ["portal", "profile"] as const;
+const taxKey = ["portal", "tax-form"] as const;
+
+/** W-8/W-9 capture. Only the last 4 digits of a tax id are ever sent or stored. */
+function TaxFormSection() {
+  const q = useQuery({
+    queryKey: taxKey,
+    queryFn: ({ signal }) => ok(api.GET("/api/v1/me/tax-form", { signal })),
+  });
+  const t = q.data;
+  return (
+    <div className="grid gap-2 rounded-lg border border-border bg-surface p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">Tax form</h2>
+        {t && (
+          <FormDialog
+            trigger={
+              <Button variant="primary">
+                <Pencil /> {t.kind === "none" ? "Add" : "Edit"}
+              </Button>
+            }
+            title="Tax form"
+            description="Enter the last 4 digits of your tax id only. Never type the full number."
+            fields={[
+              {
+                name: "kind",
+                label: "Form",
+                type: "select",
+                required: true,
+                options: [
+                  { value: "w9", label: "W-9 (US person)" },
+                  { value: "w8", label: "W-8 (non-US person)" },
+                ],
+              },
+              { name: "legal_name", label: "Legal name", required: true },
+              { name: "country", label: "Country (2 letters)", required: true, placeholder: "US" },
+              { name: "tax_id_last4", label: "Tax id, last 4 digits", placeholder: "1234" },
+            ]}
+            initial={{ kind: t.kind === "w8" ? "w8" : "w9", legal_name: t.legal_name ?? "", country: t.country ?? "", tax_id_last4: t.tax_id_last4 ?? "" }}
+            onSubmit={async (v) => {
+              const last4 = (v.tax_id_last4 ?? "").trim();
+              await ok(
+                api.PUT("/api/v1/me/tax-form", {
+                  body: { kind: v.kind ?? "w9", legal_name: v.legal_name ?? "", country: v.country ?? "", tax_id_last4: last4 || null },
+                }),
+              );
+              await refresh();
+            }}
+          />
+        )}
+      </div>
+      {q.isError && !t ? (
+        <p role="alert" className="text-xs text-danger">
+          Could not load your tax form: {errorMessage(q.error)}
+        </p>
+      ) : !t ? (
+        <Skeleton className="h-16" aria-busy />
+      ) : t.kind === "none" ? (
+        <p className="text-xs text-muted">No tax form on file. Invoices use your payout email until you add one.</p>
+      ) : (
+        <Facts
+          rows={[
+            ["Form", t.kind.toUpperCase()],
+            ["Legal name", t.legal_name ?? "—"],
+            ["Country", t.country ?? "—"],
+            ["Tax id", t.tax_id_last4 ? `•••• ${t.tax_id_last4}` : "—"],
+          ]}
+        />
+      )}
+    </div>
+  );
+}
 
 export default function ProfilePage() {
   const q = useQuery({
@@ -79,6 +150,7 @@ export default function ProfilePage() {
           />
         )}
       </div>
+      <TaxFormSection />
       <SecuritySection />
     </section>
   );

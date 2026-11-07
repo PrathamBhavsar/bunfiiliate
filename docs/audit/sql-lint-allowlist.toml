@@ -304,3 +304,8 @@ reason = "tracker snapshot loader: every workspace by design, no request context
 file = "crates/db/src/tracker.rs"
 fn = "load_program_keys"
 reason = "tracker snapshot loader: every workspace by design, no request context"
+
+[[allow]]
+file = "crates/api/src/fx.rs"
+fn = "tick"
+reason = "exchange-rate worker loop: lists the currencies in use across every program, no request context; exchange_rates has no tenant column"
