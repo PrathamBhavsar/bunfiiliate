@@ -116,7 +116,7 @@ pub const CONTACT: Rule = Rule {
 
 /// Client address as set by the reverse proxy: the last `X-Forwarded-For` entry (the one our
 /// own proxy appended). Without a proxy there is none and only the per-email limit applies.
-fn client_ip(headers: &HeaderMap) -> Option<&str> {
+pub fn client_ip(headers: &HeaderMap) -> Option<&str> {
     let v = headers.get("x-forwarded-for")?.to_str().ok()?;
     v.rsplit(',')
         .next()

@@ -8,6 +8,7 @@ pub mod ledger;
 pub mod money;
 pub mod secrets;
 pub mod state;
+pub mod throttle;
 pub mod totp;
 
 pub use attribution::{Attribution, FirstTouch, LastTouch, Touch};

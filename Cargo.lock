@@ -244,6 +244,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "chacha20poly1305",
+ "chrono",
  "data-encoding",
  "hmac",
  "proptest",
@@ -258,6 +259,7 @@ dependencies = [
 name = "bf-db"
 version = "0.1.0"
 dependencies = [
+ "bf-core",
  "chrono",
  "serde",
  "serde_json",

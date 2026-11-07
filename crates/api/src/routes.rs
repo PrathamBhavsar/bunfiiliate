@@ -252,10 +252,34 @@ async fn login(
         .as_ref()
         .map_or_else(|| dummy_hash().to_string(), |u| u.password_hash.clone());
     let ok = verify_password_bounded(req.password, hash).await;
-    let user = match user {
-        Some(u) if ok => u,
-        _ => return Err(AppError::Unauthorized("invalid credentials")),
+    // Backoff is per (email, address) so it slows a guesser without locking the account out. A
+    // backed-off address gets the same 401 as a wrong password, even for the right one.
+    let throttle_key = limit::client_ip(&headers)
+        .map(|ip| format!("{}|{ip}", req.email.trim().to_ascii_lowercase()));
+    let now = Utc::now();
+    let backed_off = match &throttle_key {
+        Some(k) => bf_db::throttle::is_locked(&s.pool, bf_db::throttle::LOGIN_IP, k, now).await?,
+        None => false,
     };
+    let user = match user {
+        Some(u) if ok && !backed_off => u,
+        _ => {
+            if let Some(k) = &throttle_key {
+                bf_db::throttle::record_failure(
+                    &s.pool,
+                    bf_db::throttle::LOGIN_IP,
+                    k,
+                    now,
+                    &bf_core::throttle::LOGIN,
+                )
+                .await?;
+            }
+            return Err(AppError::Unauthorized("invalid credentials"));
+        }
+    };
+    if let Some(k) = &throttle_key {
+        bf_db::throttle::clear(&s.pool, bf_db::throttle::LOGIN_IP, k).await?;
+    }
     let principal = Principal::from(&user);
     let ver = bf_db::auth::token_version(&s.pool, user.id)
         .await?

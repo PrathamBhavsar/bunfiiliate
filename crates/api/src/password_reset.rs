@@ -81,14 +81,30 @@ pub async fn reset(
     };
     let code = req.code.trim();
     let is_totp = code.len() == 6 && code.bytes().all(|b| b.is_ascii_digit());
+    // Throttled per user id. A locked user does the same work as an unknown one and gets the
+    // same 401, so a lock is indistinguishable from a bad code.
+    let throttled_id = user.as_ref().filter(|_| totp_row.is_some()).map(|u| u.id);
+    let locked = match throttled_id {
+        Some(id) => {
+            bf_db::throttle::is_locked(
+                &s.pool,
+                bf_db::throttle::RESET_USER,
+                &id.to_string(),
+                Utc::now(),
+            )
+            .await?
+        }
+        None => false,
+    };
     let proof = match (&user, &totp_row) {
-        (Some(u), Some(t)) => verify_code(&s, u.id, t, code, is_totp).await?,
+        (Some(u), Some(t)) if !locked => verify_code(&s, u.id, t, code, is_totp).await?,
         _ => {
             dummy_verify(is_totp).await;
             None
         }
     };
     let (Some(user), Some(proof)) = (user, proof) else {
+        note_failure(&s, throttled_id, locked).await?;
         return Err(AppError::Unauthorized(FAILED));
     };
     let hash = hash_password_bounded(req.new_password).await?;
@@ -99,8 +115,11 @@ pub async fn reset(
         Proof::Recovery(id) => bf_db::totp::consume_recovery_code(&mut *tx, user.id, id).await?,
     };
     if !claimed {
+        drop(tx);
+        note_failure(&s, Some(user.id), false).await?;
         return Err(AppError::Unauthorized(FAILED));
     }
+    bf_db::throttle::clear(&mut *tx, bf_db::throttle::RESET_USER, &user.id.to_string()).await?;
     bf_db::auth::set_password_hash(&mut *tx, user.id, &hash).await?;
     bf_db::auth::delete_refresh_tokens(&mut *tx, user.id).await?;
     bf_db::auth::bump_token_version(&mut *tx, user.id).await?;
@@ -177,4 +196,19 @@ async fn dummy_verify(is_totp: bool) {
     for _ in 0..RECOVERY_SLOTS {
         verify_password_bounded(String::new(), dummy_hash().to_string()).await;
     }
+}
+
+/// Count a failed attempt against the user (never while already locked: that would extend it).
+async fn note_failure(s: &AppState, user_id: Option<Uuid>, locked: bool) -> Result<(), AppError> {
+    if let (Some(id), false) = (user_id, locked) {
+        bf_db::throttle::record_failure(
+            &s.pool,
+            bf_db::throttle::RESET_USER,
+            &id.to_string(),
+            Utc::now(),
+            &bf_core::throttle::RESET,
+        )
+        .await?;
+    }
+    Ok(())
 }
