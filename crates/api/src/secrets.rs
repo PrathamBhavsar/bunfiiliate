@@ -12,6 +12,7 @@ pub const PROTECTED: &[(&str, &str)] = &[
     ("webhook_endpoints", "secret"),
     ("user_totp", "secret_enc"),
     ("billing_providers", "webhook_secret"),
+    ("payout_rail_credentials", "creds"),
 ];
 
 /// Primary-key column holding the row id that binds a value's AAD.
@@ -49,6 +50,7 @@ fn marker(table: &str) -> &'static str {
         "webhook_endpoints" => "secret_enc_at",
         "user_totp" => "secret_enc_at",
         "billing_providers" => "secret_enc_at",
+        "payout_rail_credentials" => "creds_enc_at",
         other => panic!("no encryption marker column for {other}"),
     }
 }

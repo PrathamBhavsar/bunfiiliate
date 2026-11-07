@@ -234,6 +234,15 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
         &[batch, program, admin_user],
     )
     .await;
+    sqlx::query(
+        "INSERT INTO payout_rail_credentials (id, workspace_id, rail, creds) \
+         VALUES ($1, $2, 'paypal_payouts', 'sealed-stand-in')",
+    )
+    .bind(Uuid::now_v7())
+    .bind(ws)
+    .execute(pool)
+    .await
+    .unwrap();
     let request = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO payout_requests (id, affiliate_id, program_id, requested_cents, currency) \
@@ -449,6 +458,9 @@ fn body(m: &str, path: &str, f: &Ws) -> Option<Value> {
             json!({"program_id": f.program, "requested_cents": 100, "currency": "USD"})
         }
         ("post", "/api/v1/payouts/batches") => json!({"program_id": f.program}),
+        ("put", "/api/v1/payouts/rails/credentials") => {
+            json!({"rail": "paypal_payouts", "credentials": {"client_id": "hijack", "client_secret": "hijack"}})
+        }
         ("patch", "/api/v1/programs/{id}") => json!({"name": "hijacked"}),
         ("post", "/api/v1/programs/{id}/conversion-types") => json!({"key": "x", "name": "x"}),
         ("post", "/api/v1/programs/{id}/enrollments") => json!({"affiliate_id": f.affiliate}),
@@ -499,7 +511,7 @@ fn query(m: &str, path: &str, f: &Ws) -> String {
 
 // ---- B snapshot ----
 
-const SNAP: [(&str, &str); 18] = [
+const SNAP: [(&str, &str); 19] = [
     (
         "workspaces",
         "SELECT id::text, name, slug FROM workspaces WHERE id = $1",
@@ -544,6 +556,10 @@ const SNAP: [(&str, &str); 18] = [
     (
         "batches",
         "SELECT c.* FROM payout_batches c JOIN programs p ON p.id = c.program_id WHERE p.workspace_id = $1",
+    ),
+    (
+        "payout_rail_credentials",
+        "SELECT * FROM payout_rail_credentials WHERE workspace_id = $1",
     ),
     (
         "payout_requests",

@@ -7,6 +7,7 @@ pub mod fraud;
 pub mod ids;
 pub mod ledger;
 pub mod money;
+pub mod payout_provider;
 pub mod secrets;
 pub mod state;
 pub mod throttle;
@@ -20,6 +21,9 @@ pub use fraud::{
 pub use ids::{AffiliateId, ConversionId, PayoutId, ProgramId, TxnId};
 pub use ledger::{Account, LedgerTxn, Posting, Unbalanced};
 pub use money::{Bps, Currency, Money, MoneyError};
+pub use payout_provider::{
+    LineEvent, LineState, PayoutDestination, PayoutError, PayoutReceipt, Rail, RailStatus,
+};
 pub use state::{
     ConversionEvent, ConversionStatus, InvalidTransition, PayoutEvent, PayoutStatus,
     conversion_created,

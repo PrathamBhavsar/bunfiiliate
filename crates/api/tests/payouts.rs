@@ -938,3 +938,259 @@ async fn leak_db_code_and_delivery_fns_4(pool: PgPool) {
         .unwrap();
     assert_eq!(n, 2);
 }
+
+// ---- payout rails (B04)
+
+use api::payout_rails::{MockRail, RailClient, dispatch, load_client, reconcile};
+use bf_core::Rail;
+use bf_core::secrets::Vault;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+/// Two affiliates owed 1000 each, batch drafted and approved but not paid.
+async fn approved_batch(pool: &PgPool) -> (Seed, Uuid) {
+    let s = seed(pool, true).await;
+    sale(pool, &s, "o1", 10_000, s.a).await;
+    sale(pool, &s, "o2", 10_000, s.b).await;
+    approve_due(pool).await.unwrap();
+    let batch = create_batch(pool, s.workspace, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    approve_batch(pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
+    (s, batch)
+}
+
+fn mock() -> (Arc<MockRail>, RailClient) {
+    let m = Arc::new(MockRail::default());
+    (m.clone(), RailClient::Mock(m))
+}
+
+async fn line_states(pool: &PgPool, batch: Uuid) -> Vec<(String, String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT COALESCE(payout_email, ''), status::text, rail_state FROM payouts \
+         WHERE batch_id = $1 ORDER BY payout_email",
+    )
+    .bind(batch)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_manual_csv_leaves_rail_columns_empty(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    mark_paid(&pool, s.workspace, batch).await.unwrap();
+    let rows = line_states(&pool, batch).await;
+    assert!(rows.iter().all(|r| r.1 == "paid" && r.2.is_none()));
+    let rails: Vec<String> = sqlx::query_scalar("SELECT DISTINCT rail FROM payouts")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rails, ["manual_csv"]);
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_mock_pays_each_line_once_and_posts_ledger(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.probe(pool.clone());
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.failed, out.submitted), (2, 0, 0));
+    assert!(out.batch_paid);
+    assert_eq!(batch_status(&pool, batch).await, "paid");
+    assert_eq!((m.accepted(), m.total_cents()), (2, 2_000));
+    let rows = line_states(&pool, batch).await;
+    assert!(
+        rows.iter()
+            .all(|r| r.1 == "paid" && r.2.as_deref() == Some("paid"))
+    );
+    let receipts: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM payouts WHERE rail_receipt IS NOT NULL")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(receipts, 2);
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_books(&pool).await;
+    // A paid batch cannot be sent again.
+    assert!(
+        dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+            .await
+            .is_err()
+    );
+    assert_eq!(m.accepted(), 2);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_provider_call_runs_outside_any_db_transaction(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.probe(pool.clone());
+    dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(m.calls(), 2);
+    assert_eq!(m.idle_in_tx_seen(), 0);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_provider_failure_mid_batch_then_retry_never_double_pays(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.reject("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    // a fails, b (processed after the failure) still goes out.
+    assert_eq!((out.paid, out.failed), (1, 1));
+    assert!(!out.batch_paid);
+    assert_eq!(batch_status(&pool, batch).await, "approved");
+    let rows = line_states(&pool, batch).await;
+    assert_eq!(
+        rows,
+        [
+            ("a@x.io".into(), "approved".into(), Some("failed".into())),
+            ("b@x.io".into(), "paid".into(), Some("paid".into())),
+        ]
+    );
+    // Only the confirmed line hit the ledger.
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+    assert_eq!(balance(&pool, &s, s.b).await, (0, 0));
+    let err: Option<String> =
+        sqlx::query_scalar("SELECT rail_error FROM payouts WHERE payout_email = 'a@x.io'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(err.unwrap().contains("refused"));
+    assert_books(&pool).await;
+
+    // Manual pay is allowed for a failed line only once nothing is in flight; here retry the rail.
+    m.heal("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.failed), (1, 0));
+    assert!(out.batch_paid);
+    // Two lines, two keys, 2000 total: b was not sent again.
+    assert_eq!((m.accepted(), m.total_cents()), (2, 2_000));
+    assert_eq!(m.calls(), 4 - 1);
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_timeout_is_retried_with_the_same_key(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.transient("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.submitted), (1, 1));
+    // Unknown outcome: stays submitted, no receipt, nothing posted for it.
+    let rows = line_states(&pool, batch).await;
+    assert_eq!(rows[0].2.as_deref(), Some("submitted"));
+    assert_eq!(rows[0].1, "approved");
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+    // Pay-by-hand is refused while the provider may have the money.
+    assert!(matches!(
+        mark_paid(&pool, s.workspace, batch).await,
+        Err(AppError::Conflict(_))
+    ));
+    m.heal("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(out.paid, 1);
+    assert!(out.batch_paid);
+    assert_eq!(m.accepted(), 2);
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_pending_posts_ledger_only_after_reconcile_confirms(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.hold("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.submitted), (1, 1));
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000)); // not paid yet
+    let st: (String, Option<String>) =
+        sqlx::query_as("SELECT rail_state, rail_status FROM payouts WHERE payout_email = 'a@x.io'")
+            .fetch_one(&pool)
+            .await
+            .map(|r: (Option<String>, Option<String>)| (r.0.unwrap(), r.1))
+            .unwrap();
+    assert_eq!(st, ("submitted".into(), Some("pending".into())));
+
+    // Re-dispatch does not send the held line again.
+    dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(m.calls(), 2);
+
+    let clients = HashMap::from([(Rail::Mock, client.clone())]);
+    let out = reconcile(&pool, s.workspace, batch, &clients)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.submitted, out.batch_paid), (0, 1, false));
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+
+    m.release();
+    let out = reconcile(&pool, s.workspace, batch, &clients)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.batch_paid), (1, true));
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_eq!(batch_status(&pool, batch).await, "paid");
+    assert_books(&pool).await;
+    // Reconciling again changes nothing.
+    let before = ledger_ids(&pool).await;
+    reconcile(&pool, s.workspace, batch, &clients)
+        .await
+        .unwrap();
+    assert_eq!(ledger_ids(&pool).await, before);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_unconfigured_provider_is_422_and_touches_nothing(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    for rail in [Rail::PaypalPayouts, Rail::Wise] {
+        let err = load_client(&pool, &Vault::plaintext(), s.workspace, rail)
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(err, AppError::Unprocessable(_)));
+    }
+    assert_eq!(batch_status(&pool, batch).await, "approved");
+    assert!(
+        line_states(&pool, batch)
+            .await
+            .iter()
+            .all(|r| r.1 == "approved" && r.2.is_none())
+    );
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_zero_amount_line_is_closed_without_a_provider_call(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    sale(&pool, &s, "o3", 5_000, s.b).await; // unrelated; keeps b earning
+    reverse(&pool, &s, "refund", "o2").await; // shrinks b's open payout to 0
+    let (m, client) = mock();
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(out.paid, 1);
+    assert!(out.batch_paid);
+    assert_eq!(m.accepted(), 1);
+    assert_books(&pool).await;
+}

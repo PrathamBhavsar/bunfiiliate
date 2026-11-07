@@ -22,8 +22,8 @@ use crate::auth::{
 use crate::error::{AppError, AppJson, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    admin_reset, affiliates, analytics, billing, mail, money, ops, password_reset, payout_requests,
-    payouts, programs, totp, webhooks, workspaces,
+    admin_reset, affiliates, analytics, billing, mail, money, ops, password_reset, payout_rails,
+    payout_requests, payouts, programs, totp, webhooks, workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -80,6 +80,8 @@ impl Modify for CookieAuth {
         payouts::create_batch_route, payouts::list_batches, payouts::get_batch,
         payouts::approve, payouts::mark_paid_route, payouts::cancel, payouts::export,
         payouts::me_payouts,
+        payout_rails::reconcile_route, payout_rails::list_rails, payout_rails::put_credentials,
+        payout_rails::delete_credentials,
         payout_requests::me_create, payout_requests::me_list, payout_requests::admin_list,
         payout_requests::approve, payout_requests::reject,
         billing::checkout, billing::subscription, billing::list_providers,
@@ -117,6 +119,7 @@ pub fn routes() -> Router<AppState> {
         .merge(ops::routes())
         .merge(money::routes())
         .merge(payouts::routes())
+        .merge(payout_rails::routes())
         .merge(payout_requests::routes())
         .merge(billing::routes())
 }

@@ -110,6 +110,15 @@ Database schema migrations execute automatically when the `api` service starts.
 
 ---
 
+## Payout rails
+
+`POST /api/v1/payouts/batches/{id}/mark-paid` with no body marks a batch paid by hand (manual CSV). With `{"rail": "mock" | "paypal_payouts" | "wise"}` each payout line goes to a provider instead.
+
+- Credentials are per workspace, not env vars: `PUT /api/v1/payouts/rails/credentials` with `{"rail": "paypal_payouts", "sandbox": true, "credentials": {...}}` (`DELETE ...?rail=` removes them). PayPal: `client_id`, `client_secret`. Wise: `api_token`, `profile_id`. They are sealed with the master key (like webhook secrets), never returned, and `GET /api/v1/payouts/rails` shows only whether each rail is configured. A rail with no credentials answers `422`; `mock` is always available.
+- Line states: `pending -> submitted -> paid | failed`. No provider call runs inside a database transaction. The provider idempotency key is the payout line id, so retrying `mark-paid` re-sends failed lines (or lines whose outcome is unknown) without paying twice. The ledger posts only when the provider confirms `paid`; the batch becomes `paid` once every line is.
+- `POST /api/v1/payouts/batches/{id}/reconcile` asks the provider about lines it accepted but has not settled (PayPal and Wise settle asynchronously) and posts the confirmed ones. Run it until the batch is paid. While a line is in flight, marking the batch paid by hand is refused.
+- PayPal Payouts has a sandbox and a pay-as-you-go live tier. Wise: the adapter follows the documented quote, recipient, transfer, fund flow, but has not been run against the Wise sandbox, and live use needs a Wise business agreement and supported email-recipient currencies. Treat it as untested until you have verified it in your sandbox. Zero-decimal currencies (JPY, KRW, ...) are refused by both adapters.
+
 ## 3. First-Run Bootstrap
 
 Before logging in, initialize the root workspace and super-administrator account using `api bootstrap`:
