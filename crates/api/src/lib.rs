@@ -15,6 +15,7 @@ pub mod mail;
 pub mod metrics;
 pub mod money;
 pub mod notify;
+pub mod notify_channels;
 pub mod ops;
 pub mod page;
 pub mod password_reset;

@@ -22,8 +22,8 @@ use crate::auth::{
 use crate::error::{AppError, AppJson, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    admin_reset, affiliates, analytics, billing, mail, money, ops, password_reset, payout_rails,
-    payout_requests, payouts, programs, totp, webhooks, workspaces,
+    admin_reset, affiliates, analytics, billing, mail, money, notify_channels, ops, password_reset,
+    payout_rails, payout_requests, payouts, programs, totp, webhooks, workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -74,6 +74,7 @@ impl Modify for CookieAuth {
         ops::list_notifications, ops::mark_read,
         ops::create_contact, ops::list_contacts, ops::update_contact,
         ops::get_settings, ops::put_settings, ops::list_audit,
+        notify_channels::get_channels, notify_channels::put_channels, notify_channels::test_channel,
         money::list_customers, money::get_customer,
         money::list_conversions, money::get_conversion,
         money::approve, money::reject, money::reverse,
@@ -85,7 +86,7 @@ impl Modify for CookieAuth {
         payout_rails::delete_credentials,
         payout_requests::me_create, payout_requests::me_list, payout_requests::admin_list,
         payout_requests::approve, payout_requests::reject,
-        billing::checkout, billing::subscription, billing::list_providers,
+        billing::checkout, billing::subscription, billing::list_plans, billing::list_providers,
         billing::set_provider, billing::webhook,
     ),
     components(schemas(
@@ -118,6 +119,7 @@ pub fn routes() -> Router<AppState> {
         .merge(webhooks::routes())
         .merge(mail::routes())
         .merge(ops::routes())
+        .merge(notify_channels::routes())
         .merge(money::routes())
         .merge(payouts::routes())
         .merge(payout_rails::routes())

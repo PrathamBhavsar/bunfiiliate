@@ -479,6 +479,10 @@ fn body(m: &str, path: &str, f: &Ws) -> Option<Value> {
             json!({"affiliate_id": f.affiliate, "program_id": f.program, "code": "XTENANT2"})
         }
         ("put", "/api/v1/settings") => json!({}),
+        ("put", "/api/v1/settings/notify-channels") => {
+            json!({"discord_url": "https://discord.example.com/hijack"})
+        }
+        ("post", "/api/v1/settings/test-notify-channel") => json!({"channel": "discord"}),
         ("post", "/api/v1/webhooks/test") => {
             json!({"program_id": f.program, "source": "generic", "payload": {}})
         }

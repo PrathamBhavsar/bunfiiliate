@@ -34,6 +34,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/v1/billing/checkout", post(checkout))
         .route("/api/v1/billing/subscription", get(subscription))
+        .route("/api/v1/billing/plans", get(list_plans))
         .route("/api/v1/billing/providers", get(list_providers))
         .route("/api/v1/billing/providers/{provider}", put(set_provider))
         .route("/api/v1/webhooks/billing/{provider}", post(webhook))
@@ -377,6 +378,37 @@ pub struct PlanView {
     max_programs: Option<i32>,
     max_affiliates: Option<i32>,
     max_monthly_clicks: Option<i64>,
+}
+
+impl From<db::Plan> for PlanView {
+    fn from(p: db::Plan) -> Self {
+        Self {
+            key: p.key,
+            name: p.name,
+            price_cents: p.price_cents,
+            currency: p.currency,
+            max_programs: p.max_programs,
+            max_affiliates: p.max_affiliates,
+            max_monthly_clicks: p.max_monthly_clicks,
+        }
+    }
+}
+
+/// Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace.
+#[utoipa::path(
+    get,
+    path = "/api/v1/billing/plans",
+    tag = "billing",
+    security(("cookie" = [])),
+    responses((status = 200, body = Vec<PlanView>)),
+)]
+pub async fn list_plans(
+    State(s): State<AppState>,
+    auth: Auth<Admin>,
+) -> Result<Json<Vec<PlanView>>, AppError> {
+    auth.principal.workspace_scope(None)?;
+    let plans = db::list_plans(&s.pool).await?;
+    Ok(Json(plans.into_iter().map(PlanView::from).collect()))
 }
 
 #[derive(Serialize, ToSchema)]

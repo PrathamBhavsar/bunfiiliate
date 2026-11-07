@@ -531,3 +531,20 @@ async fn provider_secret_is_sealed_and_never_returned(pool: PgPool) {
         (StatusCode::OK, Some("applied"))
     );
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn plans_list_orders_by_price_and_needs_admin(pool: PgPool) {
+    let app = app(pool.clone());
+    let t = tenant(&pool, &app, UserRole::Admin).await;
+    add_plan(&pool, "pro", Some(5), None).await;
+    let (st, v) = call(&app, &t, "GET", "/api/v1/billing/plans", json!({})).await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    let keys: Vec<_> = v.as_array().unwrap().iter().map(|p| p["key"].clone()).collect();
+    assert_eq!(keys, [json!("free"), json!("pro")]);
+    assert_eq!(v[1]["max_programs"], 5);
+    assert!(v[1]["max_affiliates"].is_null());
+
+    let aff = tenant(&pool, &app, UserRole::Affiliate).await;
+    let (st, _) = call(&app, &aff, "GET", "/api/v1/billing/plans", json!({})).await;
+    assert_eq!(st, StatusCode::FORBIDDEN);
+}

@@ -1256,6 +1256,35 @@
         ]
       }
     },
+    "/api/v1/billing/plans": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace.",
+        "operationId": "list_plans",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlanView"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/billing/providers": {
       "get": {
         "tags": [
@@ -5604,6 +5633,142 @@
         ]
       }
     },
+    "/api/v1/settings/notify-channels": {
+      "get": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Which notification channels are configured. URLs are never returned.",
+        "operationId": "get_channels",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelsView"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Set or clear the Telegram and Discord webhook URLs (sealed at rest).",
+        "operationId": "put_channels",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PutChannels"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChannelsView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/settings/test-notify-channel": {
+      "post": {
+        "tags": [
+          "settings"
+        ],
+        "summary": "Send a test message to a configured channel now, independent of the outbox.",
+        "operationId": "test_channel",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/signup": {
       "post": {
         "tags": [
@@ -6770,6 +6935,22 @@
           "total_cents": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ChannelsView": {
+        "type": "object",
+        "required": [
+          "telegram_set",
+          "discord_set"
+        ],
+        "properties": {
+          "discord_set": {
+            "type": "boolean"
+          },
+          "telegram_set": {
+            "type": "boolean",
+            "description": "The URL itself is write-only."
           }
         }
       },
@@ -9984,6 +10165,25 @@
           }
         }
       },
+      "PutChannels": {
+        "type": "object",
+        "properties": {
+          "discord_url": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "telegram_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Absent: unchanged. `null` or empty: cleared."
+          }
+        },
+        "additionalProperties": false
+      },
       "PutCredentials": {
         "type": "object",
         "required": [
@@ -10379,6 +10579,29 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "TestRequest": {
+        "type": "object",
+        "required": [
+          "channel"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string",
+            "description": "`telegram` or `discord`."
+          }
+        }
+      },
+      "TestResult": {
+        "type": "object",
+        "required": [
+          "sent"
+        ],
+        "properties": {
+          "sent": {
+            "type": "boolean"
           }
         }
       },
