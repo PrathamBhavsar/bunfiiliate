@@ -798,6 +798,60 @@
         ]
       }
     },
+    "/api/v1/auth/password/reset": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Reset the password of an account that has TOTP enrolled.",
+        "operationId": "reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed; every session revoked"
+          },
+          "400": {
+            "description": "New password too short or too long",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Reset failed (same body for every cause)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/auth/refresh": {
       "post": {
         "tags": [
@@ -8253,6 +8307,27 @@
           "workspace": {
             "type": "string",
             "description": "Slug of the workspace to join."
+          }
+        }
+      },
+      "ResetRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "code",
+          "new_password"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Six-digit authenticator code, or a recovery code (`xxxxx-xxxxx`)."
+          },
+          "email": {
+            "type": "string"
+          },
+          "new_password": {
+            "type": "string",
+            "description": "12 to 256 characters."
           }
         }
       },

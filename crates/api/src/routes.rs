@@ -23,7 +23,8 @@ use crate::auth::{
 use crate::error::{AppError, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    affiliates, analytics, mail, money, ops, payouts, programs, totp, webhooks, workspaces,
+    affiliates, analytics, mail, money, ops, password_reset, payouts, programs, totp, webhooks,
+    workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -45,6 +46,7 @@ impl Modify for CookieAuth {
 #[openapi(
     paths(
         login, refresh, logout, me, csrf,
+        password_reset::reset,
         totp::enrol, totp::confirm, totp::regenerate, totp::disable, totp::status,
         workspaces::create_workspace, workspaces::list_workspaces,
         workspaces::invite_member, workspaces::list_members,
@@ -78,7 +80,7 @@ impl Modify for CookieAuth {
         payouts::me_payouts,
     ),
     components(schemas(
-        LoginRequest, UserView, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
+        LoginRequest, UserView, password_reset::ResetRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account
     )),
     modifiers(&CookieAuth),
@@ -94,6 +96,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/v1/auth/logout", post(logout))
         .route("/api/v1/auth/me", get(me))
         .route("/api/v1/auth/csrf", get(csrf))
+        .merge(password_reset::routes())
         .merge(totp::routes())
         .merge(workspaces::routes())
         .merge(programs::routes())
