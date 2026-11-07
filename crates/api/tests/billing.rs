@@ -539,7 +539,12 @@ async fn plans_list_orders_by_price_and_needs_admin(pool: PgPool) {
     add_plan(&pool, "pro", Some(5), None).await;
     let (st, v) = call(&app, &t, "GET", "/api/v1/billing/plans", json!({})).await;
     assert_eq!(st, StatusCode::OK, "{v}");
-    let keys: Vec<_> = v.as_array().unwrap().iter().map(|p| p["key"].clone()).collect();
+    let keys: Vec<_> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|p| p["key"].clone())
+        .collect();
     assert_eq!(keys, [json!("free"), json!("pro")]);
     assert_eq!(v[1]["max_programs"], 5);
     assert!(v[1]["max_affiliates"].is_null());

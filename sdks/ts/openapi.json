@@ -1262,7 +1262,7 @@
           "billing"
         ],
         "summary": "Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace.",
-        "operationId": "list_plans",
+        "operationId": "list_billing_plans",
         "responses": {
           "200": {
             "description": "",

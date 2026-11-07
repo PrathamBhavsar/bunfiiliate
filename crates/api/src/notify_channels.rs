@@ -290,18 +290,14 @@ pub async fn put_channels(
     for (ch, value) in &sealed {
         // One static statement per column: the column name is never interpolated.
         let q = match ch {
-            Channel::Telegram => {
-                "UPDATE workspaces SET notify_telegram_webhook = $2, notify_enc_at = now() WHERE id = $1"
-            }
-            Channel::Discord => {
-                "UPDATE workspaces SET notify_discord_webhook = $2, notify_enc_at = now() WHERE id = $1"
-            }
+            Channel::Telegram => sqlx::query(
+                "UPDATE workspaces SET notify_telegram_webhook = $2, notify_enc_at = now() WHERE id = $1",
+            ),
+            Channel::Discord => sqlx::query(
+                "UPDATE workspaces SET notify_discord_webhook = $2, notify_enc_at = now() WHERE id = $1",
+            ),
         };
-        let done = sqlx::query(q)
-            .bind(ws)
-            .bind(value)
-            .execute(&mut *tx)
-            .await?;
+        let done = q.bind(ws).bind(value).execute(&mut *tx).await?;
         if done.rows_affected() == 0 {
             return Err(AppError::NotFound("workspace not found"));
         }

@@ -34,7 +34,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/v1/billing/checkout", post(checkout))
         .route("/api/v1/billing/subscription", get(subscription))
-        .route("/api/v1/billing/plans", get(list_plans))
+        .route("/api/v1/billing/plans", get(list_billing_plans))
         .route("/api/v1/billing/providers", get(list_providers))
         .route("/api/v1/billing/providers/{provider}", put(set_provider))
         .route("/api/v1/webhooks/billing/{provider}", post(webhook))
@@ -402,7 +402,7 @@ impl From<db::Plan> for PlanView {
     security(("cookie" = [])),
     responses((status = 200, body = Vec<PlanView>)),
 )]
-pub async fn list_plans(
+pub async fn list_billing_plans(
     State(s): State<AppState>,
     auth: Auth<Admin>,
 ) -> Result<Json<Vec<PlanView>>, AppError> {

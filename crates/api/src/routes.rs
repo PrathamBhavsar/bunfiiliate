@@ -86,7 +86,7 @@ impl Modify for CookieAuth {
         payout_rails::delete_credentials,
         payout_requests::me_create, payout_requests::me_list, payout_requests::admin_list,
         payout_requests::approve, payout_requests::reject,
-        billing::checkout, billing::subscription, billing::list_plans, billing::list_providers,
+        billing::checkout, billing::subscription, billing::list_billing_plans, billing::list_providers,
         billing::set_provider, billing::webhook,
     ),
     components(schemas(

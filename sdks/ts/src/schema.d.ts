@@ -390,7 +390,7 @@ export interface paths {
             cookie?: never;
         };
         /** Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace. */
-        get: operations["list_plans"];
+        get: operations["list_billing_plans"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3870,7 +3870,7 @@ export interface operations {
             };
         };
     };
-    list_plans: {
+    list_billing_plans: {
         parameters: {
             query?: never;
             header?: never;
