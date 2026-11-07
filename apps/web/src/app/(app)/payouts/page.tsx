@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import { type Batch, formatCents, formatTime, ok, refresh, required, toPage, useLookups } from "@/lib/admin";
 import { api, errorMessage } from "@/lib/api";
 import type { ListFn } from "@/lib/use-resource";
+import type { components } from "@bunfiiliate/sdk";
 
+const REQUEST_STATUSES = ["pending", "approved", "rejected", "paid"];
 const STATUSES = ["draft", "approved", "paid", "cancelled"];
 
 const list: ListFn<Batch> = async ({ page, pageSize, filters }, signal) =>
@@ -265,6 +267,88 @@ function BatchPanel({ batch: b }: { batch: Batch }) {
   );
 }
 
+type PayoutRequest = components["schemas"]["RequestView"];
+
+const requestList: ListFn<PayoutRequest> = async ({ page, pageSize, filters }, signal) =>
+  toPage(
+    await ok(
+      api.GET("/api/v1/payout-requests", {
+        signal,
+        params: { query: { page, limit: pageSize, status: filters.status || undefined } },
+      }),
+    ),
+  );
+
+/** Approve or reject one pending request. Approve drafts a batch sized from the current balance. */
+function RequestActions({ request: r, label }: { request: PayoutRequest; label: string }) {
+  const [note, setNote] = useState<string | null>(null);
+  if (r.status !== "pending") return <span className="text-xs text-muted">—</span>;
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <ConfirmDialog
+        trigger={
+          <Button size="sm" variant="primary" aria-label={`Approve request from ${label}`}>
+            Approve
+          </Button>
+        }
+        title="Approve payout request?"
+        description={`Drafts a payout batch for ${label}, sized from their current payable balance (they asked for ${formatCents(r.requested_cents, r.currency)}). Mark it paid from the batch list.`}
+        confirmLabel="Approve"
+        onConfirm={async () => {
+          const res = await ok(api.POST("/api/v1/payout-requests/{id}/approve", { params: { path: { id: r.id } } }));
+          setNote(`Drafted ${formatCents(res.amount_cents, r.currency)}`);
+          await refresh();
+        }}
+      />
+      <FormDialog
+        trigger={
+          <Button size="sm" aria-label={`Reject request from ${label}`}>
+            Reject
+          </Button>
+        }
+        title="Reject payout request"
+        description="The affiliate sees this reason."
+        fields={[{ name: "reason", label: "Reason", type: "textarea", required: true, hint: "Up to 500 characters." }]}
+        submitLabel="Reject"
+        onSubmit={async (v) => {
+          await ok(
+            api.POST("/api/v1/payout-requests/{id}/reject", {
+              params: { path: { id: r.id } },
+              body: { reason: required(v.reason ?? "", "Reason") },
+            }),
+          );
+          await refresh();
+        }}
+      />
+      {note && <span role="status" className="text-xs">{note}</span>}
+    </span>
+  );
+}
+
+function PayoutRequests() {
+  const lookups = useLookups();
+  const config = useMemo<ResourceConfig<PayoutRequest>>(() => {
+    const { programName, affiliateEmail } = lookups;
+    return {
+      title: "Payout requests",
+      description: "Affiliates ask to be paid. Approve drafts a payout from their balance; reject sends them a reason.",
+      list: requestList,
+      filters: [{ id: "status", label: "Status", options: REQUEST_STATUSES.map((s) => ({ value: s, label: s })) }],
+      columns: [
+        { id: "created", header: "Requested", cell: (r) => formatTime(r.created_at) },
+        { id: "affiliate", header: "Affiliate", cell: (r) => affiliateEmail(r.affiliate_id) },
+        { id: "program", header: "Program", cell: (r) => programName(r.program_id) },
+        { id: "amount", header: "Amount", align: "right", className: "tabular-nums", cell: (r) => formatCents(r.requested_cents, r.currency) },
+        { id: "status", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
+        { id: "reason", header: "Reason", className: "max-w-48 truncate", cell: (r) => r.rejection_reason ?? "—" },
+        { id: "actions", header: "Actions", cell: (r) => <RequestActions request={r} label={affiliateEmail(r.affiliate_id)} /> },
+      ],
+      empty: { title: "No payout requests", description: "Requests from affiliates appear here." },
+    };
+  }, [lookups]);
+  return <ResourceView config={config} headingLevel={2} />;
+}
+
 export default function Page() {
   const router = useRouter();
   const pathname = usePathname();
@@ -324,5 +408,10 @@ export default function Page() {
     };
   }, [lookups, router, pathname]);
 
-  return <ResourceView config={config} />;
+  return (
+    <div className="grid gap-4">
+      <ResourceView config={config} />
+      <PayoutRequests />
+    </div>
+  );
 }

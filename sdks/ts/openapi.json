@@ -3734,7 +3734,7 @@
           "payouts"
         ],
         "summary": "Approve: drafts a payout sized from the current balance.",
-        "operationId": "approve",
+        "operationId": "payout_request_approve",
         "parameters": [
           {
             "name": "id",
@@ -3792,7 +3792,7 @@
           "payouts"
         ],
         "summary": "Reject with a reason shown to the affiliate.",
-        "operationId": "reject",
+        "operationId": "payout_request_reject",
         "parameters": [
           {
             "name": "id",
