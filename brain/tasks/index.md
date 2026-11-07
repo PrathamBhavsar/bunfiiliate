@@ -79,3 +79,5 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | C30 | feat/c30-code-stats | done (`/referral-codes/{code}/stats`, `/me/...`; live clicks with ts bounds, no rollup dependency) |
 | C31 | feat/c30-code-stats | done (`/referral-codes/detail?code=`, `/me/links/detail?code=`; Playwright cases are C34) |
 | billing-variant | feat/billing-variant-plan | done, merged (0082; plan from purchased variant, store check) |
+| C30+C31+C32 | feat/c30-code-stats | done, merged (per-code stats API + pages, routing ADR 0006) |
+| notify-redact | fix/notify-redact-url | done, merged (reqwest errors stripped of channel URL) |

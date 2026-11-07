@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-07] Plan v2 wave 8a (tribe)
+
+- **Merged**: C30, C31, C32, notify channel URL redaction (webhook/bot tokens no longer reach logs via reqwest errors; use `Error::without_url`).
+- **Lessons**: a claude account at its 5-hour limit exits with no commits and leaves an empty worktree and branch: remove both and reset the board status before relaunching.
+- **Validation**: `make ci` and `make e2e` pass before merge.
+
 ## [2026-11-07] C32 + C30 + C31 code stats (tribe #37)
 
 - **Done**: ADR-0006 (detail pages are `?code=` query routes; Caddy `try_files` already fits, `trailingSlash` unset), per-code stats API (admin + `/me`), stats pages with KPIs, charts, top countries/referrers, links from both list pages.
