@@ -1,6 +1,6 @@
 # Migrating tracker v1 to v2
 
-v1 keeps working during the deprecation window (see `docs/tracker-contract-v2.md` section 7). Migrate at your pace; v1 responses carry `Deprecation`/`Sunset` headers once A13 ships.
+v1 keeps working during the deprecation window (see `docs/tracker-contract-v2.md` section 7). Migrate at your pace; v1 responses carry `Deprecation`/`Sunset` headers (A13, shipped). Sunset defaults to `Sun, 01 Nov 2027 00:00:00 GMT`; operators override it with `BF_V1_SUNSET` (RFC 7231 date). `bf_tracker_v1_requests_total{route}` counts v1 traffic so you can see when it is safe to remove. `/t.js`, `/r/{code}` and `/v2/*` carry no deprecation headers.
 
 | v1 | v2 |
 | --- | --- |
@@ -15,7 +15,7 @@ v1 keeps working during the deprecation window (see `docs/tracker-contract-v2.md
 
 Steps:
 1. Server events: switch the URL, replace the two signature headers with `Bf-Signature`, shorten/clean idempotency keys, send `"schema":"bf.event.v2"`, send `amount_cents` as an integer and an uppercase `currency`, send `ref_external_id` on refunds. Hash emails (SHA-256) into `customer.email_sha256`.
-2. Browser: load the new `/t.js` (or the A14 SDK); it posts to `/v2/c`. Pinned old copies keep using `/c` until sunset.
+2. Browser: `/t.js` now serves the v2 script, so a plain `<script src="./t.js">` snippet upgrades itself; load it (or the A14 SDK); it posts to `/v2/c`. Pinned old copies keep using `/c` until sunset.
 3. Outbound webhooks: verify with the new headers on a test endpoint set to `v2`, then switch production endpoints. Legacy headers are sent alongside until v1 sunset; ignore unknown body fields.
 4. Handle new error bodies (`error.code`) and `409 idempotency_conflict`; treat `200 duplicate` as success.
 

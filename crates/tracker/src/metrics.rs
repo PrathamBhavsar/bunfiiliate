@@ -20,8 +20,38 @@ pub static SPOOL_BYTES: Gauge = Gauge::new();
 /// Spool offset already in Postgres; `bf_spool_lag` is the bytes between the two.
 pub static SPOOL_CHECKPOINT: Gauge = Gauge::new();
 
+/// v1 (deprecated) requests by matched route, indexed like `V1_ROUTES`.
+static V1_REQUESTS: [Counter; 4] = [
+    Counter::new(),
+    Counter::new(),
+    Counter::new(),
+    Counter::new(),
+];
+const V1_ROUTES: [&str; 4] = [
+    "/c",
+    "/v1/events/{key}",
+    "/v1/webhooks/stripe/{key}",
+    "/v1/webhooks/paddle/{key}",
+];
+
+pub fn v1_request(route: &str) {
+    if let Some(i) = V1_ROUTES.iter().position(|r| *r == route) {
+        V1_REQUESTS[i].inc();
+    }
+}
+
 pub fn render() -> String {
     let mut out = String::new();
+    out.push_str(
+        "# HELP bf_tracker_v1_requests_total Requests to deprecated v1 routes.\n\
+         # TYPE bf_tracker_v1_requests_total counter\n",
+    );
+    for (route, c) in V1_ROUTES.iter().zip(&V1_REQUESTS) {
+        out.push_str(&format!(
+            "bf_tracker_v1_requests_total{{route=\"{route}\"}} {}\n",
+            c.get()
+        ));
+    }
     histogram(
         &mut out,
         "bf_ingest_latency_seconds",

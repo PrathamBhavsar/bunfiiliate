@@ -1,6 +1,7 @@
 //! Tracker: validates against an in-memory snapshot, spools every click durably,
 //! then batches it into Postgres. No DB call on the request path.
 
+pub mod deprecation;
 pub mod event;
 pub mod geo;
 pub mod idem;
@@ -48,7 +49,7 @@ use v2::ApiError;
 use webhook::Source;
 use writer::{Error, Queued, Record};
 
-const TRACKER_JS: &[u8] = include_bytes!("../js/tracker.min.js");
+const TRACKER_JS: &[u8] = include_bytes!("../js/tracker.v2.min.js");
 const QUEUE_CAPACITY: usize = 10_000;
 /// Share of the queue (a tenth) clicks may not take: a click flood must not make Stripe or
 /// Paddle deliveries get 503 (they retry, but late conversions delay payouts).
@@ -139,13 +140,17 @@ pub fn router(state: AppState) -> Router {
         .route("/v1/events/{key}", post(generic_event))
         .route("/v1/webhooks/stripe/{key}", post(stripe_webhook))
         .route("/v1/webhooks/paddle/{key}", post(paddle_webhook))
-        .layer(DefaultBodyLimit::max(MAX_EVENT_BODY));
+        .layer(DefaultBodyLimit::max(MAX_EVENT_BODY))
+        .route_layer(axum::middleware::from_fn(deprecation::v1));
     Router::new()
         .route("/t.js", get(tracker_js))
         .route("/r/{code}", get(redirect))
         .route(
             "/c",
-            post(beacon).options(preflight).layer(map_response(cors)),
+            post(beacon)
+                .options(preflight)
+                .layer(map_response(cors))
+                .route_layer(axum::middleware::from_fn(deprecation::v1)),
         )
         .route("/healthz", get(|| async { "ok" }))
         .route("/readyz", get(readyz))
