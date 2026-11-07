@@ -294,8 +294,8 @@ async fn approve_sizes_from_current_balance_not_requested_amount(pool: PgPool) {
         .fetch_one(&pool)
         .await
         .unwrap();
-    approve_batch(&pool, batch, s.admin).await.unwrap();
-    mark_paid(&pool, batch).await.unwrap();
+    approve_batch(&pool, ws, batch, s.admin).await.unwrap();
+    mark_paid(&pool, ws, batch).await.unwrap();
     let st: String = sqlx::query_scalar("SELECT status::text FROM payout_requests WHERE id = $1")
         .bind(id)
         .fetch_one(&pool)

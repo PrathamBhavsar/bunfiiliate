@@ -880,6 +880,9 @@ source = "api"
 kind = "scoped"
 role = "Admin"
 reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "get"
 path = "/healthz"
 source = "api"
 kind = "public"
@@ -893,3 +896,11 @@ source = "api"
 kind = "public"
 role = "none"
 reason = "readiness probe (db ping + migration head)"
+
+[[route]]
+method = "get"
+path = "/v2/openapi.json"
+source = "tracker"
+kind = "public"
+role = "none"
+reason = "published contract, no tenant data"

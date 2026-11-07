@@ -250,6 +250,7 @@ fn public_routes_allowlist() {
         "tracker post /v2/c",
         "tracker get /v2/openapi.json",
         "tracker get /healthz",
+        "tracker get /v2/openapi.json",
         "tracker get /readyz",
     ]
     .map(str::to_owned)
