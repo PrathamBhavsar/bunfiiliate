@@ -1,0 +1,3 @@
+{"event_id": "evt_pdl_sale", "event_type": "transaction.completed", "occurred_at": "2026-01-01T00:00:00Z",
+ "data": {"id": "txn_1", "customer_id": "ctm_1", "currency_code": "USD",
+          "details": {"totals": {"total": "20000"}}, "custom_data": {"bf_ref": "CBCODE"}}}

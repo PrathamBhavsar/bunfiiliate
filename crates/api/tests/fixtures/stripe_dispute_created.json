@@ -1,0 +1,2 @@
+{"id": "evt_dispute_9", "type": "charge.dispute.created",
+ "data": {"object": {"id": "dp_1", "charge": "ch_1", "payment_intent": "pi_1", "amount": 10000}}}

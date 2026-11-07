@@ -365,6 +365,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a plan change. `mock` switches the plan at once; `lemonsqueezy` returns a hosted checkout. */
+        post: operations["checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Providers with a webhook secret configured. The secret itself is never returned. */
+        get: operations["list_providers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/providers/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a provider's webhook secret (sealed at rest). Enables the provider. */
+        put: operations["set_provider"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's plan, status and usage against its limits. */
+        get: operations["subscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contact-requests": {
         parameters: {
             query?: never;
@@ -372,7 +440,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List contact requests, newest first, optionally by status. */
+        /** List contact requests, newest first, optionally by status and kind. */
         get: operations["list_contacts"];
         put?: never;
         /** Public contact form: stores a `new` request for the workspace's admins. */
@@ -902,9 +970,67 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** `approved -> paid`: posts payable -> cash per payout. */
+        /**
+         * `approved -> paid`: posts payable -> cash per payout. With no body (or `manual_csv`) it
+         *     marks the whole batch paid by hand. With `{rail}` it sends each line through that provider
+         *     and posts the ledger only for lines the provider confirms paid; the response then carries an
+         *     `outcome`, and the batch stays `approved` until every line is paid (call again to retry
+         *     failures, or `reconcile` to collect pending ones).
+         */
         post: operations["mark_paid_route"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask providers about submitted payout lines and settle the confirmed ones. */
+        post: operations["reconcile_route"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/rails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payout rails and whether each is usable. Credentials are never returned. */
+        get: operations["list_rails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/rails/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Store (sealed) the workspace's credentials for a provider rail, replacing any existing. */
+        put: operations["put_credentials"];
+        post?: never;
+        /** Remove the workspace's credentials for a provider rail. */
+        delete: operations["delete_credentials"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1174,6 +1300,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Self-serve signup: a new workspace with its first `admin`, signed in. 404 unless enabled. */
+        post: operations["signup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{id}/password-reset-token": {
         parameters: {
             query?: never;
@@ -1185,6 +1328,23 @@ export interface paths {
         put?: never;
         /** Issue a one-hour password reset token for a user. */
         post: operations["issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/billing/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Provider subscription webhook. Public; authenticated by the HMAC of the raw body. */
+        post: operations["webhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1263,6 +1423,64 @@ export interface paths {
         head?: never;
         /** Change an endpoint's url, topics or active flag. */
         patch: operations["update_endpoint"];
+        trace?: never;
+    };
+    "/api/v1/webhooks/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Received deliveries (newest first) with their processing outcome. */
+        get: operations["list_inbound"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/inbound/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a stored delivery through the worker again. The signature is not re-checked: it
+         *     passed when the event was stored. Duplicate sales still dedupe on the external id.
+         */
+        post: operations["replay_inbound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign `payload` with the program's own secret for `source` and deliver it to the tracker's
+         *     real inbound endpoint, returning the tracker's raw answer. Lets an admin check a secret
+         *     end to end without a provider account.
+         */
+        post: operations["test_webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/workspaces": {
@@ -1397,6 +1615,17 @@ export interface components {
             /** Format: int64 */
             total_cents: number;
         };
+        CheckoutRequest: {
+            plan_key: string;
+            /** @description `mock` or `lemonsqueezy`; default `mock` when configured, else `lemonsqueezy`. */
+            provider?: string | null;
+        };
+        CheckoutResponse: {
+            /** @description `true` when the plan is already active (mock). */
+            activated: boolean;
+            /** @description Hosted checkout to send the admin to. */
+            url?: string | null;
+        };
         CodeRequest: {
             /** @description Six-digit authenticator code. */
             code: string;
@@ -1407,11 +1636,20 @@ export interface components {
             status: string;
         };
         ContactRequest: {
+            /**
+             * Format: int64
+             * @description Disputed amount in cents; set together with `currency`.
+             */
+            amount_cents?: number | null;
             /** Format: date-time */
             created_at: string;
+            /** @description ISO 4217 code, upper case. */
+            currency?: string | null;
             email: string;
             /** Format: uuid */
             id: string;
+            /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+            kind: string;
             message: string;
             name: string;
             /** Format: uuid */
@@ -1558,6 +1796,21 @@ export interface components {
             code: string;
             message: string;
         };
+        /** @description A received provider/generic delivery, as stored. `processed_at` unset = still queued. */
+        InboundEventRow: {
+            error?: string | null;
+            external_id: string;
+            /** Format: uuid */
+            id: string;
+            payload: unknown;
+            /** Format: date-time */
+            processed_at?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            /** Format: date-time */
+            received_at: string;
+            source: string;
+        };
         IssuedToken: {
             /** Format: date-time */
             expires_at: string;
@@ -1567,6 +1820,11 @@ export interface components {
         LoginRequest: {
             email: string;
             password: string;
+        };
+        /** @description Body of `mark-paid` when a provider rail is chosen. */
+        MarkPaidRail: {
+            /** @description `manual_csv` (default), `paypal_payouts`, `wise` or `mock`. */
+            rail: string;
         };
         Member: {
             email: string;
@@ -1621,7 +1879,16 @@ export interface components {
             program_id: string;
         };
         NewContact: {
+            /**
+             * Format: int64
+             * @description Disputed amount in cents; requires `currency`.
+             */
+            amount_cents?: number | null;
+            /** @description ISO 4217 code; requires `amount_cents`. */
+            currency?: string | null;
             email: string;
+            /** @description `general_inquiry` (default), `technical_support`, `account_issue` or `payout_dispute`. */
+            kind?: string | null;
             message: string;
             name: string;
             /** Format: uuid */
@@ -1736,6 +2003,26 @@ export interface components {
             /** Format: date-time */
             read_at?: string | null;
         };
+        /** @description What a dispatch or reconcile pass did. */
+        Outcome: {
+            /** @description The whole batch is now paid. */
+            batch_paid: boolean;
+            /**
+             * Format: int32
+             * @description Lines the provider refused.
+             */
+            failed: number;
+            /**
+             * Format: int32
+             * @description Lines confirmed paid (ledger posted) in this pass.
+             */
+            paid: number;
+            /**
+             * Format: int32
+             * @description Lines left at the provider, not yet confirmed.
+             */
+            submitted: number;
+        };
         Paged_Affiliate: {
             items: {
                 email: string;
@@ -1844,11 +2131,20 @@ export interface components {
         };
         Paged_ContactRequest: {
             items: {
+                /**
+                 * Format: int64
+                 * @description Disputed amount in cents; set together with `currency`.
+                 */
+                amount_cents?: number | null;
                 /** Format: date-time */
                 created_at: string;
+                /** @description ISO 4217 code, upper case. */
+                currency?: string | null;
                 email: string;
                 /** Format: uuid */
                 id: string;
+                /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+                kind: string;
                 message: string;
                 name: string;
                 /** Format: uuid */
@@ -2045,6 +2341,31 @@ export interface components {
                  * @description Legs sharing a `txn_id` sum to zero.
                  */
                 txn_id: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
+        Paged_InboundEventRow: {
+            items: {
+                error?: string | null;
+                external_id: string;
+                /** Format: uuid */
+                id: string;
+                payload: unknown;
+                /** Format: date-time */
+                processed_at?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                /** Format: date-time */
+                received_at: string;
+                source: string;
             }[];
             /** Format: int64 */
             limit: number;
@@ -2326,6 +2647,13 @@ export interface components {
              * @description The `AffPayable -> Cash` ledger txn, once paid.
              */
             ledger_txn_id?: string | null;
+            /** @description `manual_csv`, `paypal_payouts`, `wise` or `mock`. */
+            rail: string;
+            rail_error?: string | null;
+            /** @description Provider dispatch: `pending`, `submitted`, `paid` or `failed`; null on the manual rail. */
+            rail_state?: string | null;
+            /** @description The provider's last reported status. */
+            rail_status?: string | null;
             /** @description `draft`, `approved`, `paid` or `cancelled`. */
             status: string;
         };
@@ -2358,6 +2686,19 @@ export interface components {
         PlanDuration: "one_month" | "x_months" | "lifetime";
         /** @enum {string} */
         PlanKind: "percent" | "flat";
+        PlanView: {
+            currency: string;
+            key: string;
+            /** Format: int32 */
+            max_affiliates?: number | null;
+            /** Format: int64 */
+            max_monthly_clicks?: number | null;
+            /** Format: int32 */
+            max_programs?: number | null;
+            name: string;
+            /** Format: int64 */
+            price_cents: number;
+        };
         Point: components["schemas"]["Metrics"] & {
             /** @description `YYYY-MM-DD` (UTC). */
             day: string;
@@ -2396,6 +2737,34 @@ export interface components {
             /** Format: int32 */
             hold_days?: number | null;
             name?: string | null;
+        };
+        ProviderView: {
+            provider: string;
+            /** @description The webhook secret is write-only; this only says one is stored. */
+            webhook_secret_set: boolean;
+        };
+        PutCredentials: {
+            /** @description `paypal_payouts`: `client_id`, `client_secret`. `wise`: `api_token`, `profile_id`. */
+            credentials: {
+                [key: string]: string;
+            };
+            /** @description `paypal_payouts` or `wise`. */
+            rail: string;
+            /** @description Use the provider sandbox (default true). */
+            sandbox?: boolean | null;
+        };
+        /** @description A batch dispatched or reconciled, with what this pass did. */
+        RailResult: components["schemas"]["BatchDetail"] & {
+            outcome: components["schemas"]["Outcome"];
+        };
+        /** @description Redacted view of a rail: whether it can be selected, never its credentials. */
+        RailView: {
+            /** @description Can be chosen for `mark-paid`. */
+            available: boolean;
+            /** @description Credentials are stored (they are never returned). */
+            configured: boolean;
+            rail: string;
+            sandbox?: boolean | null;
         };
         RecoveryCodes: {
             /** @description Shown once; only salted hashes are stored. */
@@ -2450,12 +2819,28 @@ export interface components {
             new_password: string;
             token: string;
         };
+        SetSecret: {
+            webhook_secret: string;
+        };
+        SignupRequest: {
+            admin_email: string;
+            admin_password: string;
+            workspace_name: string;
+        };
         Site: {
             domain: string;
         };
         Slice: components["schemas"]["Metrics"] & {
             /** @description Value of the dimension; empty = unknown. */
             dim_value: string;
+        };
+        SubscriptionView: {
+            /** Format: date-time */
+            current_period_end?: string | null;
+            plan: components["schemas"]["PlanView"];
+            provider: string;
+            status: string;
+            usage: components["schemas"]["UsageView"];
         };
         Summary: components["schemas"]["Metrics"] & {
             /** @description Top 200 values of `dim` by clicks; their sums equal the totals when there are fewer. */
@@ -2468,10 +2853,35 @@ export interface components {
             body?: string | null;
             subject?: string | null;
         };
+        TestWebhook: {
+            /** @description The event body to deliver. */
+            payload: unknown;
+            /** Format: uuid */
+            program_id: string;
+            /** @description `generic`, `stripe` or `paddle`. */
+            source: string;
+        };
+        TestWebhookResult: {
+            /** @description The tracker's response body (first 4 KiB). */
+            body: string;
+            /**
+             * Format: int32
+             * @description The tracker's HTTP status.
+             */
+            status: number;
+        };
         TotpStatus: {
             enrolled: boolean;
             /** Format: int64 */
             recovery_codes_remaining: number;
+        };
+        UsageView: {
+            /** Format: int64 */
+            affiliates: number;
+            /** Format: int64 */
+            monthly_clicks: number;
+            /** Format: int64 */
+            programs: number;
         };
         UserView: {
             email: string;
@@ -2481,6 +2891,10 @@ export interface components {
             role: string;
             /** Format: uuid */
             workspace_id?: string | null;
+        };
+        WebhookAck: {
+            /** @description `applied`, `duplicate`, or `ignored` (stale event or unknown workspace). */
+            result: string;
         };
         /**
          * @description One endpoint x outbox row. `next_attempt_at` set = still pending; unset with a 2xx
@@ -3340,11 +3754,140 @@ export interface operations {
             };
         };
     };
+    checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderView"][];
+                };
+            };
+        };
+    };
+    set_provider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description mock or lemonsqueezy */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSecret"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    subscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionView"];
+                };
+            };
+        };
+    };
     list_contacts: {
         parameters: {
             query?: {
                 /** @description `new`, `read` or `closed`. */
                 status?: string;
+                /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+                kind?: string;
                 /** @description 1-based page number (default 1). */
                 page?: number;
                 /** @description Items per page (default 50, max 200). */
@@ -3362,6 +3905,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Paged_ContactRequest"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             403: {
@@ -4794,14 +5345,27 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        /** @description Optional rail */
+        requestBody?: {
+            content: {
+                "application/json": null | components["schemas"]["MarkPaidRail"];
+            };
+        };
         responses: {
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BatchDetail"];
+                    "application/json": components["schemas"]["RailResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {
@@ -4814,6 +5378,140 @@ export interface operations {
             };
             /** @description Not approved */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Rail not configured */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reconcile_route: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description BatchView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailResult"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A rail lost its credentials */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_rails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailView"][];
+                };
+            };
+        };
+    };
+    put_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutCredentials"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_credentials: {
+        parameters: {
+            query: {
+                /** @description `paypal_payouts` or `wise`. */
+                rail: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5708,6 +6406,64 @@ export interface operations {
             };
         };
     };
+    signup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Workspace created, signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Signup disabled */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Email or slug taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     issue: {
         parameters: {
             query?: never;
@@ -5729,6 +6485,44 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description mock or lemonsqueezy */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5980,6 +6774,136 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_inbound: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `generic`, `stripe` or `paddle`. */
+                source?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_InboundEventRow"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    replay_inbound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Inbound event id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundEventRow"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Still queued */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    test_webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestWebhook"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestWebhookResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Tracker unreachable */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };

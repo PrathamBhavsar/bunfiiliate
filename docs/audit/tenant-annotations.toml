@@ -701,6 +701,14 @@ role = "Admin"
 reason = "workspace id from the session; db fns filter on it"
 
 [[route]]
+method = "post"
+path = "/api/v1/signup"
+source = "api"
+kind = "public"
+role = "none"
+reason = "self-serve signup creates a new workspace; off unless SIGNUP_ENABLED"
+
+[[route]]
 method = "get"
 path = "/api/v1/workspaces"
 source = "api"
@@ -739,6 +747,38 @@ source = "tracker"
 kind = "public"
 role = "none"
 reason = "click beacon, program found by public site"
+
+[[route]]
+method = "post"
+path = "/api/v1/payouts/batches/{id}/reconcile"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "get"
+path = "/api/v1/payouts/rails"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "put"
+path = "/api/v1/payouts/rails/credentials"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "delete"
+path = "/api/v1/payouts/rails/credentials"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
 
 [[route]]
 method = "get"
@@ -904,3 +944,67 @@ source = "tracker"
 kind = "public"
 role = "none"
 reason = "published contract, no tenant data"
+
+[[route]]
+method = "post"
+path = "/api/v1/billing/checkout"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "get"
+path = "/api/v1/billing/subscription"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; db fns filter on it"
+
+[[route]]
+method = "get"
+path = "/api/v1/billing/providers"
+source = "api"
+kind = "super"
+role = "SuperAdmin"
+reason = "instance-wide provider config, no tenant data"
+
+[[route]]
+method = "put"
+path = "/api/v1/billing/providers/{provider}"
+source = "api"
+kind = "super"
+role = "SuperAdmin"
+reason = "instance-wide provider secret; provider is an allowlisted name, not a tenant id"
+
+[[route]]
+method = "post"
+path = "/api/v1/webhooks/billing/{provider}"
+source = "api"
+kind = "public"
+role = "none"
+reason = "HMAC-verified provider webhook; workspace from signed custom_data; provider allowlisted"
+
+[[route]]
+method = "get"
+path = "/api/v1/webhooks/inbound"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; joins programs on workspace_id"
+
+[[route]]
+method = "post"
+path = "/api/v1/webhooks/inbound/{id}/replay"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; event must belong to a program of the workspace"
+
+[[route]]
+method = "post"
+path = "/api/v1/webhooks/test"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "program looked up by workspace id from the session before anything is signed or sent"

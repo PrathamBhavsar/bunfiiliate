@@ -9,7 +9,7 @@ use axum::http::StatusCode;
 use axum::http::header::{CONTENT_DISPOSITION, CONTENT_TYPE};
 use axum::routing::{get, post as post_route};
 use axum::{Json, Router};
-use bf_core::{Currency, Money, PayoutEvent, PayoutStatus};
+use bf_core::{Currency, Money, PayoutEvent, PayoutStatus, Rail};
 use bf_db::payouts::{self, CsvRow};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -26,12 +26,12 @@ use crate::programs::{require_program, viewer};
 use crate::worker::post;
 
 /// Locked batch row.
-struct Batch {
-    status: PayoutStatus,
-    currency: Currency,
+pub(crate) struct Batch {
+    pub(crate) status: PayoutStatus,
+    pub(crate) currency: Currency,
 }
 
-fn status(s: &str) -> Option<PayoutStatus> {
+pub(crate) fn status(s: &str) -> Option<PayoutStatus> {
     Some(match s {
         "draft" => PayoutStatus::Draft,
         "approved" => PayoutStatus::Approved,
@@ -41,11 +41,11 @@ fn status(s: &str) -> Option<PayoutStatus> {
     })
 }
 
-fn invalid<T>(_: T) -> AppError {
+pub(crate) fn invalid<T>(_: T) -> AppError {
     AppError::Conflict("payout batch cannot take this action")
 }
 
-async fn lock(c: &mut PgConnection, ws: Uuid, id: Uuid) -> Result<Batch, AppError> {
+pub(crate) async fn lock(c: &mut PgConnection, ws: Uuid, id: Uuid) -> Result<Batch, AppError> {
     let row: Option<(String, String)> = sqlx::query_as(
         "SELECT b.status::text, p.currency::text FROM payout_batches b \
          JOIN programs p ON p.id = b.program_id \
@@ -194,8 +194,10 @@ pub async fn cancel_batch(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<(), Ap
     Ok(tx.commit().await?)
 }
 
-/// Pay an approved batch: post payable -> cash per payout and turn its claimed conversions
-/// `paid`. A second call finds the batch paid and is rejected.
+/// Pay an approved batch by hand (manual CSV rail): post payable -> cash per payout and turn
+/// its claimed conversions `paid`. A second call finds the batch paid and is rejected. Lines a
+/// rail already paid are skipped; a batch with a line in flight at a provider is refused, or
+/// the money could go out twice.
 pub async fn mark_paid(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
     let b = lock(&mut tx, ws, batch).await?;
@@ -204,45 +206,94 @@ pub async fn mark_paid(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<(), AppEr
         .transition(PayoutEvent::MarkPaid(Money::new(0, b.currency)))
         .map_err(invalid)?;
     // scope: payout batch already locked with the workspace predicate by lock()
-    let rows: Vec<(Uuid, Uuid, i64, String)> = sqlx::query_as(
-        "SELECT id, affiliate_id, amount_cents, status::text FROM payouts \
+    let rows: Vec<(Uuid, Uuid, i64, String, Option<String>)> = sqlx::query_as(
+        "SELECT id, affiliate_id, amount_cents, status::text, rail_state FROM payouts \
          WHERE batch_id = $1 ORDER BY id FOR UPDATE",
     )
     .bind(batch)
     .fetch_all(&mut *tx)
     .await?;
-    // scope: payout batch already locked with the workspace predicate by lock()
-    let program: Uuid = sqlx::query_scalar("SELECT program_id FROM payout_batches WHERE id = $1")
-        .bind(batch)
-        .fetch_one(&mut *tx)
-        .await?;
-    for (payout, affiliate, cents, st) in rows {
+    if rows
+        .iter()
+        .any(|r| matches!(r.4.as_deref(), Some("pending" | "submitted")))
+    {
+        return Err(AppError::Conflict("a payout is in flight at a provider"));
+    }
+    let program = batch_program(&mut tx, batch).await?;
+    for (payout, affiliate, cents, st, _) in rows {
         let st = status(&st).ok_or(AppError::Internal)?;
-        let (_, txn) = st
-            .transition(PayoutEvent::MarkPaid(Money::new(cents.max(0), b.currency)))
-            .map_err(invalid)?;
-        // A payout shrunk to nothing by reversals moves no money but is still closed out.
-        let txn_id = match txn {
-            Some(t) if cents > 0 => {
-                post(&mut tx, &t, program, affiliate, (None, Some(payout))).await?
-            }
-            _ => None,
-        };
-        // scope: payout batch already locked with the workspace predicate by lock()
-        sqlx::query("UPDATE payouts SET status = 'paid', ledger_txn_id = $2 WHERE id = $1")
-            .bind(payout)
-            .bind(txn_id)
-            .execute(&mut *tx)
-            .await?;
-        // Approved -> Paid; a conversion reversed since the batch was drafted stays reversed.
-        // scope: payout batch already locked with the workspace predicate by lock()
-        sqlx::query(
-            "UPDATE conversions SET status = 'paid' WHERE payout_id = $1 AND status = 'approved'",
+        if st == PayoutStatus::Paid {
+            continue;
+        }
+        settle_line(
+            &mut tx,
+            b.currency,
+            program,
+            (payout, affiliate),
+            cents,
+            false,
         )
-        .bind(payout)
-        .execute(&mut *tx)
         .await?;
     }
+    finalize_batch(&mut tx, batch).await?;
+    Ok(tx.commit().await?)
+}
+
+pub(crate) async fn batch_program(tx: &mut PgConnection, batch: Uuid) -> Result<Uuid, AppError> {
+    // scope: payout batch already locked with the workspace predicate by lock()
+    Ok(
+        sqlx::query_scalar("SELECT program_id FROM payout_batches WHERE id = $1")
+            .bind(batch)
+            .fetch_one(&mut *tx)
+            .await?,
+    )
+}
+
+/// Pay one approved line: post payable -> cash, mark it and its conversions paid. A payout
+/// shrunk to nothing by reversals moves no money but is still closed out. `rail_paid` also
+/// marks the line's provider state paid.
+pub(crate) async fn settle_line(
+    tx: &mut PgConnection,
+    currency: Currency,
+    program: Uuid,
+    (payout, affiliate): (Uuid, Uuid),
+    cents: i64,
+    rail_paid: bool,
+) -> Result<(), AppError> {
+    let (_, txn) = PayoutStatus::Approved
+        .transition(PayoutEvent::MarkPaid(Money::new(cents.max(0), currency)))
+        .map_err(invalid)?;
+    let txn_id = match txn {
+        Some(t) if cents > 0 => {
+            post(&mut *tx, &t, program, affiliate, (None, Some(payout))).await?
+        }
+        _ => None,
+    };
+    // scope: payout line locked through its batch, which lock() scoped to the workspace
+    sqlx::query(
+        "UPDATE payouts SET status = 'paid', ledger_txn_id = $2, \
+           rail_state = CASE WHEN $3 THEN 'paid' ELSE rail_state END, \
+           rail_status = CASE WHEN $3 THEN 'paid' ELSE rail_status END, rail_error = NULL \
+         WHERE id = $1",
+    )
+    .bind(payout)
+    .bind(txn_id)
+    .bind(rail_paid)
+    .execute(&mut *tx)
+    .await?;
+    // Approved -> Paid; a conversion reversed since the batch was drafted stays reversed.
+    // scope: payout line locked through its batch, which lock() scoped to the workspace
+    sqlx::query(
+        "UPDATE conversions SET status = 'paid' WHERE payout_id = $1 AND status = 'approved'",
+    )
+    .bind(payout)
+    .execute(&mut *tx)
+    .await?;
+    Ok(())
+}
+
+/// Close the batch once every line is paid.
+pub(crate) async fn finalize_batch(tx: &mut PgConnection, batch: Uuid) -> Result<(), AppError> {
     // scope: payout batch already locked with the workspace predicate by lock()
     sqlx::query(
         "UPDATE payout_requests SET status = 'paid' WHERE status = 'approved' \
@@ -256,7 +307,7 @@ pub async fn mark_paid(pool: &PgPool, ws: Uuid, batch: Uuid) -> Result<(), AppEr
         .bind(batch)
         .execute(&mut *tx)
         .await?;
-    Ok(tx.commit().await?)
+    Ok(())
 }
 
 /// CSV of a batch for the bank/payout tool.
@@ -370,6 +421,13 @@ pub struct Payout {
     status: String,
     /// The `AffPayable -> Cash` ledger txn, once paid.
     ledger_txn_id: Option<Uuid>,
+    /// `manual_csv`, `paypal_payouts`, `wise` or `mock`.
+    rail: String,
+    /// Provider dispatch: `pending`, `submitted`, `paid` or `failed`; null on the manual rail.
+    rail_state: Option<String>,
+    /// The provider's last reported status.
+    rail_status: Option<String>,
+    rail_error: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -397,7 +455,7 @@ fn batch_select() -> String {
     )
 }
 
-async fn detail(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<BatchDetail, AppError> {
+pub(crate) async fn detail(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<BatchDetail, AppError> {
     let batch = sqlx::query_as(&format!("{}{BATCHES} AND b.id = $4", batch_select()))
         .bind(ws)
         .bind(None::<Uuid>)
@@ -409,7 +467,8 @@ async fn detail(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<BatchDetail, AppErr
     // scope: batch id checked against the workspace by the first query
     let payouts = sqlx::query_as(
         "SELECT p.id, p.affiliate_id, COALESCE(p.payout_email, a.payout_email, u.email)::text AS email, \
-                p.amount_cents, p.status::text AS status, p.ledger_txn_id \
+                p.amount_cents, p.status::text AS status, p.ledger_txn_id, p.rail, p.rail_state, \
+                p.rail_status, p.rail_error \
          FROM payouts p JOIN affiliates a ON a.id = p.affiliate_id JOIN users u ON u.id = a.user_id \
          WHERE p.batch_id = $1 ORDER BY 3, p.id",
     )
@@ -420,7 +479,7 @@ async fn detail(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<BatchDetail, AppErr
 }
 
 /// `404` unless the batch belongs to the workspace; run before any state change.
-async fn require_batch(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<(), AppError> {
+pub(crate) async fn require_batch(pool: &PgPool, ws: Uuid, id: Uuid) -> Result<(), AppError> {
     sqlx::query_scalar::<_, i32>(
         "SELECT 1 FROM payout_batches b JOIN programs pr ON pr.id = b.program_id \
          WHERE b.id = $1 AND pr.workspace_id = $2",
@@ -559,37 +618,65 @@ pub async fn approve(
     Ok(Json(detail(&s.pool, ws, id).await?))
 }
 
-/// `approved -> paid`: posts payable -> cash per payout.
+/// `approved -> paid`: posts payable -> cash per payout. With no body (or `manual_csv`) it
+/// marks the whole batch paid by hand. With `{rail}` it sends each line through that provider
+/// and posts the ledger only for lines the provider confirms paid; the response then carries an
+/// `outcome`, and the batch stays `approved` until every line is paid (call again to retry
+/// failures, or `reconcile` to collect pending ones).
 #[utoipa::path(
     post,
     path = "/api/v1/payouts/batches/{id}/mark-paid",
     tag = "payouts",
     security(("cookie" = [])),
     params(("id" = Uuid, Path, description = "BatchView id")),
+    request_body(content = Option<crate::payout_rails::MarkPaidRail>, description = "Optional rail"),
     responses(
-        (status = 200, body = BatchDetail),
+        (status = 200, body = crate::payout_rails::RailResult),
+        (status = 400, body = ErrorBody),
         (status = 404, body = ErrorBody),
         (status = 409, description = "Not approved", body = ErrorBody),
+        (status = 422, description = "Rail not configured", body = ErrorBody),
     )
 )]
 pub async fn mark_paid_route(
     State(s): State<AppState>,
     auth: Auth<Admin>,
     Path(id): Path<Uuid>,
-) -> Result<Json<BatchDetail>, AppError> {
+    body: axum::body::Bytes,
+) -> Result<Json<crate::payout_rails::RailResult>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
+    let rail = if body.iter().all(u8::is_ascii_whitespace) {
+        Rail::ManualCsv
+    } else {
+        let req: crate::payout_rails::MarkPaidRail = serde_json::from_slice(&body)
+            .map_err(|_| AppError::BadRequest("invalid request body".into()))?;
+        Rail::parse(&req.rail).ok_or_else(|| AppError::BadRequest("unknown payout rail".into()))?
+    };
     require_batch(&s.pool, ws, id).await?;
-    mark_paid(&s.pool, ws, id).await?;
+    let outcome = if rail == Rail::ManualCsv {
+        mark_paid(&s.pool, ws, id).await?;
+        crate::payout_rails::Outcome {
+            paid: 0,
+            submitted: 0,
+            failed: 0,
+            batch_paid: true,
+        }
+    } else {
+        crate::payout_rails::mark_paid_via(&s, ws, id, rail).await?
+    };
     audit::record(
         &s.pool,
         &auth.principal,
         "payout_batch.mark_paid",
         "payout_batch",
         id,
-        None,
+        Some(json!({"rail": rail.as_str()})),
     )
     .await?;
-    Ok(Json(detail(&s.pool, ws, id).await?))
+    Ok(Json(crate::payout_rails::RailResult {
+        batch: detail(&s.pool, ws, id).await?,
+        outcome,
+    }))
 }
 
 /// `draft -> cancelled`: releases the batch's conversions.

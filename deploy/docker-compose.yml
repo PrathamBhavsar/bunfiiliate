@@ -30,6 +30,7 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
       API_PORT: 8080
       TRACKER_PORT: 8081
+      TRACKER_INTERNAL_URL: http://tracker:8081
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
       BF_MASTER_KEYS: ${BF_MASTER_KEYS:?set BF_MASTER_KEYS in .env (see docs/self-hosting.md)}
       SPOOL_DIR: /var/spool/bunfiiliate

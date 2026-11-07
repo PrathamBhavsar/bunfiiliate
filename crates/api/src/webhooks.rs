@@ -5,7 +5,7 @@ use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use bf_db::ops::{WebhookDelivery, WebhookEndpoint};
+use bf_db::ops::{InboundEventRow, WebhookDelivery, WebhookEndpoint};
 use serde::Deserialize;
 use serde_json::json;
 use utoipa::{IntoParams, ToSchema};
@@ -41,6 +41,9 @@ pub fn routes() -> Router<AppState> {
             "/api/v1/webhooks/deliveries/{id}/redeliver",
             post(redeliver),
         )
+        .route("/api/v1/webhooks/inbound", get(list_inbound))
+        .route("/api/v1/webhooks/inbound/{id}/replay", post(replay_inbound))
+        .route("/api/v1/webhooks/test", post(test_webhook))
 }
 
 fn endpoint_not_found() -> AppError {
@@ -343,4 +346,190 @@ pub async fn redeliver(
         .ok_or(AppError::Internal)?;
     tx.commit().await?;
     Ok(Json(d))
+}
+
+// ---- inbound events: history, replay and the signed test sender
+
+const TEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+/// Largest slice of the tracker's response returned to the caller.
+const MAX_TEST_RESPONSE: usize = 4096;
+
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct InboundFilter {
+    program_id: Option<Uuid>,
+    /// `generic`, `stripe` or `paddle`.
+    source: Option<String>,
+}
+
+/// Received deliveries (newest first) with their processing outcome.
+#[utoipa::path(
+    get,
+    path = "/api/v1/webhooks/inbound",
+    tag = "webhooks",
+    security(("cookie" = [])),
+    params(InboundFilter, PageQuery),
+    responses((status = 200, body = Paged<InboundEventRow>), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody))
+)]
+pub async fn list_inbound(
+    State(s): State<AppState>,
+    auth: Auth<Admin>,
+    Query(f): Query<InboundFilter>,
+    Query(page): Query<PageQuery>,
+) -> Result<Json<Paged<InboundEventRow>>, AppError> {
+    let ws = auth.principal.workspace_scope(None)?;
+    if f.source
+        .as_deref()
+        .is_some_and(|x| !matches!(x, "generic" | "stripe" | "paddle"))
+    {
+        return Err(AppError::BadRequest("unknown source".into()));
+    }
+    let rows = bf_db::ops::list_inbound(
+        &s.pool,
+        ws,
+        f.program_id,
+        f.source.as_deref(),
+        page.limit(),
+        page.offset(),
+    )
+    .await?;
+    Ok(Json(page.wrap(rows)))
+}
+
+/// Run a stored delivery through the worker again. The signature is not re-checked: it
+/// passed when the event was stored. Duplicate sales still dedupe on the external id.
+#[utoipa::path(
+    post,
+    path = "/api/v1/webhooks/inbound/{id}/replay",
+    tag = "webhooks",
+    security(("cookie" = [])),
+    params(("id" = Uuid, Path, description = "Inbound event id")),
+    responses(
+        (status = 200, body = InboundEventRow),
+        (status = 404, body = ErrorBody),
+        (status = 409, description = "Still queued", body = ErrorBody),
+    )
+)]
+pub async fn replay_inbound(
+    State(s): State<AppState>,
+    auth: Auth<Admin>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<InboundEventRow>, AppError> {
+    let ws = auth.principal.workspace_scope(None)?;
+    let mut tx = s.pool.begin().await?;
+    let ev = bf_db::ops::get_inbound(&mut *tx, ws, id)
+        .await?
+        .ok_or(AppError::NotFound("inbound event not found"))?;
+    if ev.processed_at.is_none() {
+        return Err(AppError::Conflict("event is still queued"));
+    }
+    bf_db::ops::requeue_inbound(&mut *tx, ws, id).await?;
+    audit::record(
+        &mut *tx,
+        &auth.principal,
+        "webhook_inbound.replay",
+        "inbound_event",
+        id,
+        None,
+    )
+    .await?;
+    let ev = bf_db::ops::get_inbound(&mut *tx, ws, id)
+        .await?
+        .ok_or(AppError::Internal)?;
+    tx.commit().await?;
+    Ok(Json(ev))
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct TestWebhook {
+    program_id: Uuid,
+    /// `generic`, `stripe` or `paddle`.
+    source: String,
+    /// The event body to deliver.
+    payload: serde_json::Value,
+}
+
+#[derive(serde::Serialize, ToSchema)]
+pub struct TestWebhookResult {
+    /// The tracker's HTTP status.
+    status: u16,
+    /// The tracker's response body (first 4 KiB).
+    body: String,
+}
+
+/// Sign `payload` with the program's own secret for `source` and deliver it to the tracker's
+/// real inbound endpoint, returning the tracker's raw answer. Lets an admin check a secret
+/// end to end without a provider account.
+#[utoipa::path(
+    post,
+    path = "/api/v1/webhooks/test",
+    tag = "webhooks",
+    security(("cookie" = [])),
+    request_body = TestWebhook,
+    responses(
+        (status = 200, body = TestWebhookResult),
+        (status = 400, body = ErrorBody),
+        (status = 404, body = ErrorBody),
+        (status = 502, description = "Tracker unreachable", body = ErrorBody),
+    )
+)]
+pub async fn test_webhook(
+    State(s): State<AppState>,
+    auth: Auth<Admin>,
+    AppJson(req): AppJson<TestWebhook>,
+) -> Result<Json<TestWebhookResult>, AppError> {
+    use bf_core::webhook_sign::{Layout, sign};
+    let ws = auth.principal.workspace_scope(None)?;
+    let (layout, path, column) = match req.source.as_str() {
+        "generic" => (Layout::Generic, "v1/events", "webhook_secret"),
+        "stripe" => (Layout::Stripe, "v1/webhooks/stripe", "stripe_secret"),
+        "paddle" => (Layout::Paddle, "v1/webhooks/paddle", "paddle_secret"),
+        _ => return Err(AppError::BadRequest("unknown source".into())),
+    };
+    let program = bf_db::programs::get_program(&s.pool, ws, req.program_id, None)
+        .await?
+        .ok_or(AppError::NotFound("program not found"))?;
+    let stored = match column {
+        "webhook_secret" => program.webhook_secret.clone(),
+        "stripe_secret" => program.stripe_secret.clone(),
+        _ => program.paddle_secret.clone(),
+    }
+    .filter(|v| !v.is_empty())
+    .ok_or_else(|| AppError::BadRequest(format!("program has no {} secret set", req.source)))?;
+    let secret = s
+        .vault
+        .open_col("programs", column, program.id, &stored)
+        .map_err(|_| AppError::Internal)?;
+    let body = serde_json::to_vec(&req.payload).map_err(|_| AppError::Internal)?;
+    let key = format!("test-{}", Uuid::now_v7());
+    let headers = sign(layout, &secret, &key, &body, chrono::Utc::now().timestamp());
+    let url = format!("{}/{path}/{}", s.tracker_url.0, program.public_key);
+    let mut http = reqwest::Client::builder()
+        .timeout(TEST_TIMEOUT)
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|_| AppError::Internal)?
+        .post(url)
+        .header("content-type", "application/json")
+        .body(body);
+    for (k, v) in headers {
+        http = http.header(k, v);
+    }
+    let resp = http.send().await.map_err(|e| {
+        tracing::warn!(error = %e, "webhook test: tracker unreachable");
+        AppError::BadGateway
+    })?;
+    let status = resp.status().as_u16();
+    let mut text = resp.text().await.unwrap_or_default();
+    text.truncate(text.floor_char_boundary(MAX_TEST_RESPONSE));
+    audit::record(
+        &s.pool,
+        &auth.principal,
+        "webhook_inbound.test",
+        "program",
+        program.id,
+        Some(json!({ "source": req.source, "status": status })),
+    )
+    .await?;
+    Ok(Json(TestWebhookResult { status, body: text }))
 }

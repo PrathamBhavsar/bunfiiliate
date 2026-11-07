@@ -22,8 +22,8 @@ use crate::auth::{
 use crate::error::{AppError, AppJson, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    admin_reset, affiliates, analytics, mail, money, ops, password_reset, payout_requests, payouts,
-    programs, totp, webhooks, workspaces,
+    admin_reset, affiliates, analytics, billing, mail, money, ops, password_reset, payout_rails,
+    payout_requests, payouts, programs, totp, webhooks, workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -49,7 +49,7 @@ impl Modify for CookieAuth {
         admin_reset::issue,
         admin_reset::reset_with_token,
         totp::enrol, totp::confirm, totp::regenerate, totp::disable, totp::status,
-        workspaces::create_workspace, workspaces::list_workspaces,
+        workspaces::create_workspace, workspaces::list_workspaces, workspaces::signup,
         workspaces::invite_member, workspaces::list_members,
         programs::create_program, programs::list_programs, programs::get_program,
         programs::update_program, programs::delete_program, programs::rotate_secrets,
@@ -66,7 +66,8 @@ impl Modify for CookieAuth {
         analytics::summary, analytics::timeseries, analytics::report_csv,
         webhooks::create_endpoint, webhooks::list_endpoints, webhooks::get_endpoint,
         webhooks::update_endpoint, webhooks::delete_endpoint, webhooks::list_deliveries,
-        webhooks::redeliver,
+        webhooks::redeliver, webhooks::list_inbound, webhooks::replay_inbound,
+        webhooks::test_webhook,
         mail::create_template, mail::list_templates, mail::get_template,
         mail::update_template, mail::delete_template,
         ops::healthz, ops::readyz,
@@ -80,12 +81,19 @@ impl Modify for CookieAuth {
         payouts::create_batch_route, payouts::list_batches, payouts::get_batch,
         payouts::approve, payouts::mark_paid_route, payouts::cancel, payouts::export,
         payouts::me_payouts,
+        payout_rails::reconcile_route, payout_rails::list_rails, payout_rails::put_credentials,
+        payout_rails::delete_credentials,
         payout_requests::me_create, payout_requests::me_list, payout_requests::admin_list,
         payout_requests::approve, payout_requests::reject,
+        billing::checkout, billing::subscription, billing::list_providers,
+        billing::set_provider, billing::webhook,
     ),
     components(schemas(
-        LoginRequest, UserView, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
-        totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account
+        LoginRequest, UserView, workspaces::SignupRequest, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
+        totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account,
+        billing::CheckoutRequest, billing::CheckoutResponse, billing::SubscriptionView,
+        billing::PlanView, billing::UsageView, billing::ProviderView, billing::SetSecret,
+        billing::WebhookAck
     )),
     modifiers(&CookieAuth),
     info(title = "bunfiiliate API", version = "0.1.0")
@@ -112,7 +120,9 @@ pub fn routes() -> Router<AppState> {
         .merge(ops::routes())
         .merge(money::routes())
         .merge(payouts::routes())
+        .merge(payout_rails::routes())
         .merge(payout_requests::routes())
+        .merge(billing::routes())
 }
 
 /// One OpenAPI operation, for the tenant audit inventory.
@@ -285,7 +295,13 @@ async fn login(
     if let Some(k) = &throttle_key {
         bf_db::throttle::clear(&s.pool, bf_db::throttle::LOGIN_IP, k).await?;
     }
-    let principal = Principal::from(&user);
+    let cookies = start_session(&s, &user).await?;
+    Ok((cookies, Json(user.into())))
+}
+
+/// Issue the access + refresh cookies for `user` and audit the login. Shared by login and signup.
+pub(crate) async fn start_session(s: &AppState, user: &User) -> Result<HeaderMap, AppError> {
+    let principal = Principal::from(user);
     let ver = bf_db::auth::token_version(&s.pool, user.id)
         .await?
         .unwrap_or_default();
@@ -299,7 +315,7 @@ async fn login(
     )
     .await?;
     audit::record(&s.pool, &principal, "auth.login", "user", user.id, None).await?;
-    Ok((session_cookies(&s, &access, &refresh), Json(user.into())))
+    Ok(session_cookies(s, &access, &refresh))
 }
 
 /// Exchange the `bf_rt` cookie for a fresh pair. Reusing an old token revokes the family.

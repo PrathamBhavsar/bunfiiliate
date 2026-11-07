@@ -29,6 +29,7 @@ fn app(pool: PgPool) -> Router {
             std::time::Duration::from_millis(1),
             100,
         )),
+        tracker_url: Default::default(),
     };
     build(routes::routes(), state)
 }

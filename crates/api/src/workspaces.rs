@@ -25,6 +25,121 @@ pub fn routes() -> Router<AppState> {
             get(list_workspaces).post(create_workspace),
         )
         .route("/api/v1/members", get(list_members).post(invite_member))
+        .route("/api/v1/signup", axum::routing::post(signup))
+}
+
+/// Self-serve signup is off unless `SIGNUP_ENABLED` is `1` or `true`.
+fn signup_enabled() -> bool {
+    std::env::var("SIGNUP_ENABLED").is_ok_and(|v| matches!(v.trim(), "1" | "true"))
+}
+
+const MAX_SLUG_TRIES: u32 = 10;
+
+#[derive(Deserialize, ToSchema)]
+pub struct SignupRequest {
+    workspace_name: String,
+    admin_email: String,
+    admin_password: String,
+}
+
+/// Self-serve signup: a new workspace with its first `admin`, signed in. 404 unless enabled.
+#[utoipa::path(
+    post,
+    path = "/api/v1/signup",
+    tag = "workspaces",
+    request_body = SignupRequest,
+    responses(
+        (status = 201, description = "Workspace created, signed in", body = crate::routes::UserView),
+        (status = 400, body = ErrorBody),
+        (status = 404, description = "Signup disabled", body = ErrorBody),
+        (status = 409, description = "Email or slug taken", body = ErrorBody),
+        (status = 429, body = ErrorBody),
+    )
+)]
+pub async fn signup(
+    State(s): State<AppState>,
+    headers: axum::http::HeaderMap,
+    AppJson(req): AppJson<SignupRequest>,
+) -> Result<
+    (
+        StatusCode,
+        axum::http::HeaderMap,
+        Json<crate::routes::UserView>,
+    ),
+    AppError,
+> {
+    if !signup_enabled() {
+        return Err(AppError::NotFound("not found"));
+    }
+    crate::limit::check(
+        &s.limiter,
+        &crate::limit::SIGNUP,
+        &headers,
+        &req.admin_email,
+    )?;
+    let name = req.workspace_name.trim();
+    let email = req.admin_email.trim();
+    if name.is_empty() || name.len() > 200 {
+        return Err(AppError::BadRequest(
+            "workspace_name must be 1-200 characters".into(),
+        ));
+    }
+    if !email.contains('@') || email.len() > 200 {
+        return Err(AppError::BadRequest("invalid email".into()));
+    }
+    if req.admin_password.len() < MIN_PASSWORD_LEN {
+        return Err(AppError::BadRequest(format!(
+            "password must be at least {MIN_PASSWORD_LEN} characters"
+        )));
+    }
+    let password_hash = hash_password_bounded(req.admin_password).await?;
+    let ws = Uuid::now_v7();
+    let user = User {
+        id: Uuid::now_v7(),
+        workspace_id: Some(ws),
+        email: email.to_string(),
+        password_hash,
+        role: UserRole::Admin,
+    };
+    let mut tx = s.pool.begin().await?;
+    if bf_db::auth::user_by_email(&mut *tx, email).await?.is_some() {
+        return Err(AppError::Conflict("email already registered"));
+    }
+    let base = slugify(name);
+    let mut slug = None;
+    for n in 1..=MAX_SLUG_TRIES {
+        let cand = if n == 1 {
+            base.clone()
+        } else {
+            format!("{base}-{n}")
+        };
+        if bf_db::workspaces::workspace_id_by_slug(&mut *tx, &cand)
+            .await?
+            .is_none()
+        {
+            slug = Some(cand);
+            break;
+        }
+    }
+    let slug = slug.ok_or(AppError::Conflict("workspace name taken"))?;
+    // The default-plan subscription insert lives in bf_db::billing (B09).
+    bf_db::auth::create_workspace(&mut *tx, ws, name, &slug).await?;
+    bf_db::workspaces::mark_self_serve(&mut *tx, ws).await?;
+    bf_db::auth::create_user(&mut *tx, &user).await?;
+    let principal = Principal::from(&user);
+    let diff = json!({ "email": user.email, "slug": slug });
+    audit::record(
+        &mut *tx,
+        &principal,
+        "workspace.signup",
+        "workspace",
+        ws,
+        Some(diff),
+    )
+    .await?;
+    tx.commit().await?;
+    let cookies = crate::routes::start_session(&s, &user).await?;
+    Ok((StatusCode::CREATED, cookies, Json(user.into())))
 }
 
 #[derive(Deserialize, ToSchema)]
