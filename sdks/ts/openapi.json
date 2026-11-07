@@ -1195,13 +1195,22 @@
         "tags": [
           "contact-requests"
         ],
-        "summary": "List contact requests, newest first, optionally by status.",
+        "summary": "List contact requests, newest first, optionally by status and kind.",
         "operationId": "list_contacts",
         "parameters": [
           {
             "name": "status",
             "in": "query",
             "description": "`new`, `read` or `closed`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "`general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`.",
             "required": false,
             "schema": {
               "type": "string"
@@ -1237,6 +1246,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Paged_ContactRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
                 }
               }
             }
@@ -5179,6 +5198,77 @@
         ]
       }
     },
+    "/api/v1/signup": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Self-serve signup: a new workspace with its first `admin`, signed in. 404 unless enabled.",
+        "operationId": "signup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Workspace created, signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Signup disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Email or slug taken",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/users/{id}/password-reset-token": {
       "post": {
         "tags": [
@@ -6050,12 +6140,28 @@
           "email",
           "message",
           "status",
+          "kind",
           "created_at"
         ],
         "properties": {
+          "amount_cents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Disputed amount in cents; set together with `currency`."
+          },
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 4217 code, upper case."
           },
           "email": {
             "type": "string"
@@ -6063,6 +6169,10 @@
           "id": {
             "type": "string",
             "format": "uuid"
+          },
+          "kind": {
+            "type": "string",
+            "description": "`general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`."
           },
           "message": {
             "type": "string"
@@ -6683,8 +6793,30 @@
           "message"
         ],
         "properties": {
+          "amount_cents": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Disputed amount in cents; requires `currency`."
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 4217 code; requires `amount_cents`."
+          },
           "email": {
             "type": "string"
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`general_inquiry` (default), `technical_support`, `account_issue` or `payout_dispute`."
           },
           "message": {
             "type": "string"
@@ -7311,12 +7443,28 @@
                 "email",
                 "message",
                 "status",
+                "kind",
                 "created_at"
               ],
               "properties": {
+                "amount_cents": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "format": "int64",
+                  "description": "Disputed amount in cents; set together with `currency`."
+                },
                 "created_at": {
                   "type": "string",
                   "format": "date-time"
+                },
+                "currency": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "ISO 4217 code, upper case."
                 },
                 "email": {
                   "type": "string"
@@ -7324,6 +7472,10 @@
                 "id": {
                   "type": "string",
                   "format": "uuid"
+                },
+                "kind": {
+                  "type": "string",
+                  "description": "`general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`."
                 },
                 "message": {
                   "type": "string"
@@ -9042,6 +9194,25 @@
             "description": "12 to 256 characters."
           },
           "token": {
+            "type": "string"
+          }
+        }
+      },
+      "SignupRequest": {
+        "type": "object",
+        "required": [
+          "workspace_name",
+          "admin_email",
+          "admin_password"
+        ],
+        "properties": {
+          "admin_email": {
+            "type": "string"
+          },
+          "admin_password": {
+            "type": "string"
+          },
+          "workspace_name": {
             "type": "string"
           }
         }

@@ -12,6 +12,8 @@ import type { ListFn } from "@/lib/use-resource";
 type Contact = components["schemas"]["ContactRequest"];
 
 const STATUSES = ["new", "read", "closed"];
+const KINDS = ["general_inquiry", "technical_support", "account_issue", "payout_dispute"];
+const kindLabel = (k: string) => k.replace("_", " ");
 // The address is public input: only a plain single addr-spec becomes a mailto link (no `?`, `&`, `%`, spaces or commas).
 const SAFE_EMAIL = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
 
@@ -22,7 +24,7 @@ const list: ListFn<Contact> = async ({ page, pageSize, filters }, signal) =>
     await ok(
       api.GET("/api/v1/contact-requests", {
         signal,
-        params: { query: { page, limit: pageSize, status: filters.status || undefined } },
+        params: { query: { page, limit: pageSize, status: filters.status || undefined, kind: filters.kind || undefined } },
       }),
     ),
   );
@@ -31,10 +33,13 @@ const config: ResourceConfig<Contact> = {
   title: "Contact requests",
   description: "Messages sent through the public contact form.",
   list,
-  filters: [{ id: "status", label: "Status", options: STATUSES.map((s) => ({ value: s, label: s })) }],
+  filters: [{ id: "status", label: "Status", options: STATUSES.map((s) => ({ value: s, label: s })) },
+    { id: "kind", label: "Kind", options: KINDS.map((k) => ({ value: k, label: kindLabel(k) })) },
+  ],
   columns: [
     { id: "name", header: "Name", cell: (c) => c.name },
     { id: "email", header: "Email", cell: (c) => c.email },
+    { id: "kind", header: "Kind", cell: (c) => kindLabel(c.kind) },
     { id: "status", header: "Status", cell: (c) => <StatusBadge status={c.status} tone={tone(c.status)} /> },
     { id: "at", header: "Received", cell: (c) => formatTime(c.created_at) },
   ],
@@ -46,6 +51,8 @@ const config: ResourceConfig<Contact> = {
           rows={[
             ["Name", c.name],
             ["Email", SAFE_EMAIL.test(c.email) ? <a key="e" className="underline" href={`mailto:${c.email}`}>{c.email}</a> : c.email],
+            ["Kind", kindLabel(c.kind)],
+            ...(c.amount_cents != null && c.currency ? ([["Amount", `${(c.amount_cents / 100).toFixed(2)} ${c.currency}`]] as [string, string][]) : []),
             ["Received", formatTime(c.created_at)],
             ["Status", <StatusBadge key="s" status={c.status} tone={tone(c.status)} />],
           ]}

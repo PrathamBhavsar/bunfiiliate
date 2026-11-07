@@ -23,6 +23,12 @@ const MAX_NAME: usize = 200;
 const MAX_MESSAGE: usize = 5000;
 const MAX_SETTINGS: usize = 16 * 1024;
 const CONTACT_STATUSES: [&str; 3] = ["new", "read", "closed"];
+const CONTACT_KINDS: [&str; 4] = [
+    "general_inquiry",
+    "technical_support",
+    "account_issue",
+    "payout_dispute",
+];
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -135,6 +141,12 @@ pub struct NewContact {
     name: String,
     email: String,
     message: String,
+    /// `general_inquiry` (default), `technical_support`, `account_issue` or `payout_dispute`.
+    kind: Option<String>,
+    /// Disputed amount in cents; requires `currency`.
+    amount_cents: Option<i64>,
+    /// ISO 4217 code; requires `amount_cents`.
+    currency: Option<String>,
 }
 
 /// Public contact form: stores a `new` request for the workspace's admins.
@@ -167,12 +179,47 @@ pub async fn create_contact(
             "message must be 1-5000 characters".into(),
         ));
     }
+    let kind = req.kind.as_deref().unwrap_or("general_inquiry");
+    if !CONTACT_KINDS.contains(&kind) {
+        return Err(AppError::BadRequest(format!(
+            "kind must be one of: {}",
+            CONTACT_KINDS.join(", ")
+        )));
+    }
+    let currency = req
+        .currency
+        .as_deref()
+        .map(|c| c.trim().to_ascii_uppercase());
+    match (req.amount_cents, &currency) {
+        (None, None) => {}
+        (Some(a), Some(c))
+            if a >= 0 && c.len() == 3 && c.bytes().all(|b| b.is_ascii_uppercase()) => {}
+        (Some(_), Some(_)) => {
+            return Err(AppError::BadRequest(
+                "amount_cents must be >= 0 and currency a 3-letter code".into(),
+            ));
+        }
+        _ => {
+            return Err(AppError::BadRequest(
+                "amount_cents and currency go together".into(),
+            ));
+        }
+    }
     let ws = bf_db::workspaces::workspace_id_by_slug(&s.pool, &req.workspace)
         .await?
         .ok_or(AppError::NotFound("workspace not found"))?;
     let id = Uuid::now_v7();
+    let new = bf_db::ops::NewContact {
+        program_id: req.program_id,
+        name,
+        email,
+        message,
+        kind,
+        amount_cents: req.amount_cents,
+        currency: currency.as_deref(),
+    };
     let mut tx = s.pool.begin().await?;
-    let c = bf_db::ops::insert_contact(&mut *tx, id, ws, req.program_id, name, email, message)
+    let c = bf_db::ops::insert_contact(&mut *tx, id, ws, new)
         .await?
         .ok_or_else(|| AppError::BadRequest("unknown program".into()))?;
     let diff = json!({ "program_id": c.program_id, "email": c.email }).to_string();
@@ -194,16 +241,18 @@ pub async fn create_contact(
 pub struct ContactFilter {
     /// `new`, `read` or `closed`.
     status: Option<String>,
+    /// `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`.
+    kind: Option<String>,
 }
 
-/// List contact requests, newest first, optionally by status.
+/// List contact requests, newest first, optionally by status and kind.
 #[utoipa::path(
     get,
     path = "/api/v1/contact-requests",
     tag = "contact-requests",
     security(("cookie" = [])),
     params(ContactFilter, PageQuery),
-    responses((status = 200, body = Paged<ContactRequest>), (status = 403, body = ErrorBody))
+    responses((status = 200, body = Paged<ContactRequest>), (status = 400, body = ErrorBody), (status = 403, body = ErrorBody))
 )]
 pub async fn list_contacts(
     State(s): State<AppState>,
@@ -212,10 +261,17 @@ pub async fn list_contacts(
     Query(page): Query<PageQuery>,
 ) -> Result<Json<Paged<ContactRequest>>, AppError> {
     let ws = auth.principal.workspace_scope(None)?;
+    if f.kind
+        .as_deref()
+        .is_some_and(|k| !CONTACT_KINDS.contains(&k))
+    {
+        return Err(AppError::BadRequest("unknown kind".into()));
+    }
     let rows = bf_db::ops::list_contacts(
         &s.pool,
         ws,
         f.status.as_deref(),
+        f.kind.as_deref(),
         page.limit(),
         page.offset(),
     )

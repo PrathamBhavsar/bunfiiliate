@@ -1045,3 +1045,96 @@ mod health {
         assert_eq!(st, StatusCode::OK);
     }
 }
+
+// ---- contact request typing (B08)
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn contact_request_amount_requires_currency(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let base = "/api/v1/contact-requests";
+    let msg = |extra: Value| {
+        let email = format!("{}@x.io", Uuid::now_v7());
+        let mut b = json!({ "workspace": t.slug, "name": "A", "email": email, "message": "m" });
+        b.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        b
+    };
+    for bad in [
+        json!({ "amount_cents": 500 }),
+        json!({ "currency": "USD" }),
+        json!({ "amount_cents": -1, "currency": "USD" }),
+        json!({ "amount_cents": 5, "currency": "usd1" }),
+        json!({ "kind": "bogus" }),
+    ] {
+        let (st, body) = api
+            .call(Method::POST, base, None, Some(msg(bad.clone())))
+            .await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "{bad} {body}");
+    }
+    let (st, c) = api
+        .call(
+            Method::POST,
+            base,
+            None,
+            Some(msg(
+                json!({ "kind": "payout_dispute", "amount_cents": 500, "currency": "usd" }),
+            )),
+        )
+        .await;
+    assert_eq!(st, StatusCode::CREATED, "{c}");
+    assert_eq!(
+        (&c["kind"], &c["amount_cents"], &c["currency"]),
+        (&json!("payout_dispute"), &json!(500), &json!("USD"))
+    );
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn contact_request_defaults_to_general_inquiry(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let body = json!({ "workspace": t.slug, "name": "A", "email": "a@x.io", "message": "m" });
+    let (st, c) = api
+        .call(Method::POST, "/api/v1/contact-requests", None, Some(body))
+        .await;
+    assert_eq!(st, StatusCode::CREATED, "{c}");
+    assert_eq!(c["kind"], "general_inquiry");
+    assert!(c["amount_cents"].is_null() && c["currency"].is_null());
+    let id: Uuid = c["id"].as_str().unwrap().parse().unwrap();
+    let stored: String =
+        sqlx::query_scalar("SELECT kind::text FROM contact_requests WHERE id = $1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stored, "general_inquiry");
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn admin_filters_by_kind(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let base = "/api/v1/contact-requests";
+    for kind in [
+        "general_inquiry",
+        "technical_support",
+        "account_issue",
+        "payout_dispute",
+    ] {
+        let body = json!({ "workspace": t.slug, "name": "A", "email": format!("{kind}@x.io"), "message": "m", "kind": kind });
+        assert_eq!(
+            api.call(Method::POST, base, None, Some(body)).await.0,
+            StatusCode::CREATED
+        );
+    }
+    let (_, list) = api
+        .get(&format!("{base}?kind=payout_dispute"), &t.admin)
+        .await;
+    assert_eq!(list["total"], 1);
+    assert_eq!(list["items"][0]["kind"], "payout_dispute");
+    let (_, all) = api.get(base, &t.admin).await;
+    assert_eq!(all["total"], 4);
+    let (st, _) = api.get(&format!("{base}?kind=bogus"), &t.admin).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+}

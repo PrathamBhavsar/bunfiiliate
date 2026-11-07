@@ -380,35 +380,54 @@ pub struct ContactRequest {
     pub message: String,
     /// `new`, `read` or `closed`.
     pub status: String,
+    /// `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`.
+    pub kind: String,
+    /// Disputed amount in cents; set together with `currency`.
+    pub amount_cents: Option<i64>,
+    /// ISO 4217 code, upper case.
+    pub currency: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
-const CONTACT_COLS: &str =
-    "id, workspace_id, program_id, name, email::text AS email, message, status, created_at";
+const CONTACT_COLS: &str = "id, workspace_id, program_id, name, email::text AS email, message, \
+     status, kind::text AS kind, amount_cents, currency::text AS currency, created_at";
+
+/// Fields of a new contact request.
+#[derive(Debug, Clone, Copy)]
+pub struct NewContact<'a> {
+    pub program_id: Option<Uuid>,
+    pub name: &'a str,
+    pub email: &'a str,
+    pub message: &'a str,
+    pub kind: &'a str,
+    pub amount_cents: Option<i64>,
+    pub currency: Option<&'a str>,
+}
 
 /// Inserts a `new` request; `program_id` must belong to the workspace.
 pub async fn insert_contact(
     db: impl PgExecutor<'_>,
     id: Uuid,
     workspace_id: Uuid,
-    program_id: Option<Uuid>,
-    name: &str,
-    email: &str,
-    message: &str,
+    c: NewContact<'_>,
 ) -> Result<Option<ContactRequest>, sqlx::Error> {
     sqlx::query_as(&format!(
-        "INSERT INTO contact_requests (id, workspace_id, program_id, name, email, message) \
-         SELECT $1, $2, $3, $4, $5, $6 \
+        "INSERT INTO contact_requests \
+         (id, workspace_id, program_id, name, email, message, kind, amount_cents, currency) \
+         SELECT $1, $2, $3, $4, $5, $6, $7::contact_request_kind, $8, $9 \
          WHERE $3::uuid IS NULL \
             OR EXISTS (SELECT 1 FROM programs WHERE id = $3 AND workspace_id = $2) \
          RETURNING {CONTACT_COLS}"
     ))
     .bind(id)
     .bind(workspace_id)
-    .bind(program_id)
-    .bind(name)
-    .bind(email)
-    .bind(message)
+    .bind(c.program_id)
+    .bind(c.name)
+    .bind(c.email)
+    .bind(c.message)
+    .bind(c.kind)
+    .bind(c.amount_cents)
+    .bind(c.currency)
     .fetch_optional(db)
     .await
 }
@@ -417,16 +436,19 @@ pub async fn list_contacts(
     pool: &PgPool,
     workspace_id: Uuid,
     status: Option<&str>,
+    kind: Option<&str>,
     limit: i64,
     offset: i64,
 ) -> Result<(Vec<ContactRequest>, i64), sqlx::Error> {
-    const FILTER: &str = "workspace_id = $1 AND ($2::text IS NULL OR status = $2)";
+    const FILTER: &str = "workspace_id = $1 AND ($2::text IS NULL OR status = $2) \
+         AND ($3::text IS NULL OR kind::text = $3)";
     let items = sqlx::query_as(&format!(
         "SELECT {CONTACT_COLS} FROM contact_requests WHERE {FILTER} \
-         ORDER BY created_at DESC, id DESC LIMIT $3 OFFSET $4"
+         ORDER BY created_at DESC, id DESC LIMIT $4 OFFSET $5"
     ))
     .bind(workspace_id)
     .bind(status)
+    .bind(kind)
     .bind(limit)
     .bind(offset)
     .fetch_all(pool)
@@ -436,6 +458,7 @@ pub async fn list_contacts(
     ))
     .bind(workspace_id)
     .bind(status)
+    .bind(kind)
     .fetch_one(pool)
     .await?;
     Ok((items, total))
