@@ -10,7 +10,16 @@ pub const PROTECTED: &[(&str, &str)] = &[
     ("programs", "stripe_secret"),
     ("programs", "paddle_secret"),
     ("webhook_endpoints", "secret"),
+    ("user_totp", "secret_enc"),
 ];
+
+/// Primary-key column holding the row id that binds a value's AAD.
+fn key_col(table: &str) -> &'static str {
+    match table {
+        "user_totp" => "user_id",
+        _ => "id",
+    }
+}
 
 /// Load the vault from `BF_MASTER_KEYS` / `BF_MASTER_KEY_FILE`.
 ///
@@ -37,6 +46,7 @@ fn marker(table: &str) -> &'static str {
     match table {
         "programs" => "secrets_enc_at",
         "webhook_endpoints" => "secret_enc_at",
+        "user_totp" => "secret_enc_at",
         other => panic!("no encryption marker column for {other}"),
     }
 }
@@ -108,7 +118,8 @@ pub async fn reencrypt(
                 if let (Some(next), false) = (next, dry_run) {
                     let m = marker(table);
                     sqlx::query(&format!(
-                        "UPDATE {table} SET {column} = $2, {m} = now() WHERE id = $1"
+                        "UPDATE {table} SET {column} = $2, {m} = now() WHERE {} = $1",
+                        key_col(table)
                     ))
                     .bind(id)
                     .bind(next)
@@ -147,11 +158,12 @@ async fn pending_rows(
     lock: bool,
 ) -> Result<Vec<(Uuid, String)>, sqlx::Error> {
     let lock = if lock { "FOR UPDATE SKIP LOCKED" } else { "" };
+    let key = key_col(table);
     sqlx::query_as(&format!(
-        "SELECT id, {column} FROM {table} \
-         WHERE id > $1 AND {column} IS NOT NULL AND {column} <> '' \
+        "SELECT {key}, {column} FROM {table} \
+         WHERE {key} > $1 AND {column} IS NOT NULL AND {column} <> '' \
            AND NOT starts_with({column}, $2) \
-         ORDER BY id LIMIT $3 {lock}"
+         ORDER BY {key} LIMIT $3 {lock}"
     ))
     .bind(after)
     .bind(format!("bfenc1:{}:", ring.active_kid()))

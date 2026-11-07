@@ -18,6 +18,7 @@ pub mod programs;
 pub mod routes;
 pub mod secrets;
 pub mod ssrf;
+pub mod totp;
 pub mod webhooks;
 pub mod worker;
 pub mod workspaces;

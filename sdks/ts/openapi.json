@@ -808,6 +808,259 @@
         }
       }
     },
+    "/api/v1/auth/totp/confirm": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Finish enrolment with a current code and the password; returns the recovery codes once.",
+        "operationId": "confirm",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong password or code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already enrolled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/totp/disable": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Turn TOTP off and delete the secret and recovery codes.",
+        "operationId": "disable",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Disabled"
+          },
+          "401": {
+            "description": "Wrong password or code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not enrolled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/totp/enrol": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Start enrolment: returns the otpauth URI and secret. Replaces any unconfirmed secret.",
+        "operationId": "enrol",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrolRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already enrolled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/totp/recovery-codes/regenerate": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Replace all recovery codes with ten new ones; the old ones stop working.",
+        "operationId": "regenerate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecoveryCodes"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Wrong password or code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not enrolled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/totp/status": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Whether TOTP is enrolled and how many recovery codes are left.",
+        "operationId": "status",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TotpStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/contact-requests": {
       "get": {
         "tags": [
@@ -5181,6 +5434,22 @@
           }
         }
       },
+      "CodeRequest": {
+        "type": "object",
+        "required": [
+          "current_password",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Six-digit authenticator code."
+          },
+          "current_password": {
+            "type": "string"
+          }
+        }
+      },
       "ContactPatch": {
         "type": "object",
         "required": [
@@ -5510,6 +5779,24 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "EnrolRequest": {
+        "type": "object"
+      },
+      "EnrolResponse": {
+        "type": "object",
+        "required": [
+          "otpauth_uri",
+          "secret_base32"
+        ],
+        "properties": {
+          "otpauth_uri": {
+            "type": "string"
+          },
+          "secret_base32": {
+            "type": "string"
           }
         }
       },
@@ -7870,6 +8157,21 @@
           }
         }
       },
+      "RecoveryCodes": {
+        "type": "object",
+        "required": [
+          "recovery_codes"
+        ],
+        "properties": {
+          "recovery_codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Shown once; only salted hashes are stored."
+          }
+        }
+      },
       "ReferralCode": {
         "type": "object",
         "required": [
@@ -8006,6 +8308,22 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "TotpStatus": {
+        "type": "object",
+        "required": [
+          "enrolled",
+          "recovery_codes_remaining"
+        ],
+        "properties": {
+          "enrolled": {
+            "type": "boolean"
+          },
+          "recovery_codes_remaining": {
+            "type": "integer",
+            "format": "int64"
           }
         }
       },
