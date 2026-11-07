@@ -6,6 +6,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"
 export CI=true # pnpm must never prompt
+# pg_dump/pg_restore must match the server major version (the dev server is 16; PATH may hold newer ones).
+export PG_BIN="${PG_BIN:-/opt/homebrew/opt/postgresql@16/bin}"
 BASE="${FINAL_GATE_BASE:-prod}"
 GATE_DIR="${GATE_DIR:-$ROOT/.gate}"
 mkdir -p "$GATE_DIR"
