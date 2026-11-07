@@ -64,3 +64,9 @@ Finished worktrees hold about 4 GB each (own target dir). Remove a worktree as s
 
 ## password_reset flake under load
 Six `password_reset` tests failed once with 401 while two workers were building, then passed alone and on a rerun of `make ci`. Not reproduced; if it recurs, check the TOTP step window and reset throttle first.
+
+## e2e rate limits and seeding
+Login is limited to 10/min per email and 30/min per IP, register/signup 5 per email and 10 per IP, all behind Caddy from one address. Seed through the api port directly (`E2E_API_URL`): no proxy header means only per-email limits apply. Give every suite its own workspace (self-serve `SIGNUP_ENABLED=1`, unique admin email) instead of reusing the bootstrap admin. Program secrets are returned only by create and rotate, not by GET. A fresh `/r/<code>` can 404 briefly: poll for the redirect. A comment line between `VAR=x \` continuation lines and the command in `e2e.sh` silently drops the env.
+
+## Duplicate OpenAPI operation ids
+utoipa takes the function name as operationId; `approve` exists for affiliates and conversions, so openapi-typescript merges them and the SDK types are wrong for one. Give new handlers a unique `operation_id`.

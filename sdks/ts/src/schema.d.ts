@@ -940,7 +940,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Approve: drafts a payout sized from the current balance. */
-        post: operations["approve"];
+        post: operations["payout_request_approve"];
         delete?: never;
         options?: never;
         head?: never;
@@ -957,7 +957,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Reject with a reason shown to the affiliate. */
-        post: operations["reject"];
+        post: operations["payout_request_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5552,7 +5552,7 @@ export interface operations {
             };
         };
     };
-    approve: {
+    payout_request_approve: {
         parameters: {
             query?: never;
             header?: never;
@@ -5591,7 +5591,7 @@ export interface operations {
             };
         };
     };
-    reject: {
+    payout_request_reject: {
         parameters: {
             query?: never;
             header?: never;

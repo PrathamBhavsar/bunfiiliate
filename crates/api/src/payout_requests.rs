@@ -459,6 +459,7 @@ pub async fn admin_list(
 #[utoipa::path(
     post,
     path = "/api/v1/payout-requests/{id}/approve",
+    operation_id = "payout_request_approve",
     tag = "payouts",
     security(("cookie" = [])),
     params(("id" = Uuid, Path, description = "RequestView id")),
@@ -491,6 +492,7 @@ pub async fn approve(
 #[utoipa::path(
     post,
     path = "/api/v1/payout-requests/{id}/reject",
+    operation_id = "payout_request_reject",
     tag = "payouts",
     security(("cookie" = [])),
     params(("id" = Uuid, Path, description = "RequestView id")),
