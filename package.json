@@ -4,8 +4,8 @@
   "type": "module",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
-    "build:js": "esbuild crates/tracker/js/tracker.src.js --minify --target=es2017 --outfile=crates/tracker/js/tracker.min.js",
-    "test:js": "node scripts/size-check.mjs && node --test scripts/"
+    "build:js": "esbuild crates/tracker/js/tracker.src.js --minify --target=es2017 --outfile=crates/tracker/js/tracker.min.js && esbuild crates/tracker/js/tracker.v2.src.js --minify --target=es2017 --outfile=crates/tracker/js/tracker.v2.min.js",
+    "test:js": "node scripts/size-check.mjs && node --test scripts/ && node --test \"sdks/js/test/*.test.ts\""
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

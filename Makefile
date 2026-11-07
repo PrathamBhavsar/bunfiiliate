@@ -1,11 +1,11 @@
-.PHONY: ci fmt clippy test deny web openapi openapi-check e2e schemas-check
+.PHONY: ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test
 
 ci:
 	cargo fmt --check
 	cargo clippy --workspace -- -D warnings
 	cargo test --workspace
 	cargo deny check
-	$(MAKE) web openapi-check
+	$(MAKE) web openapi-check js-test
 
 fmt:
 	cargo fmt
@@ -44,3 +44,7 @@ e2e:
 schemas-check:
 	npm --prefix scripts/schemas install --silent --no-audit --no-fund
 	node scripts/validate-schemas.mjs
+
+js-test:
+	node scripts/size-check.mjs
+	node --test scripts/ "sdks/js/test/*.test.ts"

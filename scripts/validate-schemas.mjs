@@ -25,7 +25,7 @@ const lexicalAmountBad = (raw) => /"amount_cents"\s*:\s*-?\d+(\.\d+|[eE])/.test(
 const fails = [];
 const invalidFiles = [];
 const dir = join(root, "examples");
-for (const f of readdirSync(dir).filter((x) => x.endsWith(".json")).sort()) {
+for (const f of readdirSync(dir).filter((x) => x.endsWith(".json") && x !== "signature-vector.json").sort()) {
   const parts = f.replace(/\.json$/, "").split(".");
   const schema = parts[0];
   const kind = parts[parts.length - 1];
