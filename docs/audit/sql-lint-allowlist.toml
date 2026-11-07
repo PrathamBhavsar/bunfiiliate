@@ -324,3 +324,8 @@ reason = "retention loop over all programs' rollup watermark; DDL on whole month
 file = "crates/db/src/ops.rs"
 fn = "notify_super_admins_alert"
 reason = "alert sink fans out to every super admin across workspaces; token-authenticated, no request tenant"
+
+[[allow]]
+file = "crates/db/src/code_stats.rs"
+fn = "code_stats"
+reason = "program_id comes from find_code(), which resolved the code through programs.workspace_id (and the affiliate for /me); every query filters on that program"

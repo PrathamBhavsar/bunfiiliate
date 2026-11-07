@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-07] C32 + C30 + C31 code stats (tribe #37)
+
+- **Done**: ADR-0006 (detail pages are `?code=` query routes; Caddy `try_files` already fits, `trailingSlash` unset), per-code stats API (admin + `/me`), stats pages with KPIs, charts, top countries/referrers, links from both list pages.
+- **Lessons**: a conversion has no code column; attribute it through `customers.first_click_id` -> `clicks.code`. The click query is bounded on `ts` both sides (test `per_code_stats_query_has_ts_bound`). Query keys are `["admin"|"portal","code-stats",...]`, never `"me"`.
+- **Known limits**: Playwright cases for the stats pages belong to C34.
+
 ## [2026-11-07] Plan v2 wave 7 + billing variant fix (tribe)
 
 - **Merged**: B05, B06, B07, B11, C10-C13, C20-C22, billing plan-from-variant fix. Migrations 0074-0076, 0080, 0082 (0081 intentionally unused).

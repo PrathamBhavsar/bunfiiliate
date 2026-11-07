@@ -99,3 +99,25 @@ export async function download1099(year: number) {
   setTimeout(() => URL.revokeObjectURL(url));
   return name;
 }
+
+export type CodeStats = components["schemas"]["CodeStats"];
+export type CodeStatsScope = "admin" | "portal";
+export const CODE_NOT_FOUND = "code not found";
+
+/**
+ * Stats of one referral code. Admin and portal use separate cache keys and routes; the key never
+ * starts with "me" (that is the session query, see anti-pattern #30).
+ */
+export function useCodeStats(scope: CodeStatsScope, code: string, range: Range) {
+  return useQuery({
+    queryKey: [scope, "code-stats", code, range],
+    enabled: code !== "",
+    retry: false,
+    queryFn: ({ signal }) => {
+      const query = { from: range.from, to: range.to, granularity: "day" as const };
+      return scope === "admin"
+        ? ok(api.GET("/api/v1/referral-codes/{code}/stats", { signal, params: { path: { code }, query } }))
+        : ok(api.GET("/api/v1/me/referral-codes/{code}/stats", { signal, params: { path: { code }, query } }));
+    },
+  });
+}

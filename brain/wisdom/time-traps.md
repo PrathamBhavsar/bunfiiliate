@@ -51,3 +51,6 @@ Cargo's metadata hash ignores the checkout path, so concurrent worktrees on one 
 
 ## e2e 503 on a full host disk
 Spool disk-full shedding trips at 85% disk used; `scripts/e2e.sh` pins `BF_SPOOL_*` so the suite does not depend on host disk.
+
+## Per-code conversions
+`conversions` has no `code` column. Join `customers.first_click_id` to `clicks.code`; a code-less (recurring) conversion is not attributed to any code.

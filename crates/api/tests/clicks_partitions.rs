@@ -214,3 +214,52 @@ async fn retention_then_rollup_keeps_dropped_days(pool: PgPool) {
             .unwrap();
     assert_eq!(after, 1, "the dropped day's rollup survives later ticks");
 }
+
+/// C30: the per-code stats click query is bounded on `ts`, so months outside the range
+/// are pruned on both sides.
+#[sqlx::test(migrations = "../db/migrations")]
+async fn per_code_stats_query_has_ts_bound(pool: PgPool) {
+    let (prog, _) = seed(&pool).await;
+    for back in 0..12 {
+        let d = month_of(back);
+        ensure_partitions(
+            &pool,
+            0,
+            Utc.from_utc_datetime(&d.and_hms_opt(1, 0, 0).unwrap()),
+        )
+        .await
+        .unwrap();
+    }
+    let to = Utc::now();
+    let from = to - Duration::days(7);
+    let plan: Vec<Value> = sqlx::query_scalar(&format!(
+        "EXPLAIN (FORMAT JSON) {}",
+        bf_db::code_stats::CLICK_SQL
+    ))
+    .bind(prog)
+    .bind("abc")
+    .bind(from)
+    .bind(to)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let rels = pruned_to(&plan, "code stats click query");
+    let floor = format!("clicks_y{:04}m{:02}", from.year(), from.month());
+    let stale: Vec<_> = rels
+        .iter()
+        .filter(|r| r.starts_with("clicks_y") && **r < floor)
+        .collect();
+    assert!(
+        stale.is_empty(),
+        "months before the range scanned: {stale:?}"
+    );
+    let ceil = format!("clicks_y{:04}m{:02}", to.year(), to.month());
+    let future: Vec<_> = rels
+        .iter()
+        .filter(|r| r.starts_with("clicks_y") && **r > ceil)
+        .collect();
+    assert!(
+        future.is_empty(),
+        "months after the range scanned: {future:?}"
+    );
+}

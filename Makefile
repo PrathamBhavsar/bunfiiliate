@@ -26,6 +26,7 @@ web:
 	pnpm -C apps/web typecheck
 	pnpm -C apps/web lint
 	pnpm -C apps/web build
+	scripts/check-static-export.sh
 
 openapi:
 	cargo run -q -p api -- openapi > sdks/ts/openapi.json

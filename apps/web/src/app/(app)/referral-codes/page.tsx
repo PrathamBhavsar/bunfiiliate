@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { useMemo } from "react";
 import { Facts, Section } from "@/components/admin-ui";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -17,6 +18,7 @@ import {
   type ReferralCode,
 } from "@/lib/admin";
 import { api } from "@/lib/api";
+import { codeStatsHref } from "@/lib/nav";
 import type { ListFn } from "@/lib/use-resource";
 
 type Row = ReferralCode & { id: string };
@@ -55,7 +57,15 @@ export default function Page() {
         { id: "affiliate_id", label: "Affiliate", options: (affiliates ?? []).map((a) => ({ value: a.id, label: a.email })) },
       ],
       columns: [
-        { id: "code", header: "Code", cell: (c) => <code className="font-medium">{c.code}</code> },
+        {
+          id: "code",
+          header: "Code",
+          cell: (c) => (
+            <Link href={codeStatsHref(c.code, true)} className="font-medium hover:underline" aria-label={`Stats for ${c.code}`}>
+              <code>{c.code}</code>
+            </Link>
+          ),
+        },
         { id: "affiliate", header: "Affiliate", cell: (c) => affiliateEmail(c.affiliate_id) },
         { id: "program", header: "Program", cell: (c) => programName(c.program_id) },
         { id: "landing", header: "Landing URL", className: "break-all", cell: (c) => c.landing_url },

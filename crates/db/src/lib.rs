@@ -3,6 +3,7 @@
 pub mod affiliates;
 pub mod auth;
 pub mod billing;
+pub mod code_stats;
 pub mod ledger;
 pub mod ops;
 pub mod partitions;
