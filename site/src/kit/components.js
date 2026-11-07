@@ -6,7 +6,7 @@ import { base, esc, md, wbr, copyText, ghFacts } from "./util.js";
 const define = (name, cls) => customElements.define(name, cls);
 const facts = ghFacts(brand.repo); // one fetch shared by every component
 
-const mark = () => `<a class="mark" href="${base}" aria-label="${esc(brand.name)} home">${brand.wordmark}</a>`;
+const mark = () => `<a class="mark" href="${base}" aria-label="${esc(brand.name)} home">${brand.markImg ? `<img class="mark-img" src="${base}${brand.markImg}" alt="" width="22" height="22">` : ""}${brand.wordmark}</a>`;
 
 define("x-nav", class extends HTMLElement {
   connectedCallback() {
@@ -49,6 +49,7 @@ define("x-hero", class extends HTMLElement {
         <h1 class="display">${brand.headline}</h1>
         <p class="lede">${brand.sub}</p>
         <x-copy cmd="${esc(brand.heroCmdPre ?? brand.heroCmd)}"></x-copy>
+        ${brand.heroNote ? `<p class="hero-note">${md(brand.heroNote)}</p>` : ""}
         <div class="cta">
           <a class="btn primary" href="${base}docs/#/quickstart">Get started ${icon("arrow")}</a>
           <a class="btn" href="https://github.com/${brand.repo}">${icon("github")} Star on GitHub</a>
@@ -75,7 +76,7 @@ define("x-live", class extends HTMLElement {
       this.querySelector(".receipt").innerHTML = live.concat(brand.facts.map(([k, v]) => row(k, md(v)))).join("");
     };
     this.innerHTML = `<div class="wrap live">
-      <div><h2 class="display">${brand.liveTitle}</h2><p class="note">${md(brand.liveNote)}</p></div>
+      <div><h2 class="display">${brand.liveTitle}</h2><p class="note">${md(brand.liveNote)}</p>${brand.liveLinks ? `<div class="cta">${brand.liveLinks.map(([t, u]) => `<a class="btn" href="https://github.com/${brand.repo}/blob/${brand.branch ?? "staging"}/${u}">${icon("book")} ${esc(t)}</a>`).join("")}</div>` : ""}</div>
       <ul class="receipt" aria-label="Project facts"></ul>
     </div>`;
     draw(null); facts.then(draw);
@@ -90,7 +91,9 @@ define("x-features", class extends HTMLElement {
       <p class="sec-lede">${md(brand.featuresLede)}</p>
       <div class="groups">${brand.features.map((g) => `<section class="group">
         <div class="group-head"><h3 class="display">${esc(g.title)}</h3><p>${md(g.blurb)}</p></div>
-        <ul class="rows">${g.items.map(([ic, t, d]) => `<li>${icon(ic)}<div><h4>${esc(t)}</h4><p>${md(d)}</p></div></li>`).join("")}</ul>
+        <ul class="rows${g.ledger ? " ledger" : ""}">${g.items.map(([ic, t, d]) => g.ledger
+          ? `<li><div class="led"><h4>${esc(t)}</h4><span class="dots"></span>${icon(ic)}</div><p>${md(d)}</p></li>`
+          : `<li>${icon(ic)}<div><h4>${esc(t)}</h4><p>${md(d)}</p></div></li>`).join("")}</ul>
       </section>`).join("")}</div>
     </div>`;
   }
@@ -155,7 +158,7 @@ define("x-faq", class extends HTMLElement {
   connectedCallback() {
     this.innerHTML = `<div class="wrap">
       <h2 class="display sec-head">Questions people ask.</h2>
-      <div class="faq">${brand.faq.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${md(a)}</p></details>`).join("")}</div>
+      <div class="faq">${brand.faq.map(([q, a]) => `<details><summary>${esc(q)}<span class="pm">${icon("plus")}</span></summary><p>${md(a)}</p></details>`).join("")}</div>
     </div>`;
   }
 });
@@ -166,7 +169,7 @@ define("x-footer", class extends HTMLElement {
     const gh = `https://github.com/${brand.repo}`;
     this.innerHTML = `<div class="wrap">
       <div class="foot">
-        <div>${mark()}<p>${esc(brand.footBlurb)}</p></div>
+        <div>${mark()}<p>${md(brand.footBlurb)}</p></div>
         ${col("Product", [["Features", `${base}#features`], ["Install", `${base}#install`], ["Releases", `${gh}/releases`]])}
         ${col("Docs", (brand.footDocs ?? [["Quickstart", "quickstart"], ["Configuration", "configuration"], ["Security", "security"]]).map(([t, s]) => [t, `${base}docs/#/${s}`]).concat([["llms.txt", `${base}llms.txt`]]))}
         ${col("Project", brand.footProject ?? [["GitHub", gh], ["Issues", `${gh}/issues`], ["Security policy", `${gh}/blob/staging/SECURITY.md`]])}

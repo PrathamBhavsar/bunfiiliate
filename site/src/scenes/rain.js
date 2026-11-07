@@ -58,8 +58,8 @@ registerScene("rain", ({ cols, rows, rand }) => {
 
       // the sheet: columns of figures scrolling at their own pace. Rows k and k+1 of a column share an
       // amount with opposite signs, so every pair cancels.
-      if (wide) {
-        const colW = 11, start = Math.floor(cols * 0.58), n = Math.floor((cols - start - 1) / colW);
+      {
+        const colW = 11, start = wide ? Math.floor(cols * 0.58) : cols - colW - 1, n = wide ? Math.floor((cols - start - 1) / colW) : 1;
         for (let j = 0; j < n; j++) {
           const k0 = Math.floor(t / (520 + j * 140)) + j * 37;
           for (let r = 0; r < top; r++) {
@@ -67,7 +67,7 @@ registerScene("rain", ({ cols, rows, rand }) => {
             const sx = fmt(k & 1 ? -amt : amt).padStart(colW - 2);
             for (let i = 0; i < sx.length; i++) {
               const c = start + j * colW + i;
-              if (!taken.has(c * 1000 + r)) put(c, r, sx[i], 0, 0.2 + 0.14 * (r / top), true);
+              if (!taken.has(c * 1000 + r)) put(c, r, sx[i], 0, (wide ? 0.2 : 0.13) + 0.14 * (r / top), true);
             }
           }
         }

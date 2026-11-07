@@ -42,6 +42,9 @@ h3.display { font-size: clamp(1.25rem, 2vw, 1.625rem); line-height: 1.2; }
 x-nav { display: block; position: sticky; top: 0; z-index: 50; background: var(--bg); border-bottom: 1px solid var(--line); }
 .nav { height: var(--nav-h); display: flex; align-items: center; gap: 32px; }
 .mark { font-family: var(--font-display); font-size: 1.375rem; text-decoration: none; white-space: nowrap; }
+.mark { display: inline-flex; align-items: center; }
+.mark-img { width: 22px; height: 22px; margin-right: 10px; image-rendering: pixelated; }
+.hero-note { margin-top: 12px; color: var(--fg-dim); font-size: 0.875rem; max-width: 56ch; }
 .mark b { color: var(--accent); font-weight: 400; }
 .nav-links { display: flex; gap: 28px; margin-left: 12px; font-weight: 500; font-size: 0.9375rem; }
 .nav-links a { text-decoration: none; color: var(--fg-dim); transition: color 0.15s; }
@@ -120,6 +123,12 @@ x-features { display: block; padding-block: clamp(64px, 10vw, 128px); }
 .rows h4 { margin: 0; font-size: 1.0625rem; font-weight: 700; }
 .rows p { color: var(--fg-dim); font-size: 0.9688rem; margin-top: 2px; text-wrap: pretty; max-width: 62ch; }
 .rows code { font-size: 0.85em; color: var(--fg); background: var(--bg-3); padding: 1px 6px; }
+.rows.ledger li { grid-template-columns: 1fr; gap: 4px; }
+.rows.ledger .led { display: flex; align-items: baseline; gap: 10px; }
+.rows.ledger .led .dots { flex: 1; border-bottom: 1px dotted var(--line-2); transform: translateY(-4px); min-width: 16px; }
+.rows.ledger .led .icon { margin: 0; align-self: center; }
+.rows.ledger h4 { font-family: var(--font-mono); font-size: 0.9375rem; font-weight: 400; letter-spacing: 0.02em; }
+.live .cta { margin-top: 24px; }
 @media (max-width: 860px) { .group { grid-template-columns: 1fr; } .group-head { position: static; } }
 
 /* flow */
@@ -163,8 +172,9 @@ x-faq { display: block; padding-block: clamp(64px, 10vw, 128px); }
 .faq details { border-bottom: 1px solid var(--line); }
 .faq summary { list-style: none; cursor: pointer; padding: 22px 48px 22px 0; font-weight: 700; font-size: 1.125rem; position: relative; }
 .faq summary::-webkit-details-marker { display: none; }
-.faq summary::after { content: "+"; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-family: var(--font-display); font-size: 1.5rem; color: var(--accent); transition: transform 0.25s var(--ease); }
-.faq details[open] summary::after { transform: translateY(-50%) rotate(45deg); }
+.faq summary .pm { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: grid; color: var(--accent); transition: transform 0.25s var(--ease); }
+.faq summary .pm .icon { width: 22px; height: 22px; }
+.faq details[open] summary .pm { transform: translateY(-50%) rotate(45deg); }
 .faq details > p { padding: 0 48px 24px 0; color: var(--fg-dim); max-width: 64ch; text-wrap: pretty; }
 .faq code { font-size: 0.85em; color: var(--fg); background: var(--bg-3); padding: 1px 6px; }
 

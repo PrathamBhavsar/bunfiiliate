@@ -14,6 +14,7 @@ export default {
 
   liveTitle: "Built in the open.",
   liveNote: "Live GitHub facts appear here as they exist. The rest comes from files in the repo. Benchmarks are from one laptop: read `docs/benchmarks.md` before quoting them.",
+  liveLinks: [["Benchmarks", "docs/benchmarks.md"], ["Ledger spec", "docs/ledger.md"]],
   facts: [
     ["Workspace", "6 crates · 2 binaries"],
     ["Tracker p50, fsync off", "0.4 ms · 27.6k req/s"],
@@ -34,7 +35,7 @@ export default {
       ["code", "Client script under 2 KB", "`tracker.min.js` sets first-party `bf_vid` and `bf_ref` cookies and sends click beacons."],
       ["webhook", "Webhook ingestion", "Stripe, Paddle and generic HMAC events, verified in constant time with a 5-minute tolerance and idempotency keys."],
     ]},
-    { title: "Money", blurb: "Correctness first. Balances are derived, never stored.", items: [
+    { title: "Money", ledger: true, blurb: "Correctness first. Balances are derived, never stored.", items: [
       ["wallet", "Double-entry ledger", "Accounts: Expense, AffPending, AffPayable, Cash. Every movement posts a balanced transaction."],
       ["lock", "Append-only by trigger", "Postgres rejects `UPDATE` and `DELETE` on `ledger_entries`. A deferrable constraint enforces `sum(amount) = 0` per transaction."],
       ["coins", "Integer cents, basis points", "No floats. Commission is `i128` bps math, round-half-up, written down in `docs/ledger.md`."],

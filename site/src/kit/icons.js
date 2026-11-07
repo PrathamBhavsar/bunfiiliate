@@ -11,7 +11,7 @@ import {
   RepeatIcon, Idea01Icon, PuzzleIcon, Image01Icon, File01Icon, Pdf01Icon, BubbleChatIcon, EyeIcon,
   Bug01Icon, Activity01Icon, Clock01Icon, HourglassIcon, Fire02Icon, Shield01Icon, Folder01Icon,
   SourceCodeIcon, StarIcon, DashboardSquare01Icon, CloudServerIcon, DatabaseSyncIcon,
-  FileExportIcon, MailSend01Icon, InboxIcon, Ticket01Icon, CustomerSupportIcon, User02Icon,
+  FileExportIcon, MailSend01Icon, InboxIcon, Add01Icon, HelpCircleIcon, Ticket01Icon, CustomerSupportIcon, User02Icon,
 } from "@hugeicons/core-free-icons";
 
 const set = {
@@ -31,7 +31,7 @@ const set = {
   activity: Activity01Icon, clock: Clock01Icon, hourglass: HourglassIcon, fire: Fire02Icon,
   shield2: Shield01Icon, folder: Folder01Icon, source: SourceCodeIcon, star: StarIcon,
   dash: DashboardSquare01Icon, cloud: CloudServerIcon, sync: DatabaseSyncIcon, export: FileExportIcon,
-  send: MailSend01Icon, inbox: InboxIcon, ticket: Ticket01Icon, support: CustomerSupportIcon, user: User02Icon,
+  send: MailSend01Icon, inbox: InboxIcon, plus: Add01Icon, help: HelpCircleIcon, ticket: Ticket01Icon, support: CustomerSupportIcon, user: User02Icon,
 };
 
 export function icon(name, cls = "icon") {
