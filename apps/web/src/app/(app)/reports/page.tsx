@@ -5,7 +5,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { ScopeSelects } from "@/components/analytics-filters";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select } from "@/components/ui/input";
-import { DIMS, downloadReport, lastDays, type Dim, type Scope } from "@/lib/analytics";
+import { DIMS, download1099, downloadReport, lastDays, type Dim, type Scope } from "@/lib/analytics";
 import { errorMessage } from "@/lib/api";
 
 export default function Page() {
@@ -28,6 +28,22 @@ export default function Page() {
       setResult({ ok: false, text: errorMessage(err) });
     } finally {
       setPending(false);
+    }
+  }
+
+  const [taxPending, setTaxPending] = useState(false);
+  const [taxResult, setTaxResult] = useState<{ ok: boolean; text: string } | null>(null);
+  async function submitTax(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const year = Number(new FormData(e.currentTarget).get("year"));
+    setTaxPending(true);
+    setTaxResult(null);
+    try {
+      setTaxResult({ ok: true, text: `Downloaded ${await download1099(year)}` });
+    } catch (err) {
+      setTaxResult({ ok: false, text: errorMessage(err) });
+    } finally {
+      setTaxPending(false);
     }
   }
 
@@ -74,6 +90,27 @@ export default function Page() {
         <div className="flex justify-end">
           <Button type="submit" variant="primary" disabled={pending}>
             <Download /> {pending ? "Preparing…" : "Download CSV"}
+          </Button>
+        </div>
+      </form>
+      <form onSubmit={submitTax} className="grid gap-3 rounded-lg border border-border bg-surface p-3">
+        <h2 className="text-sm font-semibold">1099-style payout report</h2>
+        <p className="text-xs text-muted">
+          Total paid per affiliate and currency in a calendar year, for affiliates at or above the threshold
+          (TAX_REPORT_THRESHOLD_CENTS, default 60000). A starting point for your accountant, not tax advice.
+        </p>
+        <div className="grid gap-1">
+          <Label htmlFor="tax-year">Year</Label>
+          <Input id="tax-year" name="year" type="number" min={2000} max={9999} required defaultValue={new Date().getUTCFullYear()} />
+        </div>
+        {taxResult && (
+          <p role={taxResult.ok ? "status" : "alert"} className={taxResult.ok ? "text-xs text-success" : "text-xs text-danger"}>
+            {taxResult.text}
+          </p>
+        )}
+        <div className="flex justify-end">
+          <Button type="submit" variant="primary" disabled={taxPending}>
+            <Download /> {taxPending ? "Preparing…" : "Download CSV"}
           </Button>
         </div>
       </form>

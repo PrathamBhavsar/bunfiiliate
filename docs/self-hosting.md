@@ -119,6 +119,11 @@ Database schema migrations execute automatically when the `api` service starts.
 - `POST /api/v1/payouts/batches/{id}/reconcile` asks the provider about lines it accepted but has not settled (PayPal and Wise settle asynchronously) and posts the confirmed ones. Run it until the batch is paid. While a line is in flight, marking the batch paid by hand is refused.
 - PayPal Payouts has a sandbox and a pay-as-you-go live tier. Wise: the adapter follows the documented quote, recipient, transfer, fund flow, but has not been run against the Wise sandbox, and live use needs a Wise business agreement and supported email-recipient currencies. Treat it as untested until you have verified it in your sandbox. Zero-decimal currencies (JPY, KRW, ...) are refused by both adapters.
 
+## Tax forms, invoices and currencies
+
+- **Tax forms.** Affiliates can record a W-8/W-9 under Profile (`PUT /api/v1/me/tax-form`). Only the last 4 digits of a tax id are accepted and stored; a longer value is refused. Admins get a per-payout invoice (`/api/v1/payouts/{id}/invoice.html`) and a 1099-style CSV (`/api/v1/reports/1099-style.csv?year=YYYY`): paid totals per affiliate and currency for the calendar year, at or above `TAX_REPORT_THRESHOLD_CENTS` (default `60000`, the US 1099-NEC figure used as a default only). This is bookkeeping, not tax advice; hand the CSV to your own accountant or compliance vendor.
+- **Exchange rates.** Programs keep one currency each. The worker fetches USD-based rates for the currencies in use once a day from `api.frankfurter.dev` (ECB data, no key; `api.frankfurter.app` redirects there) and caches them in `exchange_rates`. `GET /api/v1/analytics/summary-all?display_currency=XXX` converts every program day by day with the latest cached rate on or before that day, going through USD for cross rates and rounding half-even to cents. A program with no rate is left out of the totals and listed under `unconverted`; there is never a 1:1 fallback. If the fetch fails, the last cached rates stay in use. Display currencies that no program uses are only convertible once a rate for them is cached.
+
 ## 3. First-Run Bootstrap
 
 Before logging in, initialize the root workspace and super-administrator account using `api bootstrap`:

@@ -1008,3 +1008,43 @@ source = "api"
 kind = "scoped"
 role = "Admin"
 reason = "program looked up by workspace id from the session before anything is signed or sent"
+
+[[route]]
+method = "get"
+path = "/api/v1/analytics/summary-all"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; rollups joined through programs.workspace_id; exchange_rates is a global cache"
+
+[[route]]
+method = "get"
+path = "/api/v1/me/tax-form"
+source = "api"
+kind = "self"
+role = "Affiliate"
+reason = "own affiliate row only"
+
+[[route]]
+method = "put"
+path = "/api/v1/me/tax-form"
+source = "api"
+kind = "self"
+role = "Affiliate"
+reason = "own affiliate row only"
+
+[[route]]
+method = "get"
+path = "/api/v1/payouts/{id}/invoice.html"
+source = "api"
+kind = "self"
+role = "Any"
+reason = "workspace id from the session; an affiliate only gets payouts of their own affiliate row"
+
+[[route]]
+method = "get"
+path = "/api/v1/reports/1099-style.csv"
+source = "api"
+kind = "scoped"
+role = "Admin"
+reason = "workspace id from the session; payouts joined through programs.workspace_id"

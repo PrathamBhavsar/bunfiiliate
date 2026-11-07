@@ -18,7 +18,7 @@ use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
 use crate::AppState;
-use crate::auth::{Any, Auth, Principal};
+use crate::auth::{Admin, Any, Auth, Principal};
 use crate::error::{AppError, ErrorBody};
 use crate::programs::{require_program, viewer};
 
@@ -123,6 +123,7 @@ ON CONFLICT (program_id, affiliate_id, day, dim, dim_value) DO UPDATE SET \
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/v1/analytics/summary", get(summary))
+        .route("/api/v1/analytics/summary-all", get(summary_all))
         .route("/api/v1/analytics/timeseries", get(timeseries))
         .route("/api/v1/reports/analytics.csv", get(report_csv))
 }
@@ -473,4 +474,167 @@ pub async fn report_csv(
         ],
         out,
     ))
+}
+
+// ---- all programs in one display currency (B06)
+
+#[derive(Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct SummaryAllQuery {
+    /// ISO 4217 code every program's money is converted to. Default `USD`.
+    display_currency: Option<String>,
+    /// First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.
+    from: Option<String>,
+    /// Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.
+    to: Option<String>,
+}
+
+/// Money of a program that could not be converted: no cached rate on or before the day.
+#[derive(Serialize, ToSchema, PartialEq, Debug)]
+pub struct Unconverted {
+    program_id: Uuid,
+    /// The program's own currency; amounts are in its minor unit.
+    currency: String,
+    revenue_cents: i64,
+    commission_cents: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct SummaryAll {
+    display_currency: String,
+    from: String,
+    to: String,
+    /// Converted revenue of every program with a rate, in `display_currency` cents.
+    revenue_cents: i64,
+    commission_cents: i64,
+    /// Programs left out of the totals; never silently converted 1:1.
+    unconverted: Vec<Unconverted>,
+}
+
+/// Cached USD-based rates of one currency, oldest first.
+type RateHistory = Vec<(NaiveDate, bf_core::Rate)>;
+
+/// Units of `cur` per USD on `day`: the latest cached rate on or before it, never a later one.
+fn per_usd(
+    rates: &std::collections::HashMap<String, RateHistory>,
+    cur: &str,
+    day: NaiveDate,
+) -> Option<bf_core::Rate> {
+    if cur == "USD" {
+        return Some(bf_core::Rate::ONE);
+    }
+    let h = rates.get(cur)?;
+    let n = h.partition_point(|(d, _)| *d <= day);
+    n.checked_sub(1).map(|i| h[i].1)
+}
+
+/// Revenue and commission of every program, converted to one currency day by day with the
+/// latest rate on or before each day (cross rates go through USD, rounded half-even to cents).
+#[utoipa::path(
+    get,
+    path = "/api/v1/analytics/summary-all",
+    tag = "analytics",
+    security(("cookie" = [])),
+    params(SummaryAllQuery),
+    responses(
+        (status = 200, body = SummaryAll),
+        (status = 400, body = ErrorBody),
+        (status = 403, body = ErrorBody),
+    )
+)]
+pub async fn summary_all(
+    State(s): State<AppState>,
+    auth: Auth<Admin>,
+    Query(q): Query<SummaryAllQuery>,
+) -> Result<Json<SummaryAll>, AppError> {
+    let ws = auth.principal.workspace_scope(None)?;
+    let display = bf_core::Currency::new(
+        &q.display_currency
+            .as_deref()
+            .unwrap_or("USD")
+            .to_ascii_uppercase(),
+    )
+    .ok_or_else(|| AppError::BadRequest("display_currency is a 3-letter code".into()))?;
+    let to =
+        q.to.as_deref()
+            .map_or_else(|| Ok(Utc::now().date_naive()), parse_day)?;
+    let from = q
+        .from
+        .as_deref()
+        .map_or_else(|| Ok(to - Duration::days(29)), parse_day)?;
+    if from > to || (to - from).num_days() >= MAX_RANGE_DAYS {
+        return Err(AppError::BadRequest(format!(
+            "from must not be after to, and the range is at most {MAX_RANGE_DAYS} days"
+        )));
+    }
+    let rows: Vec<(Uuid, String, NaiveDate, i64, i64)> = sqlx::query_as(
+        "SELECT p.id, p.currency::text, r.day, sum(r.revenue_cents)::bigint, \
+                sum(r.commission_cents)::bigint \
+         FROM daily_rollups r JOIN programs p ON p.id = r.program_id \
+         WHERE p.workspace_id = $1 AND r.dim = 'total' AND r.day BETWEEN $2 AND $3 \
+         GROUP BY p.id, p.currency, r.day ORDER BY p.id, r.day",
+    )
+    .bind(ws)
+    .bind(from)
+    .bind(to)
+    .fetch_all(&s.pool)
+    .await?;
+    let mut wanted: Vec<String> = rows.iter().map(|r| r.1.clone()).collect();
+    wanted.push(display.as_str().to_owned());
+    wanted.retain(|c| c != "USD");
+    wanted.sort_unstable();
+    wanted.dedup();
+    // exchange_rates is global (no tenant column); rows older than the range are the fallback
+    let cached: Vec<(String, NaiveDate, String)> = sqlx::query_as(
+        "SELECT quote::text, as_of, rate::text FROM exchange_rates \
+         WHERE base = 'USD' AND quote = ANY($1) AND as_of <= $2 ORDER BY quote, as_of",
+    )
+    .bind(&wanted)
+    .bind(to)
+    .fetch_all(&s.pool)
+    .await?;
+    let mut rates: std::collections::HashMap<String, RateHistory> = Default::default();
+    for (cur, as_of, rate) in cached {
+        let rate = bf_core::Rate::parse(&rate).map_err(|_| AppError::Internal)?;
+        rates.entry(cur).or_default().push((as_of, rate));
+    }
+    let (mut revenue, mut commission) = (0_i128, 0_i128);
+    let mut left: Vec<Unconverted> = Vec::new();
+    for (program, cur, day, rev, com) in rows {
+        let converted = per_usd(&rates, &cur, day)
+            .zip(per_usd(&rates, display.as_str(), day))
+            .and_then(|(f, t)| {
+                Some((
+                    bf_core::convert_cents(rev, f, t).ok()?,
+                    bf_core::convert_cents(com, f, t).ok()?,
+                ))
+            });
+        match converted {
+            Some((r, c)) => {
+                revenue += i128::from(r);
+                commission += i128::from(c);
+            }
+            None => match left.last_mut().filter(|u| u.program_id == program) {
+                Some(u) => {
+                    u.revenue_cents = u.revenue_cents.saturating_add(rev);
+                    u.commission_cents = u.commission_cents.saturating_add(com);
+                }
+                None => left.push(Unconverted {
+                    program_id: program,
+                    currency: cur,
+                    revenue_cents: rev,
+                    commission_cents: com,
+                }),
+            },
+        }
+    }
+    let clamp = |v: i128| i64::try_from(v).map_err(|_| AppError::Internal);
+    Ok(Json(SummaryAll {
+        display_currency: display.to_string(),
+        from: from.to_string(),
+        to: to.to_string(),
+        revenue_cents: clamp(revenue)?,
+        commission_cents: clamp(commission)?,
+        unconverted: left,
+    }))
 }

@@ -519,6 +519,81 @@
         ]
       }
     },
+    "/api/v1/analytics/summary-all": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Revenue and commission of every program, converted to one currency day by day with the\nlatest rate on or before each day (cross rates go through USD, rounded half-even to cents).",
+        "operationId": "summary_all",
+        "parameters": [
+          {
+            "name": "display_currency",
+            "in": "query",
+            "description": "ISO 4217 code every program's money is converted to. Default `USD`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "Last day, `YYYY-MM-DD` UTC, inclusive. Default: today.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryAll"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/analytics/timeseries": {
       "get": {
         "tags": [
@@ -3048,6 +3123,96 @@
         ]
       }
     },
+    "/api/v1/me/tax-form": {
+      "get": {
+        "tags": [
+          "me"
+        ],
+        "summary": "The signed-in affiliate's tax form.",
+        "operationId": "me_get",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxForm"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "me"
+        ],
+        "summary": "Submit or replace the signed-in affiliate's tax form.",
+        "operationId": "me_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxFormInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxForm"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad kind, name, country or tax id",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
     "/api/v1/members": {
       "get": {
         "tags": [
@@ -4122,6 +4287,54 @@
           },
           "404": {
             "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/payouts/{id}/invoice.html": {
+      "get": {
+        "tags": [
+          "payouts"
+        ],
+        "summary": "Invoice of an approved or paid payout: the workspace admin, or the affiliate it belongs to.",
+        "operationId": "invoice",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Payout id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/html",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown, draft, or someone else's payout",
             "content": {
               "application/json": {
                 "schema": {
@@ -5405,6 +5618,54 @@
             "description": ""
           },
           "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "cookie": []
+          }
+        ]
+      }
+    },
+    "/api/v1/reports/1099-style.csv": {
+      "get": {
+        "tags": [
+          "reports"
+        ],
+        "summary": "One row per affiliate and currency whose payouts paid in the year reach the threshold.",
+        "operationId": "report_1099",
+        "parameters": [
+          {
+            "name": "year",
+            "in": "query",
+            "description": "Calendar year (UTC) of the payout's paid date. Default: the current year.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "text/csv",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
             "description": "",
             "content": {
               "application/json": {
@@ -10365,6 +10626,111 @@
           }
         ]
       },
+      "SummaryAll": {
+        "type": "object",
+        "required": [
+          "display_currency",
+          "from",
+          "to",
+          "revenue_cents",
+          "commission_cents",
+          "unconverted"
+        ],
+        "properties": {
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "display_currency": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "revenue_cents": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Converted revenue of every program with a rate, in `display_currency` cents."
+          },
+          "to": {
+            "type": "string"
+          },
+          "unconverted": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Unconverted"
+            },
+            "description": "Programs left out of the totals; never silently converted 1:1."
+          }
+        }
+      },
+      "TaxForm": {
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "ISO 3166 alpha-2, upper case."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`w8`, `w9`, or `none` when nothing was submitted."
+          },
+          "legal_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "submitted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "RFC 3339 UTC."
+          },
+          "tax_id_last4": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Last 4 digits of the tax id; the full id is never stored."
+          }
+        }
+      },
+      "TaxFormInput": {
+        "type": "object",
+        "required": [
+          "kind",
+          "legal_name",
+          "country"
+        ],
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "Two letters."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`w8` or `w9`."
+          },
+          "legal_name": {
+            "type": "string"
+          },
+          "tax_id_last4": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Exactly 4 digits when present. Anything longer is refused, never truncated."
+          }
+        }
+      },
       "TemplatePatch": {
         "type": "object",
         "properties": {
@@ -10433,6 +10799,34 @@
             "type": "boolean"
           },
           "recovery_codes_remaining": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "Unconverted": {
+        "type": "object",
+        "description": "Money of a program that could not be converted: no cached rate on or before the day.",
+        "required": [
+          "program_id",
+          "currency",
+          "revenue_cents",
+          "commission_cents"
+        ],
+        "properties": {
+          "commission_cents": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "currency": {
+            "type": "string",
+            "description": "The program's own currency; amounts are in its minor unit."
+          },
+          "program_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "revenue_cents": {
             "type": "integer",
             "format": "int64"
           }

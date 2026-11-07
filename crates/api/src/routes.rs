@@ -22,8 +22,8 @@ use crate::auth::{
 use crate::error::{AppError, AppJson, ErrorBody, ErrorDetail};
 use crate::limit;
 use crate::{
-    admin_reset, affiliates, analytics, billing, mail, money, ops, password_reset, payout_rails,
-    payout_requests, payouts, programs, totp, webhooks, workspaces,
+    admin_reset, affiliates, analytics, billing, invoice, mail, money, ops, password_reset,
+    payout_rails, payout_requests, payouts, programs, tax, totp, webhooks, workspaces,
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
@@ -63,7 +63,7 @@ impl Modify for CookieAuth {
         affiliates::unenroll, affiliates::create_code, affiliates::list_codes,
         affiliates::delete_code, affiliates::me_affiliate, affiliates::me_update,
         affiliates::me_create_code, affiliates::me_list_codes, affiliates::me_delete_code,
-        analytics::summary, analytics::timeseries, analytics::report_csv,
+        analytics::summary, analytics::summary_all, analytics::timeseries, analytics::report_csv,
         webhooks::create_endpoint, webhooks::list_endpoints, webhooks::get_endpoint,
         webhooks::update_endpoint, webhooks::delete_endpoint, webhooks::list_deliveries,
         webhooks::redeliver, webhooks::list_inbound, webhooks::replay_inbound,
@@ -87,6 +87,7 @@ impl Modify for CookieAuth {
         payout_requests::approve, payout_requests::reject,
         billing::checkout, billing::subscription, billing::list_providers,
         billing::set_provider, billing::webhook,
+        tax::me_get, tax::me_put, tax::report_1099, invoice::invoice,
     ),
     components(schemas(
         LoginRequest, UserView, workspaces::SignupRequest, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
@@ -123,6 +124,8 @@ pub fn routes() -> Router<AppState> {
         .merge(payout_rails::routes())
         .merge(payout_requests::routes())
         .merge(billing::routes())
+        .merge(tax::routes())
+        .merge(invoice::routes())
 }
 
 /// One OpenAPI operation, for the tenant audit inventory.

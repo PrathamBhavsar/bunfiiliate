@@ -100,6 +100,7 @@ struct Ws {
     customer: Uuid,
     conversion: Uuid,
     batch: Uuid,
+    payout: Uuid,
     request: Uuid,
     endpoint: Uuid,
     delivery: Uuid,
@@ -236,6 +237,25 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
         &[batch, program, admin_user],
     )
     .await;
+    // A paid payout over the 1099 threshold, so a leak through the report or invoice shows up.
+    let payout = Uuid::now_v7();
+    sqlx::query(
+        "INSERT INTO payouts (id, batch_id, affiliate_id, amount_cents, status, payout_email) \
+         VALUES ($1, $2, $3, 100000, 'paid', $4)",
+    )
+    .bind(payout)
+    .bind(batch)
+    .bind(affiliate)
+    .bind(format!("{secret}@pay.io"))
+    .execute(pool)
+    .await
+    .unwrap();
+    exec(
+        pool,
+        "UPDATE payout_batches SET paid_at = now() WHERE id = $1",
+        &[batch],
+    )
+    .await;
     sqlx::query(
         "INSERT INTO payout_rail_credentials (id, workspace_id, rail, creds) \
          VALUES ($1, $2, 'paypal_payouts', 'sealed-stand-in')",
@@ -310,6 +330,7 @@ async fn seed(pool: &PgPool, tag: &str) -> Ws {
         customer,
         conversion,
         batch,
+        payout,
         request,
         endpoint,
         delivery,
@@ -430,6 +451,7 @@ fn resource_for(prefix: &str, ids: &Ws) -> String {
         ("/api/v1/notifications", ids.notification),
         ("/api/v1/payout-requests", ids.request),
         ("/api/v1/payouts/batches", ids.batch),
+        ("/api/v1/payouts", ids.payout),
         ("/api/v1/programs", ids.program),
         ("/api/v1/users", ids.aff_user),
         ("/api/v1/webhooks/deliveries", ids.delivery),
@@ -467,6 +489,9 @@ fn body(m: &str, path: &str, f: &Ws) -> Option<Value> {
         ("post", "/api/v1/payouts/batches") => json!({"program_id": f.program}),
         ("put", "/api/v1/payouts/rails/credentials") => {
             json!({"rail": "paypal_payouts", "credentials": {"client_id": "hijack", "client_secret": "hijack"}})
+        }
+        ("put", "/api/v1/me/tax-form") => {
+            json!({"kind": "w9", "legal_name": "hijack", "country": "US", "tax_id_last4": "0000"})
         }
         ("patch", "/api/v1/programs/{id}") => json!({"name": "hijacked"}),
         ("post", "/api/v1/programs/{id}/conversion-types") => json!({"key": "x", "name": "x"}),
@@ -691,6 +716,7 @@ async fn run_matrix(pool: &PgPool, check_snapshot: bool) -> Run {
             b.delivery,
             b.conversion,
             b.batch,
+            b.payout,
             b.request,
             b.customer,
             b.affiliate,
@@ -786,6 +812,7 @@ async fn lists_never_contain_foreign_rows(pool: PgPool) {
             b.affiliate,
             b.conversion,
             b.batch,
+            b.payout,
             b.request,
             b.endpoint,
             b.template,

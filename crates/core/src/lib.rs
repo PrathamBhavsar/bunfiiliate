@@ -3,6 +3,7 @@
 pub mod attribution;
 pub mod billing;
 pub mod commission;
+pub mod exchange_rate;
 pub mod fraud;
 pub mod ids;
 pub mod ledger;
@@ -16,6 +17,7 @@ pub mod webhook_sign;
 
 pub use attribution::{Attribution, FirstTouch, LastTouch, Touch};
 pub use commission::{CommissionError, CommissionKind, CommissionPlan, Duration};
+pub use exchange_rate::{Rate, RateError, convert_cents};
 pub use fraud::{
     BotUa, ClickFacts, Dedupe, FraudRule, IpVelocity, Verdict, default_rules, first_flag,
 };
