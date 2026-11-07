@@ -17,4 +17,10 @@ SELECT 'ledger_entries=' || count(*) FROM ledger_entries;
 SELECT 'ledger_hash=' || coalesce(md5(string_agg(id::text || ':' || txn_id::text || ':' || account::text || ':' || amount_cents::text, ',' ORDER BY id)), '-') FROM ledger_entries;
 SELECT 'unbalanced_txns=' || count(*) FROM (SELECT txn_id FROM ledger_entries GROUP BY txn_id HAVING sum(amount_cents) <> 0) x;
 SQL
+  # Per-partition click counts (C24): a restore that loses a partition or lands rows in the wrong
+  # one differs here even when the grand total matches. Sorted so output is stable.
+  pgx psql "$1" -qAt -v ON_ERROR_STOP=1 <<'SQL'
+SELECT 'clicks_total=' || count(*) FROM clicks;
+SELECT 'clicks:' || tableoid::regclass::text || '=' || count(*) FROM clicks GROUP BY tableoid ORDER BY 1;
+SQL
 }

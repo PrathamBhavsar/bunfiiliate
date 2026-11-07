@@ -82,3 +82,6 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | C30+C31+C32 | feat/c30-code-stats | done, merged (per-code stats API + pages, routing ADR 0006) |
 | notify-redact | fix/notify-redact-url | done, merged (reqwest errors stripped of channel URL) |
 | C40+C41+C42 | feat/c40-42-bench | done on branch; reproducible `bench/run.sh` (schema v1, pinned oha, median of repeats), `bench/compare.py` + thresholds + nightly workflow, benchmark publishing rules + `gen_docs.py` |
+| C24 | feat/c24-c05-a16-closeout | done (drill verifies per-partition click counts; `restore.sh --force` wipes schema, `--clean` failed on partitions) |
+| C05 | feat/c24-c05-a16-closeout | done (ADR-0004: RLS not enabled; disabled spike + `#[ignore]` tests pass on PG16) |
+| A16 | feat/c24-c05-a16-closeout | done (ADRs 0007-0009, secrets page, anti-patterns 32-39, README/SECURITY/self-hosting) |

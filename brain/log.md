@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-07] C24 + C05 + A16 closeout (tribe #40)
+
+- **Done**: drill fingerprint has per-partition click counts (`drill_counts_per_partition`); ADR-0004 RLS (not enabled, disabled spike `0060_rls_spike.sql.disabled`); A16 ADRs 0007-0009, `architecture/secrets.md`, anti-patterns 32-39, README env table, SECURITY.md, self-hosting.
+- **Lessons**: `pg_restore --clean` fails on partitioned tables (inherited PK drop), so `--force` now drops the schema first. Plan A16 numbered anti-patterns 31-37 but C04 took 31: renumbered 32-38. `BF_MAIL_PROVIDER` from the plan does not exist in code (mail is `SMTP_URL`), so it is not documented. Run the drill test with `PG_BIN` set to the PG16 bin dir when the default pg_dump is newer.
+- **Known limits**: RLS cost on `ledger_entries` not measured.
+
 ## [2026-11-07] Plan v2 wave 8a (tribe)
 
 - **Merged**: C30, C31, C32, notify channel URL redaction (webhook/bot tokens no longer reach logs via reqwest errors; use `Error::without_url`).

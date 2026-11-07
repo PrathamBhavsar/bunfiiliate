@@ -313,6 +313,8 @@ Existing plaintext rows keep working and are encrypted by the re-encrypt command
 
 The tracker skips a program whose secrets will not decrypt (`bf_snapshot_decrypt_fail_total` counts them) and answers 503 for that program's key until the keys are fixed; other programs are unaffected.
 
+Other security variables: `BF_JWT_SECRETS` (`kid:secret` list, first signs; legacy `JWT_SECRET` is kid `legacy`), `BF_HSTS=1` (send HSTS once TLS is final), `BF_V1_SUNSET` (date for the tracker's v1 `Sunset` header), `SMTP_URL` (mail for password reset). `restore.sh --force` wipes the `public` schema before restoring; see [backup and restore](ops/backup-restore.md).
+
 ### WAL Spool Directory
 
 The spool directory (`/var/spool/bunfiiliate` or volume `spool_data`) stores in-flight event records. Segments are deleted only after the batch writer confirms database insertion. Ensure this directory is stored on persistent storage.
