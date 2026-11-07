@@ -1,6 +1,7 @@
 # Changelog
 
 ## [2026-11-07] S1 marketing + docs site (feat/site)
+- **Review pass**: finish reviewer round 2 = ship. Fixed: mobile ledger sheet, Money group as ledger rows, FAQ plus is a Hugeicons icon, footer blurb via `md()`, live column links to benchmarks and ledger spec, `.btn` nowrap. Wrong clone URL in `docs/self-hosting.md` fixed on `fix/docs-clone-url` (unmerged).
 
 - **Done**: `site/` Vite (vanilla JS, custom-element components) landing + docs. Geist Pixel Square display, Satoshi body, Geist Mono code, Hugeicons. `<x-ascii>` canvas with the `rain` scene (clicks land in a ledger that sums to 0.00). Docs from `site/content/docs/*.md`, hash routed, search on `/`, `llms.txt` generated at build. `.github/workflows/site.yml` builds, smoke-tests (`site/scripts/smoke.mjs`) and deploys to Pages from `prod`.
 - **Decision**: kit (`site/src/kit`) is canonical here and copied to sendesk and learnpuppy with `site/scripts/sync-kit.sh`. Copy states only verified facts: "sub-millisecond" is quoted as 0.4 ms p50 with `BF_FSYNC=off` and 13 ms with `always`, per `docs/benchmarks.md`. No usage claims; the stats block reads live GitHub numbers.
