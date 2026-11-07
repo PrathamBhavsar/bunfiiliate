@@ -246,6 +246,7 @@ fn public_routes_allowlist() {
         "tracker get /r/{code}",
         "tracker post /c",
         "tracker post /v2/c",
+        "tracker get /v2/openapi.json",
         "tracker get /healthz",
         "tracker get /readyz",
     ]

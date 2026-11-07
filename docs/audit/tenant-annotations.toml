@@ -835,3 +835,11 @@ source = "tracker"
 kind = "webhook"
 role = "none"
 reason = "Paddle inbound, program key in path"
+
+[[route]]
+method = "get"
+path = "/v2/openapi.json"
+source = "tracker"
+kind = "public"
+role = "none"
+reason = "spec is public"

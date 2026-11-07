@@ -2649,6 +2649,7 @@ dependencies = [
  "bf-spool",
  "hmac",
  "maxminddb",
+ "proptest",
  "serde",
  "serde_json",
  "sha2",
@@ -2656,6 +2657,7 @@ dependencies = [
  "tokio",
  "tower",
  "tracing",
+ "utoipa",
  "uuid",
  "woothee",
 ]
