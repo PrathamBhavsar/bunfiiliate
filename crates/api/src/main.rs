@@ -124,7 +124,11 @@ async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
         with_worker.then(|| tokio::spawn(api::worker::run(pool.clone(), mailer, vault.clone())));
     let state = AppState {
         pool,
-        jwt_secret: Arc::from(cfg.jwt_secret),
+        jwt_keys: Arc::new(api::auth::JwtKeys::parse(
+            cfg.jwt_secrets.as_deref(),
+            cfg.jwt_secret.as_deref(),
+        )?),
+        version_cache: Default::default(),
         vault,
         secure_cookies: !matches!(std::env::var("COOKIE_SECURE").as_deref(), Ok("0" | "false")),
         limiter: Default::default(),

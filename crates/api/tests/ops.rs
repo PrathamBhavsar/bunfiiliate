@@ -31,7 +31,8 @@ impl Api {
         api::ssrf::allow_private_targets();
         let state = AppState {
             pool: pool.clone(),
-            jwt_secret: SECRET.into(),
+            jwt_keys: api::auth::JwtKeys::single(SECRET).into(),
+            version_cache: Default::default(),
             vault: vault(),
             secure_cookies: true,
             limiter: Default::default(),

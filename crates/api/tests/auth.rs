@@ -20,14 +20,22 @@ async fn admin_only(_: Auth<Admin>) -> &'static str {
     "ok"
 }
 
-fn app(pool: PgPool) -> Router {
-    let state = AppState {
+fn state(pool: PgPool) -> AppState {
+    AppState {
         pool,
-        jwt_secret: "test-secret".into(),
+        jwt_keys: api::auth::JwtKeys::single("test-secret").into(),
+        version_cache: Default::default(),
         vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
         secure_cookies: true,
         limiter: Default::default(),
-    };
+    }
+}
+
+fn app(pool: PgPool) -> Router {
+    app_with(state(pool))
+}
+
+fn app_with(state: AppState) -> Router {
     build(
         routes::routes().route("/admin-only", get(admin_only)),
         state,
@@ -540,4 +548,82 @@ async fn auth_oversized_body_is_refused(pool: PgPool) {
     )
     .await;
     assert_eq!(res.status(), StatusCode::PAYLOAD_TOO_LARGE);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn jwt_token_version_bump_revokes(pool: PgPool) {
+    let st = state(pool.clone());
+    let app = app_with(st.clone());
+    let u = add_user(&pool, "v@x.io", UserRole::Admin).await;
+    let ver = bf_db::auth::token_version(&pool, u.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(ver, 0);
+    let tok = st
+        .jwt_keys
+        .issue(&api::auth::Principal::from(&u), ver)
+        .unwrap();
+    let call = || get_req("/admin-only").cookie(&format!("bf_at={tok}"));
+    assert_eq!(send(&app, call()).await.status(), StatusCode::OK);
+    api::auth::revoke_access_tokens(&st, u.id).await.unwrap();
+    assert_eq!(send(&app, call()).await.status(), StatusCode::UNAUTHORIZED);
+    // a token minted at the new version works
+    let fresh = st
+        .jwt_keys
+        .issue(&api::auth::Principal::from(&u), ver + 1)
+        .unwrap();
+    let r = send(
+        &app,
+        get_req("/admin-only").cookie(&format!("bf_at={fresh}")),
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::OK);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn jwt_token_without_ver_survives_upgrade(pool: PgPool) {
+    let st = state(pool.clone());
+    let app = app_with(st);
+    let u = add_user(&pool, "old@x.io", UserRole::Admin).await;
+    // header/claims as issued before A08: legacy header, no ver/jti/iat
+    let enc = |v: Value| {
+        base64::Engine::encode(
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+            v.to_string(),
+        )
+    };
+    let input = format!(
+        "{}.{}",
+        enc(json!({"alg":"HS256","typ":"JWT"})),
+        enc(
+            json!({"sub": u.id, "role": "admin", "ws": u.workspace_id, "exp": chrono::Utc::now().timestamp() + 600})
+        )
+    );
+    let mut mac = <hmac::Hmac<sha2::Sha256> as hmac::Mac>::new_from_slice(b"test-secret").unwrap();
+    hmac::Mac::update(&mut mac, input.as_bytes());
+    let sig = base64::Engine::encode(
+        &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        hmac::Mac::finalize(mac).into_bytes(),
+    );
+    let r = send(
+        &app,
+        get_req("/admin-only").cookie(&format!("bf_at={input}.{sig}")),
+    )
+    .await;
+    assert_eq!(r.status(), StatusCode::OK);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn jwt_deleted_user_rejected(pool: PgPool) {
+    let st = state(pool.clone());
+    let app = app_with(st.clone());
+    let ghost = api::auth::Principal {
+        user_id: Uuid::now_v7(),
+        role: UserRole::Admin,
+        workspace_id: None,
+    };
+    let tok = st.jwt_keys.issue(&ghost, 0).unwrap();
+    let r = send(&app, get_req("/admin-only").cookie(&format!("bf_at={tok}"))).await;
+    assert_eq!(r.status(), StatusCode::UNAUTHORIZED);
 }

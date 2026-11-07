@@ -17,7 +17,7 @@ use crate::AppState;
 use crate::audit;
 use crate::auth::{
     ACCESS_COOKIE, ACCESS_TTL_SECS, Any, Auth, Principal, REFRESH_COOKIE, REFRESH_TTL_SECS, cookie,
-    dummy_hash, hash_refresh_token, issue_access, new_refresh_token, verify_password_bounded,
+    dummy_hash, hash_refresh_token, new_refresh_token, verify_password_bounded,
 };
 use crate::error::{AppError, ErrorBody, ErrorDetail};
 use crate::limit;
@@ -208,7 +208,10 @@ async fn login(
         _ => return Err(AppError::Unauthorized("invalid credentials")),
     };
     let principal = Principal::from(&user);
-    let access = issue_access(&s.jwt_secret, &principal)?;
+    let ver = bf_db::auth::token_version(&s.pool, user.id)
+        .await?
+        .unwrap_or_default();
+    let access = s.jwt_keys.issue(&principal, ver)?;
     let refresh = new_refresh_token();
     bf_db::auth::issue_refresh(
         &s.pool,
@@ -268,7 +271,10 @@ async fn refresh(
     let user = bf_db::auth::user_by_id(&s.pool, user_id)
         .await?
         .ok_or(AppError::Unauthorized("invalid refresh token"))?;
-    let access = issue_access(&s.jwt_secret, &Principal::from(&user))?;
+    let ver = bf_db::auth::token_version(&s.pool, user.id)
+        .await?
+        .unwrap_or_default();
+    let access = s.jwt_keys.issue(&Principal::from(&user), ver)?;
     Ok((session_cookies(&s, &access, &new), Json(user.into())))
 }
 

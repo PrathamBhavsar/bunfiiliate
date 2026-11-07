@@ -28,3 +28,4 @@ uuid = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
+proptest.workspace = true
