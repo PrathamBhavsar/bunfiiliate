@@ -20,7 +20,8 @@ fn app(pool: PgPool) -> Router {
     let ring = KeyRing::from_pairs("t1", &[("t1", [7u8; 32])]).unwrap();
     let state = AppState {
         pool,
-        jwt_secret: "test-secret".into(),
+        jwt_keys: api::auth::JwtKeys::single("test-secret").into(),
+        version_cache: Default::default(),
         vault: Arc::new(Vault::new(ring)),
         secure_cookies: true,
         limiter: Default::default(),
@@ -59,8 +60,17 @@ async fn call(
     if origin {
         b = b.header(ORIGIN, "https://bf.test");
     }
-    if let Some(c) = cookie {
-        b = b.header(COOKIE, c);
+    // Auth routes and cookie-authenticated writes need the double-submit CSRF token.
+    let csrf = "bf_csrf=csrf-test-token";
+    b = b.header(
+        COOKIE,
+        match cookie {
+            Some(c) => format!("{c}; {csrf}"),
+            None => csrf.to_string(),
+        },
+    );
+    if method != "GET" {
+        b = b.header("x-csrf-token", "csrf-test-token");
     }
     let req = b
         .header(CONTENT_TYPE, "application/json")
