@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-11-07] C24 + C05 + A16 closeout (tribe #40)
+
+- **Done**: drill fingerprint has per-partition click counts (`drill_counts_per_partition`); ADR-0004 RLS (not enabled, disabled spike `0060_rls_spike.sql.disabled`); A16 ADRs 0007-0009, `architecture/secrets.md`, anti-patterns 32-39, README env table, SECURITY.md, self-hosting.
+- **Lessons**: `pg_restore --clean` fails on partitioned tables (inherited PK drop), so `--force` now drops the schema first. Plan A16 numbered anti-patterns 31-37 but C04 took 31: renumbered 32-38. `BF_MAIL_PROVIDER` from the plan does not exist in code (mail is `SMTP_URL`), so it is not documented. Run the drill test with `PG_BIN` set to the PG16 bin dir when the default pg_dump is newer.
+- **Known limits**: RLS cost on `ledger_entries` not measured.
+
+## [2026-11-07] C33 states and a11y, B01/B03/B04 web UI (tribe #38)
+
+- **Done**: `components/state.tsx` (`EmptyState`, `ErrorState`, `LoadingRows`), `ApiError` keeps the HTTP status so a 403 shows "No access" without Retry, `DataTable` takes a required accessible `label`, `ResourceView` takes `headingLevel` for a second list on a page. New pages: `/webhooks/test` (tester + inbound replay), payout request dialog and request list on `/me/payouts`, rail select on Mark paid plus Reconcile in the batch sheet. No new API routes.
+- **Lessons**: see `wisdom/time-traps.md` (e2e runner is not Playwright).
+- **Known limits**: admin approve/reject UI for payout requests is not built; axe runs through `axe-core` injected by `evaluate` (no `@axe-core/playwright`: the runner has no Playwright Page).
+
 ## [2026-11-07] Plan v2 wave 8a (tribe)
 
 - **Merged**: C30, C31, C32, notify channel URL redaction (webhook/bot tokens no longer reach logs via reqwest errors; use `Error::without_url`).
@@ -11,6 +23,12 @@
 - **Done**: ADR-0006 (detail pages are `?code=` query routes; Caddy `try_files` already fits, `trailingSlash` unset), per-code stats API (admin + `/me`), stats pages with KPIs, charts, top countries/referrers, links from both list pages.
 - **Lessons**: a conversion has no code column; attribute it through `customers.first_click_id` -> `clicks.code`. The click query is bounded on `ts` both sides (test `per_code_stats_query_has_ts_bound`). Query keys are `["admin"|"portal","code-stats",...]`, never `"me"`.
 - **Known limits**: Playwright cases for the stats pages belong to C34.
+
+## [2026-11-07] C40-C42 bench (tribe #39)
+
+- **Done on `feat/c40-42-bench`**: `bench/run.sh` (pinned oha 1.16.0, exit 2 if missing, warm-up, repeats, seeded codes, `--quick`, `--write-docs`), result schema v1 with hardware block, `bench/compare.py` (0/1/3, noisy downgrade), `bench-nightly.yml` (self-hosted authoritative, hosted advisory), `bench/gen_docs.py`, publishing rules in `docs/benchmarks.md`, `check-bench-numbers.sh` reads the new schema.
+- **Lessons**: see [Bench](/wisdom/bench.md).
+- **Known limits**: no baseline and no schema v1 full result committed: the full run fails its own error gate (503 shedding on `/r` off mode, see wisdom). Quick run, helper tests, compare self-test, docs/site check pass.
 
 ## [2026-11-07] Plan v2 wave 7 + billing variant fix (tribe)
 

@@ -90,6 +90,10 @@ The following areas are explicitly excluded from our threat model for v1 (see [`
 - **Webhook delivery**: deliveries are leased before the HTTP call, sent with bounded concurrency and a 2 s connect / 10 s total timeout, and never hold a database transaction open. A workspace may register at most 20 endpoints.
 - **Auth abuse limits**: login, register and contact-requests have an in-process per-IP and per-email sliding-window limiter (HTTP 429), and password hashing runs with bounded concurrency. This is best effort and per process: put real volumetric limits in Caddy or Cloudflare in front of the API.
 - **Refresh tokens**: re-presenting a token within 10 s of its rotation is a plain 401 and keeps the session; later reuse revokes the whole family and writes an `auth.refresh_reuse` audit entry. A session family cannot be refreshed past 90 days.
+- **Secrets at rest**: provider and webhook secrets are sealed (XChaCha20-Poly1305, per-value data key, row-bound AAD) under `BF_MASTER_KEYS`; rotate with `api secrets reencrypt` then `api secrets check`. Back keys up apart from the database.
+- **Account recovery**: TOTP (replayed steps rejected) and single-use recovery codes; reset failures are indistinguishable (unknown email, bad code, locked) and lock after 5 attempts.
+- **JWT**: strict `alg`/`kid`/`exp` parsing, key rotation via `BF_JWT_SECRETS`, instant revocation through `token_version`.
+- **Tenant isolation**: every tenant query carries a workspace id, enforced by a test matrix and `make sql-lint`. Postgres RLS was evaluated and is not enabled (brain ADR-0004).
 - **Request size**: the API rejects request bodies over 64 KB.
 
 ---

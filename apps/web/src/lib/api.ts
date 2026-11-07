@@ -62,6 +62,18 @@ async function fetchWithRefresh(input: Request) {
 
 export const api = createApi({ fetch: fetchWithRefresh });
 
+/** An API failure that keeps the HTTP status, so pages can tell "no access" from "broken". */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+export const isForbidden = (error: unknown) => error instanceof ApiError && error.status === 403;
+
 export function errorMessage(error: unknown): string {
   if (error instanceof TypeError) return "Cannot reach the server.";
   if (error instanceof Error) return error.message;

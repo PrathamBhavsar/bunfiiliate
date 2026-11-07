@@ -54,3 +54,13 @@ Spool disk-full shedding trips at 85% disk used; `scripts/e2e.sh` pins `BF_SPOOL
 
 ## Per-code conversions
 `conversions` has no `code` column. Join `customers.first_click_id` to `clicks.code`; a code-less (recurring) conversion is not attributed to any code.
+
+## The e2e runner is not Playwright
+`e2e/` uses the `e2e` + `@e2e-dev/web` runner (CDP, `browser.route`, `browser.evaluate`), so `@axe-core/playwright` cannot be used. Inject `axe-core/axe.min.js` with `evaluate` and call `axe.run`. Tests share one database across files: mock list endpoints with `browser.route` when a test needs a known empty or failing state.
+
+
+## Disk at 100% shows up as e2e 503
+Finished worktrees hold about 4 GB each (own target dir). Remove a worktree as soon as its branch is merged or committed; check `df -h /tmp` before a gate. A full disk trips spool shedding and the e2e conversion ingest returns 503.
+
+## password_reset flake under load
+Six `password_reset` tests failed once with 401 while two workers were building, then passed alone and on a rerun of `make ci`. Not reproduced; if it recurs, check the TOTP step window and reset throttle first.

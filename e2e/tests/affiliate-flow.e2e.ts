@@ -239,4 +239,41 @@ describe('affiliate click to cash', { serial: true }, () => {
     await expect(row).toContainText(COMMISSION);
     await expect(row).toContainText('paid', { ignoreCase: true });
   });
+  test('the affiliate requests a payout; the server checks it against the balance', async ({ app, screen, browser }) => {
+    const fx = { app, screen, browser };
+    await app.open('/me/payouts');
+    await expect(screen.getByRole('heading', 'Payouts')).toBeVisible();
+    await screen.getByRole('button', 'Request payout').tap();
+    await dialog(fx, 'Request a payout').getByLabel('Program').selectOption(PROGRAM);
+    // Everything was paid out above, so nothing is left to request: the API says so.
+    await dialog(fx, 'Request a payout').getByLabel('Amount').fill('5000');
+    await dialog(fx, 'Request a payout').getByRole('button', 'Send request').tap();
+    await expect(dialog(fx, 'Request a payout').getByRole('alert')).toContainText(/payable balance|minimum/);
+    // A malformed amount is refused before any request is made.
+    await dialog(fx, 'Request a payout').getByLabel('Amount').fill('12.345');
+    await dialog(fx, 'Request a payout').getByRole('button', 'Send request').tap();
+    await expect(dialog(fx, 'Request a payout').getByRole('alert')).toContainText('amount like');
+  });
+
+  test('an accepted request appears in the affiliate request list', async ({ app, screen, browser }) => {
+    const fx = { app, screen, browser };
+    const made = { id: '00000000-0000-4000-8000-0000000000d1', affiliate_id: '00000000-0000-4000-8000-0000000000d2', program_id: '00000000-0000-4000-8000-0000000000d3', requested_cents: 2550, currency: 'USD', status: 'pending', rejection_reason: null, payout_id: null, created_at: '2026-01-01T00:00:00Z', decided_at: null };
+    let posted = '';
+    await browser.route(/\/api\/v1\/me\/payout-requests(\?.*)?$/, (route) => {
+      if (route.request.method === 'POST') {
+        posted = route.request.postData ?? '';
+        return route.fulfill({ status: 201, json: { ...made, program_id: JSON.parse(posted).program_id } });
+      }
+      return route.fulfill({ json: posted ? { items: [{ ...made, program_id: JSON.parse(posted).program_id }], total: 1 } : { items: [], total: 0 } });
+    });
+    await app.open('/me/payouts');
+    await screen.getByRole('button', 'Request payout').tap();
+    await dialog(fx, 'Request a payout').getByLabel('Program').selectOption(PROGRAM);
+    await dialog(fx, 'Request a payout').getByLabel('Amount').fill('25.50');
+    await dialog(fx, 'Request a payout').getByRole('button', 'Send request').tap();
+    await expect(dialog(fx, 'Request a payout')).toBeHidden();
+    expect(JSON.parse(posted)).toMatchObject({ requested_cents: 2550, currency: 'USD' });
+    await expect(screen.getByRole('row').filter({ hasText: '25.50 USD' })).toContainText('pending', { ignoreCase: true });
+    await browser.unrouteAll();
+  });
 });

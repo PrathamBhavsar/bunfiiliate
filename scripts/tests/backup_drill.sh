@@ -19,6 +19,16 @@ INSERT INTO ledger_entries (id, txn_id, account, program_id, amount_cents, curre
   SELECT gen_random_uuid(), t, a.acc::ledger_account, '00000000-0000-7000-8000-000000000002', a.amt, 'USD'
   FROM (SELECT gen_random_uuid() AS t FROM generate_series(1, 5)) x,
        LATERAL (VALUES ('cash', 500), ('aff_pending', -500)) AS a(acc, amt);
+INSERT INTO users (id, email, password_hash, role, workspace_id)
+  VALUES ('00000000-0000-7000-8000-000000000003', 'a@x.test', 'x', 'affiliate', '00000000-0000-7000-8000-000000000001');
+INSERT INTO affiliates (id, workspace_id, user_id)
+  VALUES ('00000000-0000-7000-8000-000000000004', '00000000-0000-7000-8000-000000000001', '00000000-0000-7000-8000-000000000003');
+SELECT bf_ensure_clicks_partition(date '2026-03-01');
+SELECT bf_ensure_clicks_partition(date '2026-04-01');
+-- 2 clicks in March, 3 in April, 1 in default (a month nobody created)
+INSERT INTO clicks (id, program_id, affiliate_id, code, visitor_id, ts)
+  SELECT gen_random_uuid(), '00000000-0000-7000-8000-000000000002', '00000000-0000-7000-8000-000000000004', 'c', 'v', t
+  FROM unnest(ARRAY['2026-03-05 10:00+00','2026-03-20 10:00+00','2026-04-02 10:00+00','2026-04-03 10:00+00','2026-04-04 10:00+00','2031-01-01 10:00+00']::timestamptz[]) t;
 SQL
 # A fake spool: two segments and a checkpoint inside the first.
 mkdir -p "$t/spool"; head -c 100 /dev/zero > "$t/spool/00000000000000000000.wal"; head -c 50 /dev/zero > "$t/spool/00000000000000000100.wal"
@@ -29,6 +39,10 @@ export DATABASE_URL="$src_url" SPOOL_DIR="$t/spool" BF_BACKUP_DIR="$t/bk" BF_BAC
 [ ! -e "$t/spool/gc.paused" ] || { echo "FAIL gc left paused"; exit 1; }
 dump=$(ls "$t/bk/pg"/*.dump | head -n1); tarf=$(ls "$t/bk/spool"/*.tar | head -n1)
 want=$(fingerprint "$src_url")
+
+# drill_counts_per_partition: the fingerprint carries one line per partition
+grep -qx 'clicks:clicks_y2026m03=2' <<<"$want" && grep -qx 'clicks:clicks_y2026m04=3' <<<"$want" \
+  && grep -qx 'clicks:clicks_default=1' <<<"$want" || { echo "FAIL drill_counts_per_partition: $want"; exit 1; }
 
 # backup_checksum_mismatch_aborts_restore
 pgx psql "$DATABASE_URL" -qc "CREATE DATABASE $dst" >/dev/null 2>&1 || pgx psql "$(url_with_db "$DATABASE_URL" postgres)" -qc "CREATE DATABASE $dst" >/dev/null

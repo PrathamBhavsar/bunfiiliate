@@ -32,7 +32,10 @@ if [ -n "$tar" ] && [ -d "$sdir" ] && [ -n "$(ls -A "$sdir" 2>/dev/null)" ] && [
   die "spool target $sdir is not empty; pass --force"
 fi
 
-if [ "$force" = 1 ]; then pgx pg_restore --no-owner --clean --if-exists -d "$url" "$dump"; else pgx pg_restore --no-owner -d "$url" "$dump"; fi
+# --force wipes the public schema first. pg_restore --clean cannot drop the inherited primary keys
+# of the clicks partitions (C20), so it would exit non-zero on a partitioned database.
+if [ "$force" = 1 ]; then pgx psql "$url" -qv ON_ERROR_STOP=1 -c 'SET client_min_messages = warning; DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public'; fi
+pgx pg_restore --no-owner -d "$url" "$dump"
 
 if [ -n "$tar" ]; then
   if [ -d "$sdir" ] && [ -n "$(ls -A "$sdir" 2>/dev/null)" ]; then mv "$sdir" "$sdir.pre-restore.$(date -u +%s)"; fi

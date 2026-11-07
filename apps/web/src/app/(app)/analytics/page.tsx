@@ -1,6 +1,6 @@
 "use client";
 
-import { TriangleAlert } from "lucide-react";
+import { ErrorState } from "@/components/state";
 import { useMemo, useState } from "react";
 import { ScopeSelects } from "@/components/analytics-filters";
 import { formatDay, LineChart } from "@/components/charts";
@@ -11,7 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, Td, Th } from "@/components/ui/table";
 import { formatBps, formatCents, usePrograms } from "@/lib/admin";
 import { currencyFor, DIMS, lastDays, useSummary, useTimeseries, type Dim, type Scope } from "@/lib/analytics";
-import { errorMessage } from "@/lib/api";
 
 const RANGES = [7, 30, 90];
 const BREAKDOWNS = DIMS.filter((d) => d.value !== "total");
@@ -59,20 +58,7 @@ export default function Page() {
       </div>
 
       {error ? (
-        <div role="alert" className="grid justify-items-center gap-2 rounded-lg border border-border bg-surface px-4 py-12 text-center">
-          <TriangleAlert aria-hidden className="size-5 text-danger" />
-          <p className="font-medium">Could not load analytics</p>
-          <p className="text-xs text-muted">{errorMessage(error)}</p>
-          <Button
-            size="sm"
-            onClick={() => {
-              void summary.refetch();
-              void series.refetch();
-            }}
-          >
-            Retry
-          </Button>
-        </div>
+        <div className="rounded-lg border border-border bg-surface"><ErrorState error={error} what="analytics" onRetry={() => { void summary.refetch(); void series.refetch(); }} /></div>
       ) : (
         <>
           <MetricCards summary={summary.data} currency={currency} suffix={`${days}d`} />
@@ -126,7 +112,7 @@ export default function Page() {
                   <p className="border-t border-border p-3 text-xs text-muted">Nothing to break down in this range.</p>
                 ) : (
                   <>
-                    <Table>
+                    <Table aria-label="Breakdown">
                       <thead>
                         <tr>
                           <Th>{BREAKDOWNS.find((d) => d.value === dim)?.label}</Th>
@@ -172,7 +158,7 @@ export default function Page() {
 
               <details className="rounded-lg border border-border bg-surface">
                 <summary className="cursor-pointer p-3 text-xs font-semibold">Daily data table</summary>
-                <Table>
+                <Table aria-label="Daily data">
                   <thead>
                     <tr>
                       <Th>Day</Th>
