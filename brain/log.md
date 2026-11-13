@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-13] UI accent to green + screenshot hero
+
+- **Done** on `feat/ui-green`: product UI accent moved from safety orange `#ff5a1f` to the site's acid green `#b8ff3c` (tokens in `apps/web/src/app/globals.css` only; text-sized green on light is `#3f6212`, chart series now blue/green/violet). Site hero swaps the rain scene for a framed Analytics screenshot (`site/public/shots/analytics-dark.webp`, dark-only via `brand.shot.only`).
+- **Fixed**: `LineChart` figure overflowed its grid cell (SVG starts 600px wide, grid items default to `min-width:auto`); now `min-w-0 grid-cols-[minmax(0,1fr)]`.
+- **Lessons**: demo data = `bf_demo` scratch DB on pg16 :5433, api/tracker/`scripts/dev.mjs`; open the dev UI on `localhost`, not `127.0.0.1` (Next `allowedDevOrigins` stops hydration). Seed through the API, backdate `clicks.ts` + `conversions.occurred_at`, then `delete from daily_rollups` so the worker rebuilds. `ledger_entries` is append-only: never backdate it. Sample data only in public shots.
+
 ## [2026-11-13] Site theme pass
 
 - **Done**: Decision: bunfiiliate site stays as the dark pixel reference (acid green). Sister sites (learnpuppy, sendesk) now follow their own product UIs. Follow-up idea: move this product UI accent from orange to site green.

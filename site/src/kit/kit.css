@@ -197,3 +197,19 @@ x-footer { display: block; border-top: 1px solid var(--line); padding-block: 56p
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition-duration: 0s !important; } }
+
+/* hero with a product screenshot instead of the ASCII scene */
+.hero.has-shot::before { display: none; }
+.hero.has-shot .hero-grid { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: clamp(28px, 3.5vw, 56px); align-items: center; padding-block: clamp(40px, 7vh, 96px); }
+.hero.has-shot .hero-inner { padding-block: 0; }
+.hero.has-shot h1 { font-size: clamp(2.25rem, 4.2vw, 3.75rem); max-width: 14ch; }
+.shot { position: relative; margin: 0; border: 1px solid var(--line-2); border-radius: 14px; background: var(--bg-2); overflow: hidden;
+  box-shadow: 0 1px 0 color-mix(in oklab, var(--fg) 6%, transparent), 0 24px 60px -24px color-mix(in oklab, var(--fg) 38%, transparent); }
+.shot-bar { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--bg-3); }
+.shot-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); }
+.shot img { display: block; width: 100%; height: auto; }
+.shot figcaption { position: absolute; right: 10px; bottom: 8px; padding: 2px 8px; border-radius: 6px; font: 400 0.6875rem/1.5 var(--font-mono); color: var(--fg-dim); background: color-mix(in oklab, var(--bg) 88%, transparent); border: 1px solid var(--line); }
+@media (max-width: 960px) {
+  .hero.has-shot .hero-grid { grid-template-columns: 1fr; padding-block: 32px 56px; }
+  .hero.has-shot h1 { max-width: 14ch; }
+}

@@ -43,9 +43,20 @@ define("x-copy", class extends HTMLElement {
 
 define("x-hero", class extends HTMLElement {
   connectedCallback() {
-    this.innerHTML = `<section class="hero">
-      <x-ascii scene="${brand.scene}"></x-ascii>
-      <div class="wrap hero-inner">
+    const s = brand.shot;
+    const img = s && `<img src="${base}shots/${s.name}-${s.only ?? "light"}.webp" alt="${esc(s.alt)}" width="2000" height="1250" fetchpriority="high" decoding="async">`;
+    const shot = s ? `<figure class="shot">
+        <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i></div>
+        ${s.only ? img : `<picture>
+          <source media="(prefers-color-scheme: dark)" srcset="${base}shots/${s.name}-dark.webp">
+          ${img}
+        </picture>`}
+        <figcaption>Sample data from a local demo.</figcaption>
+      </figure>` : "";
+    this.innerHTML = `<section class="hero${s ? " has-shot" : ""}">
+      ${s ? "" : `<x-ascii scene="${brand.scene}"></x-ascii>`}
+      <div class="wrap ${s ? "hero-grid" : "hero-inner"}">
+      ${s ? `<div class="hero-inner">` : ""}
         <h1 class="display">${brand.headline}</h1>
         <p class="lede">${brand.sub}</p>
         <x-copy cmd="${esc(brand.heroCmdPre ?? brand.heroCmd)}"></x-copy>
@@ -55,6 +66,7 @@ define("x-hero", class extends HTMLElement {
           <a class="btn" href="https://github.com/${brand.repo}">${icon("github")} Star on GitHub</a>
         </div>
         <p class="hero-meta"><span data-tag>${esc(brand.status)}</span><span>${esc(brand.license)}</span><span>${esc(brand.stack)}</span></p>
+      ${s ? `</div>${shot}` : ""}
       </div>
     </section>`;
     facts.then((f) => { if (!f?.tag) return; this.querySelector("[data-tag]").textContent = f.tag + (f.pre ? " (pre-release)" : ""); this.querySelector("x-copy").setAttribute("cmd", brand.heroCmd); this.querySelector("x-copy").connectedCallback(); });

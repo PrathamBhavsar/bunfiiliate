@@ -71,7 +71,7 @@ export function LineChart({
   }
 
   return (
-    <figure className="m-0 grid gap-1 rounded-lg border border-border bg-surface p-3">
+    <figure className="m-0 grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1 rounded-lg border border-border bg-surface p-3">
       <figcaption className="flex items-baseline justify-between gap-2 text-xs">
         <span className="font-semibold">{title}</span>
         <span className="tabular-nums text-muted" aria-hidden>

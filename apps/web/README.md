@@ -42,4 +42,4 @@ To add a page: put a `page.tsx` under `src/app/(app)/<route>/`, add the route to
 
 ## Design
 
-Neutral grayscale plus one accent, safety orange `#FF5A1F`, for primary actions and key numbers. Tokens live in `src/app/globals.css`; the dark theme is a `.dark` class on `<html>` (system default, toggle remembered in `localStorage`). Orange carries dark text (white fails contrast); orange text on light backgrounds uses a darker shade.
+Neutral grayscale plus one accent, acid green `#B8FF3C` (darker `#3F6212` for text on light), for primary actions and key numbers. Tokens live in `src/app/globals.css`; the dark theme is a `.dark` class on `<html>` (system default, toggle remembered in `localStorage`). Orange carries dark text (white fails contrast); orange text on light backgrounds uses a darker shade.
