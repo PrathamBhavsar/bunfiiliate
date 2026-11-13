@@ -12,8 +12,10 @@ p.on("console", (m) => m.type() === "error" && !/api\.github\.com|Failed to load
 
 await p.goto(base + "/", { waitUntil: "networkidle" });
 assert.ok(await p.locator("h1").isVisible(), "hero h1 visible");
-assert.ok((await p.locator("x-ascii canvas").count()) === 1, "ascii canvas mounted");
-assert.equal(await p.locator("x-ascii").getAttribute("aria-hidden"), "true");
+const shot = p.locator(".hero .shot img");
+assert.ok((await shot.count()) === 1, "hero product screenshot mounted");
+assert.ok(await shot.evaluate((i) => i.complete && i.naturalWidth > 0), "hero screenshot loaded");
+assert.ok(((await shot.getAttribute("alt")) || "").length > 20, "hero screenshot has alt text");
 await p.locator("x-hero x-copy button").click();
 assert.match(await p.evaluate(() => navigator.clipboard.readText()), /^curl|^cargo|^npx|^make|^git/, "copy button copies install command");
 const tabs = p.locator("x-install [role=tab]");

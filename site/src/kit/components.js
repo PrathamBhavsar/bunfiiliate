@@ -169,7 +169,7 @@ define("x-install", class extends HTMLElement {
 define("x-faq", class extends HTMLElement {
   connectedCallback() {
     this.innerHTML = `<div class="wrap">
-      <h2 class="display sec-head">Questions people ask.</h2>
+      <h2 class="display sec-head">FAQ</h2>
       <div class="faq">${brand.faq.map(([q, a]) => `<details><summary>${esc(q)}<span class="pm">${icon("plus")}</span></summary><p>${md(a)}</p></details>`).join("")}</div>
     </div>`;
   }

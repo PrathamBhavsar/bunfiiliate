@@ -52,7 +52,7 @@ systemd unit files and a Caddyfile live in `deploy/`. Run `api serve --with-work
 
 ## Operate
 
-- **Metrics:** Prometheus on `:9100` (api) and `:9101` (tracker). Alert rules are in `deploy/monitoring/` and `docs/ops/alerts.md`.
-- **Backups and restore:** `deploy/backup/` and `docs/ops/backup-restore.md`.
-- **Disk:** the tracker spool needs free disk. See `docs/ops/spool-disk.md`.
-- **Release checklist:** `docs/ops/release-checklist.md`.
+- Metrics: Prometheus on `:9100` (api) and `:9101` (tracker). Alert rules are in `deploy/monitoring/` and `docs/ops/alerts.md`.
+- Backups and restore: `deploy/backup/` and `docs/ops/backup-restore.md`.
+- Disk: the tracker spool needs free disk. See `docs/ops/spool-disk.md`.
+- Release checklist: `docs/ops/release-checklist.md`.

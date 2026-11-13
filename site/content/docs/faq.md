@@ -23,6 +23,6 @@ bunfiiliate builds the payout batch and a bank CSV. You can pay by hand and mark
 
 AGPL-3.0. It is a clean-room implementation: no code, schema text or copy from any closed-source project.
 
-## Can I trust the ledger?
+## How is the ledger protected?
 
 Postgres enforces it. Updates and deletes on `ledger_entries` are rejected by trigger, and every transaction must sum to zero or the commit fails. Read [Ledger](#/ledger).
