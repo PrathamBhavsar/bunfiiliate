@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** One headline number. `accent` paints it orange; use it for the key figure on a page. */
+/** One headline number. `accent` paints it in the accent green; use it for the key figure on a page. */
 export function StatCard({
   label,
   value,

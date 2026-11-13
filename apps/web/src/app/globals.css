@@ -2,7 +2,7 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Neutral grayscale plus one safety-orange accent. Orange carries primary actions and key numbers. */
+/* Neutral grayscale plus one acid-green accent (the site's #b8ff3c). Green carries primary actions and key numbers; text-sized green uses a darker step on light for contrast. */
 :root {
   --background: #fafafa;
   --surface: #ffffff;
@@ -10,16 +10,16 @@
   --border: #e4e4e7;
   --foreground: #0a0a0a;
   --muted: #52525b;
-  --accent: #ff5a1f;
+  --accent: #b8ff3c;
   --accent-foreground: #0a0a0a;
-  --accent-text: #c2410c;
+  --accent-text: #3f6212;
   --danger: #b91c1c;
   --success: #15803d;
   --warning: #b45309;
-  /* Chart series, fixed order: blue, orange, aqua. Dark steps are chosen for the dark surface. */
+  /* Chart series, fixed order: blue, green, violet (distinct from the accent and from success/danger). Dark steps are chosen for the dark surface. */
   --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
+  --series-2: #5f8f00;
+  --series-3: #8250d6;
   color-scheme: light;
 }
 
@@ -30,13 +30,13 @@
   --border: #2a2a2e;
   --foreground: #fafafa;
   --muted: #a1a1aa;
-  --accent-text: #ff5a1f;
+  --accent-text: #b8ff3c;
   --danger: #f87171;
   --success: #4ade80;
   --warning: #fbbf24;
   --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
+  --series-2: #a8e02f;
+  --series-3: #a583ec;
   color-scheme: dark;
 }
 
