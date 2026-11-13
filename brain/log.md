@@ -1,5 +1,11 @@
 # Changelog
 
+## [2026-11-11] Action pins + final gate rerun
+
+- **Done** on `fix/pin-actions` (a2f37c5): third-party actions in `docker.yml`, `web-asset.yml` pinned to commit SHAs. `release.yml` untouched (cargo-dist regenerates it).
+- **Gate** (`.gate/report.md`): ci, sql-lint, migrations, tenant-matrix, spool-disk-full, alerts, backup-drill, e2e x2, bench-quick ok. brain, hygiene ok. **bench-numbers FAIL**: `feat/site` replaced static `site/index.html` (datasheet rows gone). `ocr` fails: no LLM endpoint configured.
+- **Lessons**: dev Postgres must be pg16 on port 5433 (`pg_ctl -D /opt/homebrew/var/postgresql@16 -o "-p 5433" start`; brew service fails, pg18 holds 5432). Export `DATABASE_URL=postgres://pratham@localhost:5433/postgres` before `make ci`.
+
 ## [2026-11-07] R1 release automation
 
 - **Done**: cargo-dist 0.34.0 (`dist-workspace.toml`, `.github/workflows/release.yml`), `web-asset.yml` (pnpm build, uploads `bunfiiliate-web-static.tar.gz` to the release), `docker.yml` (GHCR multi-arch), `docs/releasing.md`. `repository` added to workspace package; `[package.metadata.dist] dist = true` on api and tracker.
