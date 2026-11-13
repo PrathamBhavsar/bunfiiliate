@@ -1,5 +1,9 @@
 # Changelog
 
+## [2026-11-13] Site theme pass
+
+- **Done**: Decision: bunfiiliate site stays as the dark pixel reference (acid green). Sister sites (learnpuppy, sendesk) now follow their own product UIs. Follow-up idea: move this product UI accent from orange to site green.
+
 ## [2026-11-13] Merge pin-actions, CI rerun, de-flake
 
 - **Done**: `fix/pin-actions` merged to staging. `make ci` green on staging after `fix/flaky-tax-test` (invoice test asserted no "1234" in HTML that contains random UUIDs; now strips UUIDs first).
