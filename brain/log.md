@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-11-13] Site copy humanizer pass
+
+- **Done**: every string on the site (`brand.js`, `content/docs/*.md`, kit headings, FAQ, footers) read against blader/humanizer v4. Removed staged headings ("Everything it does, listed.", "Built in the open."), "not X, Y" footers, fragment rows, decorative bold labels, inflated blurbs ("Hardened from the first commit."), stock words. No facts, numbers, commands or claims changed. Smoke test now asserts the hero screenshot instead of the ASCII canvas.
+- **Rule kept**: contrasts stay where both halves carry information (`404`, not `403`). Docs stay plain reference text.
+
 ## [2026-11-13] UI accent to green + screenshot hero
 
 - **Done** on `feat/ui-green`: product UI accent moved from safety orange `#ff5a1f` to the site's acid green `#b8ff3c` (tokens in `apps/web/src/app/globals.css` only; text-sized green on light is `#3f6212`, chart series now blue/green/violet). Site hero swaps the rain scene for a framed Analytics screenshot (`site/public/shots/analytics-dark.webp`, dark-only via `brand.shot.only`).

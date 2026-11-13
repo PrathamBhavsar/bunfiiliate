@@ -2,19 +2,16 @@
 title: Introduction
 group: Start
 order: 1
-description: What bunfiiliate is, what runs where, and what it is not.
+description: What bunfiiliate is, what runs where, and what it leaves out.
 ---
 
 # bunfiiliate
 
 Open-source affiliate tracking and commission engine in Rust. Self-host it on one VPS.
 
-It has two jobs and keeps them apart:
+It has two jobs, and each has its own binary. The `tracker` answers clicks and conversion events without a database call, writing to a crash-safe spool first. The `api` binary, together with its worker, turns events into conversions and posts every movement of money to an append-only double-entry ledger.
 
-- **Track.** The `tracker` binary answers clicks and conversion events without a database call, writing to a crash-safe spool first.
-- **Account.** The `api` binary (with its worker) turns events into conversions and posts every movement of money to an append-only double-entry ledger.
-
-> bunfiiliate is **pre-release**. There is no tagged release yet. Read the [FAQ](#/faq) before you rely on it.
+> bunfiiliate is pre-release. There is no tagged release yet. Read the [FAQ](#/faq) before you rely on it.
 
 ## What runs
 
@@ -27,8 +24,8 @@ It has two jobs and keeps them apart:
 
 ## Model
 
-Workspace, program, affiliate, referral code. Roles are `super_admin`, `admin` and `affiliate`. Every query is scoped to a workspace.
+Data is organized as workspace, program, affiliate and referral code. The roles are `super_admin`, `admin` and `affiliate`, and every query is scoped to a workspace.
 
-## Not goals
+## Non-goals
 
-No Kafka, Redis or NATS. No GraphQL, no ORM, no Kubernetes. One Postgres, two binaries.
+bunfiiliate does not use Kafka, Redis, NATS, GraphQL, an ORM or Kubernetes. It needs one Postgres and runs two binaries.

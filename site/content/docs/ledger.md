@@ -23,7 +23,7 @@ Accounts: `Expense`, `AffPending`, `AffPayable`, `Cash`.
 | Chargeback or refund after approval | AffPayable | Expense |
 | Payout paid | AffPayable | Cash |
 
-A chargeback after approval may drive a balance negative. The clawback rolls into the next payout. Balances are always derived from posted transactions, never stored.
+A chargeback after approval may drive a balance negative. The clawback rolls into the next payout. Balances are derived from posted transactions and are not stored.
 
 ## Commission rounding
 

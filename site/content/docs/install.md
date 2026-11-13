@@ -7,7 +7,7 @@ description: Release binaries, Docker Compose, or build from source. Verify chec
 
 # Install
 
-Pick one. All of them need **PostgreSQL 16**.
+Pick one. All of them need PostgreSQL 16.
 
 ## Release binaries
 
