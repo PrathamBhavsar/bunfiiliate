@@ -4,6 +4,7 @@ export default {
   wordmark: "bunf<b>ii</b>liate",
   repo: "PrathamBhavsar/bunfiiliate",
   scene: "rain",
+  shot: { name: "analytics", only: "dark", alt: "The bunfiiliate admin Analytics page: clicks, conversions and commission over 30 days, a country breakdown, and the acid-green accent on a dark theme." },
   license: "AGPL-3.0",
   stack: "Rust · Postgres 16",
   status: "pre-release",
