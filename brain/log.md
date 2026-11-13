@@ -1,5 +1,10 @@
 # Changelog
 
+## [2026-11-13] Merge pin-actions, CI rerun, de-flake
+
+- **Done**: `fix/pin-actions` merged to staging. `make ci` green on staging after `fix/flaky-tax-test` (invoice test asserted no "1234" in HTML that contains random UUIDs; now strips UUIDs first).
+- **Lessons**: `make ci` needs `DATABASE_URL=postgres://pratham@localhost:5433/postgres` (pg16 cluster). Port 5432 is pg18 for other projects and has no `postgres` role. Never assert absence of short digit strings in output containing UUIDs.
+
 ## [2026-11-11] Action pins + final gate rerun
 
 - **Done** on `fix/pin-actions` (a2f37c5): third-party actions in `docker.yml`, `web-asset.yml` pinned to commit SHAs. `release.yml` untouched (cargo-dist regenerates it).
