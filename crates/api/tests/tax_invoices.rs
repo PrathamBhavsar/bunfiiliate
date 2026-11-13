@@ -592,7 +592,16 @@ async fn tax_invoices_invoice_uses_legal_name_and_escapes_html(pool: PgPool) {
         html.contains("&lt;script&gt;alert(1)&lt;/script&gt; &quot;Q&quot; &amp; &#39;R&#39;"),
         "{html}"
     );
-    assert!(!html.contains("1234"), "tax id must not be on the invoice");
+    // UUIDs are random hex and can contain "1234" by chance; ignore them.
+    let visible: String = html
+        .split(|c: char| !(c.is_ascii_hexdigit() || c == '-'))
+        .filter(|t| t.len() != 36)
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        !visible.contains("1234"),
+        "tax id must not be on the invoice"
+    );
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
