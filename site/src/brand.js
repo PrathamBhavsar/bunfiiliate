@@ -3,6 +3,7 @@ export default {
   name: "bunfiiliate",
   wordmark: "bunf<b>ii</b>liate",
   repo: "PrathamBhavsar/bunfiiliate",
+  branch: "prod",
   scene: "rain",
   shot: { name: "analytics", only: "dark", alt: "The bunfiiliate admin Analytics page: clicks, conversions and commission over 30 days, a country breakdown, and the acid-green accent on a dark theme." },
   license: "AGPL-3.0",
