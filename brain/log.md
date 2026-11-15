@@ -7,6 +7,26 @@
 - **Fixed**: Caddy did not route `/v2/*` to the tracker (all v2 traffic lost in compose); empty `BF_GEOIP_DB` from compose crashed the tracker; refund after a rail-submitted payout shrank the booked amount; billing `canceled` for another subscription id downgraded a workspace; UI claimed two-step sign-in but login is password-only (copy fixed, enforcement is O1); one-time secrets survived logout; no SIGTERM handling; stale root Dockerfile lacked curl; docs and quickstart errors; bench check and push guard (remote is `PrathamBhavsar/*`).
 - **Decisions**: remote stays `PrathamBhavsar/bunfiiliate`; first release `v0.1.0`, GitHub pre-release; Dependabot majors (sqlx 0.9, utoipa 6, argon2 0.6, sha2 0.11) after the release.
 - **Lessons**: [Time-Traps](/wisdom/time-traps.md) (stale pg lock, empty compose env, docs drift from code). Docker was never run, so deploy bugs hide until a real `docker compose up`.
+- **Final gate** (head aa4dd41, `OCR_MODE=delegated`, PG16 :5433):
+
+  | step | result | seconds |
+  | --- | --- | --- |
+  | ci | ok | 414 |
+  | sql-lint | ok | 0 |
+  | migrations | ok | 1 |
+  | tenant-matrix | ok | 5 |
+  | spool-disk-full | ok | 0 |
+  | alerts | ok | 14 |
+  | backup-drill | ok | 6 |
+  | e2e-1 | ok | 59 |
+  | e2e-2 | ok | 35 |
+  | bench-quick | ok | 81 |
+  | bench-numbers | ok | 0 |
+  | ocr | ok | 0 |
+  | brain | ok | 0 |
+  | hygiene | ok | 2 |
+  ALL STEPS PASSED
+
 - **Open**: needs owner (see release checklist): Docker smoke on a clean host, live rail and billing tests, secrets, SMTP, Pages, branch protection, private vulnerability reporting, Satoshi licence.
 
 ## [2026-11-13] Site copy humanizer pass
