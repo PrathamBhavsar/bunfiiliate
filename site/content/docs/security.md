@@ -13,9 +13,9 @@ Caddy serves the UI and `/api` from one origin, so there is no CORS. The access 
 
 Every mutating request has its `Origin` header checked.
 
-## Passwords and 2FA
+## Passwords and authenticator codes
 
-Argon2 hashing. Optional TOTP with recovery codes. Password reset is rate-limited and does not reveal whether an account exists.
+Argon2 hashing. Optional TOTP and recovery codes, which reset your own password; sign-in is password-only. Password reset is rate-limited and does not reveal whether an account exists.
 
 ## Secrets at rest
 

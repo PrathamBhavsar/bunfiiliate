@@ -17,8 +17,8 @@ It has two jobs, and each has its own binary. The `tracker` answers clicks and c
 
 | Part | Port | Role |
 | --- | --- | --- |
-| `tracker` | 8081 | Clicks, beacons, conversion events, Stripe and Paddle webhooks. Metrics on 9101. |
-| `api` | 8080 | Admin and affiliate APIs, OpenAPI at `/api/openapi.json`, background worker. Metrics on 9100. |
+| `tracker` | 8081 | Clicks, beacons, conversion events, Stripe and Paddle webhooks. Metrics on 9100. |
+| `api` | 8080 | Admin and affiliate APIs, OpenAPI at `/api/openapi.json`, background worker. Metrics on 9101. |
 | PostgreSQL 16 | 5432 | Single source of truth, including the ledger. |
 | Caddy | 80, 443 | TLS, static web UI, same-origin proxy for `/api` and tracker routes. |
 

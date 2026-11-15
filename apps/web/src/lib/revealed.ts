@@ -10,4 +10,6 @@ export const remember = (kind: string, id: string, secret: string | null | undef
 
 export const forget = (kind: string, id: string) => store.delete(`${kind}:${id}`);
 
-export const recall =(kind: string, id: string): string | undefined => store.get(`${kind}:${id}`);
+export const clearRevealed = () => store.clear();
+
+export const recall = (kind: string, id: string): string | undefined => store.get(`${kind}:${id}`);

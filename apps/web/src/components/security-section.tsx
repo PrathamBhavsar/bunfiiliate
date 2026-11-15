@@ -146,7 +146,7 @@ export function SecuritySection() {
     run(async () => {
       await ok(api.POST("/api/v1/auth/totp/disable", { body }));
       setMode(null);
-      setResult({ ok: true, text: "Two-step sign-in is off." });
+      setResult({ ok: true, text: "Authenticator codes are off." });
       await reload();
     });
 
@@ -156,7 +156,7 @@ export function SecuritySection() {
         <h2 id="security-title" className="text-sm font-semibold">
           Security
         </h2>
-        <p className="text-xs text-muted">Two-step sign-in with an authenticator app. It also lets you reset your own password.</p>
+        <p className="text-xs text-muted">Authenticator app codes. They do not change sign-in. They let you reset your own password.</p>
       </div>
       {status.isPending ? (
         <p className="text-xs text-muted">Loading…</p>
@@ -178,7 +178,7 @@ export function SecuritySection() {
       ) : status.data.enrolled ? (
         <div className="grid gap-2">
           <p className="text-xs" role="status">
-            Two-step sign-in is <strong>on</strong>. {status.data.recovery_codes_remaining} recovery codes left.
+            Authenticator codes are <strong>on</strong> (for password reset; sign-in stays password-only). {status.data.recovery_codes_remaining} recovery codes left.
           </p>
           {mode ? (
             <PasswordAndCode submitLabel={mode === "disable" ? "Turn off" : "Regenerate codes"} pending={pending} onSubmit={mode === "disable" ? disable : regenerate} />
@@ -202,7 +202,7 @@ export function SecuritySection() {
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <p className="text-xs">Two-step sign-in is <strong>off</strong>.</p>
+          <p className="text-xs">Authenticator codes are <strong>off</strong>.</p>
           <Button size="sm" variant="primary" disabled={pending} onClick={start}>
             Set up
           </Button>

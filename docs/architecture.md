@@ -45,8 +45,8 @@ graph TD
 - **`bf-db`**: Database persistence layer using SQLx. Manages PostgreSQL connections, schema migrations, repository operations, transaction management, the transactional outbox table, and advisory lock coordinators.
 - **`bf-spool`**: Dedicated high-throughput segmented Write-Ahead Log (WAL). Features custom record framing `[len u32 | crc32 | json]`, group-commit async fsync routines, atomic checkpoint persistence, replay iterators with torn-tail tolerance, and automated segment garbage collection.
 - **`bf-rt`**: Operational runtime support including environment-based configuration, structured `tracing` instrumentation, Prometheus metric exporters, and graceful process shutdown handlers.
-- **`tracker` (bin)**: High-performance hot-path ingestion daemon (port `8081`, internal metrics `9101`). Serves `/t.js`, handles click redirects `/r/:code`, click beacons `/c`, and receives external conversion and webhook payloads.
-- **`api` (bin)**: Administrative and management daemon (port `8080`, internal metrics `9100`). Provides subcommands: `serve [--with-worker]`, `worker`, `openapi`, `bootstrap`, and `seed-demo`.
+- **`tracker` (bin)**: High-performance hot-path ingestion daemon (port `8081`, internal metrics `9100`). Serves `/t.js`, handles click redirects `/r/:code`, click beacons `/c`, and receives external conversion and webhook payloads.
+- **`api` (bin)**: Administrative and management daemon (port `8080`, internal metrics `9101`). Provides subcommands: `serve [--with-worker]`, `worker`, `openapi`, `bootstrap`, and `seed-demo`.
 
 ### Deployables & Edge Layout
 

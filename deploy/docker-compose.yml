@@ -38,6 +38,10 @@ services:
       SMTP_FROM: ${SMTP_FROM:-bunfiiliate <noreply@example.com>}
       # Secure cookies need https; set COOKIE_SECURE=0 only with SITE_ADDRESS=:80 for local use.
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-0}
+      BF_HSTS: ${BF_HSTS:-0}
+      BF_JWT_SECRETS: ${BF_JWT_SECRETS:-}
+      TAX_REPORT_THRESHOLD_CENTS: ${TAX_REPORT_THRESHOLD_CENTS:-60000}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - spool_data:/var/spool/bunfiiliate
@@ -69,6 +73,7 @@ services:
       BF_GEOIP_DB: ${BF_GEOIP_DB:-}
       BF_IP_SALT: ${BF_IP_SALT:?set BF_IP_SALT in .env (openssl rand -hex 32)}
       BF_TRUST_CF: ${BF_TRUST_CF:-0}
+      BF_V1_SUNSET: ${BF_V1_SUNSET:-}
       # Caddy reaches the tracker over the compose network; believe its X-Forwarded-For, or
       # every click would be attributed to Caddy's own address.
       BF_TRUSTED_PROXIES: ${BF_TRUSTED_PROXIES:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}

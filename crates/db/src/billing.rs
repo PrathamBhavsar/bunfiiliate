@@ -212,7 +212,9 @@ pub struct EventUpdate<'a> {
 
 /// Apply a provider event. `false` when the workspace does not exist or the stored subscription
 /// already reflects a newer event (events are ordered by the provider's `updated_at`).
-/// A canceled subscription drops back to the default plan.
+/// A canceled subscription drops back to the default plan, but only when the event is about the
+/// stored subscription: cancelling an old or foreign subscription must not downgrade a workspace
+/// that is paying for another one.
 pub async fn apply_event(
     db: impl PgExecutor<'_>,
     e: &EventUpdate<'_>,
@@ -233,8 +235,11 @@ pub async fn apply_event(
            provider_subscription_id = EXCLUDED.provider_subscription_id, \
            status = EXCLUDED.status, current_period_end = EXCLUDED.current_period_end, \
            provider_event_at = EXCLUDED.provider_event_at, updated_at = now() \
-         WHERE subscriptions.provider_event_at IS NULL \
-            OR subscriptions.provider_event_at <= EXCLUDED.provider_event_at",
+         WHERE (subscriptions.provider_event_at IS NULL \
+                OR subscriptions.provider_event_at <= EXCLUDED.provider_event_at) \
+           AND (EXCLUDED.status <> 'canceled' \
+                OR subscriptions.provider_subscription_id IS NULL \
+                OR subscriptions.provider_subscription_id = EXCLUDED.provider_subscription_id)",
     )
     .bind(e.workspace_id)
     .bind(e.provider)

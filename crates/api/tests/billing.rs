@@ -375,6 +375,28 @@ async fn billing_webhook_dedupes_by_event_id(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
+async fn billing_cancel_of_another_subscription_does_not_downgrade(pool: PgPool) {
+    let app = app(pool.clone());
+    let t = tenant(&pool, &app, UserRole::Admin).await;
+    add_plan(&pool, "pro", None, None).await;
+    enable_provider(&pool, "lemonsqueezy").await;
+    let b = event(t.ws, Some("e1"), "active", "2026-03-01T00:00:00Z", "pro");
+    let (_, r) = hook(&app, "lemonsqueezy", &b, signed(&b)).await;
+    assert_eq!(r["result"], "applied");
+
+    // A newer cancel for a different subscription id (an old one, or another buyer's).
+    let other = event(t.ws, Some("e2"), "cancelled", "2026-03-02T00:00:00Z", "pro")
+        .replace("sub_9", "sub_other");
+    let (st, r) = hook(&app, "lemonsqueezy", &other, signed(&other)).await;
+    assert_eq!(
+        (st, r["result"].as_str()),
+        (StatusCode::OK, Some("ignored"))
+    );
+    assert_eq!(sub(&pool, t.ws).await.0, "pro");
+    assert_eq!(sub(&pool, t.ws).await.1, "active");
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
 async fn billing_webhook_applies_in_updated_at_order(pool: PgPool) {
     let app = app(pool.clone());
     let t = tenant(&pool, &app, UserRole::Admin).await;

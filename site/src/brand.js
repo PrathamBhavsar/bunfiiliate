@@ -57,12 +57,12 @@ export default {
     ]},
     { title: "Security", blurb: "How sessions, passwords and secrets are handled.", items: [
       ["shield", "Cookie sessions", "HttpOnly `SameSite=Strict` access JWT, rotating refresh token. Reuse of an old token revokes the whole family."],
-      ["finger", "Passwords and 2FA", "Argon2 hashing, optional TOTP with recovery codes, rate-limited non-enumerating reset."],
+      ["finger", "Passwords and authenticator codes", "Argon2 hashing, rate-limited non-enumerating reset, optional TOTP and recovery codes to reset your own password. Sign-in is password-only."],
       ["lock", "Secrets at rest", "Webhook and provider secrets encrypted with a rotating master key (`BF_MASTER_KEYS`)."],
     ]},
     { title: "Operate it", blurb: "It runs on one VPS.", items: [
       ["server", "Two binaries, one image", "`api` and `tracker`. Docker Compose or systemd behind Caddy. Backups and monitoring configs in `deploy/`."],
-      ["activity", "Prometheus metrics", "API on 9100, tracker on 9101. OpenAPI at `/api/openapi.json`, typed TypeScript SDK."],
+      ["activity", "Prometheus metrics", "API on 9101, tracker on 9100. OpenAPI at `/api/openapi.json`, typed TypeScript SDK."],
       ["chart", "Benchmarked, with caveats", "`bench/` scripts and `docs/benchmarks.md` publish both fsync modes with the hardware they ran on."],
     ]},
   ],
@@ -83,20 +83,21 @@ export default {
   install: [
     { id: "docker", label: "Docker", cmds: [
       "git clone https://github.com/PrathamBhavsar/bunfiiliate && cd bunfiiliate",
-      "cp .env.example .env   # set JWT_SECRET, BF_IP_SALT, BF_MASTER_KEYS, SITE_ADDRESS",
+      "cp .env.example .env   # set JWT_SECRET, BF_IP_SALT, BF_MASTER_KEYS, POSTGRES_PASSWORD, SITE_ADDRESS",
       "docker compose --env-file .env -f deploy/docker-compose.yml up -d",
     ], note: "Postgres, api, tracker and Caddy with automatic TLS. Caddy serves the UI and `/api` on one origin." },
     { id: "source", label: "Source", cmds: [
       "git clone https://github.com/PrathamBhavsar/bunfiiliate && cd bunfiiliate",
       "cargo build --release -p api -p tracker",
+      "set -a; . ./.env; set +a   # load the secrets and DATABASE_URL",
       "cargo run -p api -- serve --with-worker",
-    ], note: "Rust 1.80+ and PostgreSQL 16. See the quickstart for the first admin and a demo seed." },
+    ], note: "Rust 1.85+ and PostgreSQL 16. Copy `.env.example` to `.env` and fill the secrets first. See the quickstart for the first admin." },
     { id: "binary", label: "Binary", cmds: [
       "curl -LsSf https://github.com/PrathamBhavsar/bunfiiliate/releases/latest/download/api-installer.sh | sh",
       "curl -LsSf https://github.com/PrathamBhavsar/bunfiiliate/releases/latest/download/tracker-installer.sh | sh",
-      "api bootstrap --email you@example.com --workspace \"Acme\"",
+      "api bootstrap --email you@example.com --password \"a-long-passphrase\" --workspace \"Acme\"",
       "api serve --with-worker & tracker",
-    ], note: "Needs PostgreSQL 16 and `DATABASE_URL`. macOS and Linux, x86_64 and arm64.", pending: "No release is tagged yet: these URLs work from the first release. Use Docker or source today." },
+    ], note: "Needs PostgreSQL 16 and the variables from `.env.example` (`DATABASE_URL`, `JWT_SECRET`, `BF_MASTER_KEYS`, `BF_IP_SALT`, `SPOOL_DIR`, ports). macOS and Linux, x86_64 and arm64.", pending: "No release is tagged yet: these URLs work from the first release. Use Docker or source today." },
   ],
 
   faq: [

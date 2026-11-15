@@ -18,7 +18,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let pool = bf_db::connect(&cfg.database_url).await?;
     let spool = SpoolConfig::new(&cfg.spool_dir).with_fsync_mode(fsync);
     // Optional DB-IP lite country database (`scripts/fetch-dbip.sh`); unset = header only.
-    let geo = match std::env::var_os("BF_GEOIP_DB") {
+    // Compose passes an unset `BF_GEOIP_DB` as an empty string: that also means "disabled".
+    let geo = match std::env::var_os("BF_GEOIP_DB").filter(|p| !p.is_empty()) {
         Some(path) => tracker::geo::Geo::open(path.as_ref())?,
         None => tracker::geo::Geo::disabled(),
     };

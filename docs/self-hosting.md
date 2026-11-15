@@ -186,11 +186,13 @@ The tracker assigns country codes to incoming click and conversion traffic:
 ./scripts/fetch-dbip.sh
 ```
 
-Then configure `BF_GEOIP_DB` in your `.env`:
+Then configure `BF_GEOIP_DB` in your `.env` (systemd install):
 
 ```dotenv
 BF_GEOIP_DB=data/dbip-country-lite.mmdb
 ```
+
+With Docker Compose the file has to be inside the tracker container: bind-mount it (for example `./data:/data:ro` on the `tracker` service) and set `BF_GEOIP_DB=/data/dbip-country-lite.mmdb`. Leave it unset to use the Cloudflare header only.
 
 > **Note on MaxMind**: Do not commit or vendor MaxMind GeoLite2 databases; use DB-IP Lite or the Cloudflare header.
 
@@ -245,6 +247,12 @@ DATABASE_URL=postgres://bunfiiliate:secret@localhost:5432/bunfiiliate
 API_PORT=8080
 TRACKER_PORT=8081
 JWT_SECRET=your-secure-random-secret-key-at-least-32-chars
+# Required by api and tracker: kid:base64(32 bytes), e.g. echo "k1:$(head -c32 /dev/urandom | base64)"
+BF_MASTER_KEYS=
+# Required by the tracker: openssl rand -hex 32
+BF_IP_SALT=
+# Caddy on the same host: believe its X-Forwarded-For
+BF_TRUSTED_PROXIES=127.0.0.1/32
 SPOOL_DIR=/var/spool/bunfiiliate
 RUST_LOG=info
 ```
@@ -329,7 +337,8 @@ bunfiiliate migrations are non-destructive and backward-compatible.
 
 ```bash
 cd /opt/bunfiiliate
-git pull origin staging
+git fetch --tags origin
+git checkout vX.Y.Z   # the release you are upgrading to; track releases, not branches
 
 # Rebuild and restart services
 docker compose --env-file .env -f deploy/docker-compose.yml up -d --build

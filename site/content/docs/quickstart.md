@@ -13,8 +13,10 @@ A local run, no Docker. About five minutes.
 
 Any Postgres 16 works. Set the connection string:
 
+Copy `.env.example` to `.env`, fill `JWT_SECRET`, `BF_MASTER_KEYS` and `BF_IP_SALT` (the file shows how to generate each), set `DATABASE_URL`, then load it in every terminal you use below:
+
 ```bash
-export DATABASE_URL=postgres://postgres@localhost:5432/postgres
+set -a; . ./.env; set +a
 ```
 
 ## 2. Bootstrap the super admin

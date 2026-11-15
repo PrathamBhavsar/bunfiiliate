@@ -54,6 +54,8 @@ impl Config {
     }
 
     pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
+        // An empty value is an unset one (Compose passes `${VAR:-}` as an empty string).
+        let get = |k: &str| get(k).filter(|v| !v.trim().is_empty());
         let required = |key: &'static str| get(key).ok_or(ConfigError::Missing(key));
         let port = |key: &'static str| {
             required(key)?
@@ -129,6 +131,27 @@ mod tests {
     #[test]
     fn reports_missing_key() {
         let err = Config::from_lookup(|k| lookup(k).filter(|_| k != "JWT_SECRET")).unwrap_err();
+        assert_eq!(err, ConfigError::Missing("JWT_SECRET"));
+    }
+
+    #[test]
+    fn empty_value_counts_as_unset() {
+        // Compose passes unset optional vars as "": an empty JWT_SECRETS must not matter, an
+        // empty required one must read as missing.
+        let empty_list = |k: &str| {
+            (k == "BF_JWT_SECRETS")
+                .then(String::new)
+                .or_else(|| lookup(k))
+        };
+        assert!(Config::from_lookup(empty_list).is_ok());
+        let empty_secret = |k: &str| {
+            if k == "JWT_SECRET" {
+                Some(String::new())
+            } else {
+                lookup(k)
+            }
+        };
+        let err = Config::from_lookup(empty_secret).unwrap_err();
         assert_eq!(err, ConfigError::Missing("JWT_SECRET"));
     }
 

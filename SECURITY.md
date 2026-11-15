@@ -76,7 +76,7 @@ We welcome reports regarding flaws that undermine the confidentiality, integrity
 The following areas are explicitly excluded from our threat model for v1 (see [`docs/PLAN.md`](docs/PLAN.md) and [`brain/decisions/0003-skip-list.md`](brain/decisions/0003-skip-list.md)):
 
 - **Plaintext Database Secrets**: Storing webhook secrets and third-party integration keys in database columns without a dedicated Key Management Service (KMS). bunfiiliate v1 operates on a trusted, single-VPS database model.
-- **Missing Enterprise Auth**: Lack of single sign-on (SSO), SAML, hardware tokens, or two-factor authentication (2FA) in v1.
+- **Missing Enterprise Auth**: Lack of single sign-on (SSO), SAML, hardware tokens, or two-factor authentication at sign-in in v1. Sign-in is password-only. TOTP authenticator codes and recovery codes exist, but they only reset your own password.
 - **Volumetric Denial of Service**: High-volume HTTP flood attacks against unauthenticated public endpoints (`/r/:code`, `/c`). Production instances are required to be deployed behind a reverse proxy (e.g., Caddy, Cloudflare) providing transport-level rate limiting and TLS termination.
 - **Compromised Host Environment**: Attacks requiring direct root or administrative shell access to the host server, or direct read/write access to the PostgreSQL database cluster port (`5433`).
 - **Insecure Development Flags**: Issues arising solely when `COOKIE_SECURE=0` or plain HTTP is deliberately configured by the operator.
