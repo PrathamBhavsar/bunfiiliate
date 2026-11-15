@@ -48,9 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!(port = cfg.tracker_port, "tracker started");
     let app = tracker::router(tracker.state).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
+        .with_graceful_shutdown(bf_rt::shutdown_signal())
         .await?;
     // The router is gone, so the queue is closed: let the writer drain it.
     tracker.writer.await?;
