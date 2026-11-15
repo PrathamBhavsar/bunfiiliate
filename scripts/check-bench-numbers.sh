@@ -1,126 +1,76 @@
 #!/usr/bin/env bash
+# Fails when the benchmark numbers quoted in the site copy drift from docs/benchmarks.md.
+# docs/benchmarks.md is the published source (its table is generated from bench/results by bench/gen_docs.py).
+# The site quotes `/r/:code` rps and p50 for both BF_FSYNC modes in site/src/brand.js ("facts" rows and the FAQ).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-SITE_HTML="$ROOT_DIR/site/index.html"
-RESULTS_DIR="$ROOT_DIR/bench/results"
+BRAND="$ROOT_DIR/site/src/brand.js"
+DOCS="$ROOT_DIR/docs/benchmarks.md"
 
-if [ ! -f "$SITE_HTML" ]; then
-  echo "Error: $SITE_HTML not found." >&2
-  exit 1
-fi
+for f in "$BRAND" "$DOCS"; do
+  [ -f "$f" ] || { echo "Error: $f not found." >&2; exit 1; }
+done
 
-if [ ! -d "$RESULTS_DIR" ]; then
-  echo "Error: $RESULTS_DIR not found." >&2
-  exit 1
-fi
+echo "=== Verifying benchmark numbers in site/src/brand.js against docs/benchmarks.md ==="
 
-echo "=== Verifying site/index.html benchmark numbers against bench/results/*.json ==="
-
-# New schema (bench/run.sh, schema_version 1): check the latest full result via gen_docs.py.
-LATEST="$(python3 -I "$ROOT_DIR/bench/gen_docs.py" --latest || true)"
-if [ -n "$LATEST" ]; then
-  echo "Using $LATEST"
-  if python3 -I "$ROOT_DIR/bench/gen_docs.py" --check "$LATEST" "$SITE_HTML"; then
-    echo "All benchmark numbers in site/index.html match $(basename "$LATEST")."
-    exit 0
-  fi
-  echo "Benchmark verification failed: site/index.html drifted from $(basename "$LATEST"). Run bench/run.sh --write-docs." >&2
-  exit 1
-fi
-echo "No schema_version=1 result found; falling back to legacy per-file results."
-
-python3 - "$ROOT_DIR" << 'EOF'
-import json
-import os
+python3 -I - "$BRAND" "$DOCS" <<'PY'
 import re
 import sys
 
-root_dir = sys.argv[1] if len(sys.argv) > 1 else os.getcwd()
-site_file = os.path.join(root_dir, "site/index.html")
-results_dir = os.path.join(root_dir, "bench/results")
+brand = open(sys.argv[1], encoding="utf-8").read()
+docs = open(sys.argv[2], encoding="utf-8").read()
 
-with open(site_file, "r", encoding="utf-8") as f:
-    html = f.read()
 
-benchmarks = [
-    ("fsync_always_c", "fsync_always_c.json", "/c", "always"),
-    ("fsync_always_r", "fsync_always_r.json", "/r/:code", "always"),
-    ("fsync_always_webhook", "fsync_always_webhook.json", "/v1/events/:key", "always"),
-    ("fsync_off_c", "fsync_off_c.json", "/c", "off"),
-    ("fsync_off_r", "fsync_off_r.json", "/r/:code", "off"),
-    ("fsync_off_webhook", "fsync_off_webhook.json", "/v1/events/:key", "off"),
-]
+def row(fsync):
+    """rps and p50 (ms) of the `/r/:code` row for one BF_FSYNC mode."""
+    for line in docs.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 4 and cells[0] == "`/r/:code`" and cells[1] == fsync:
+            return float(cells[2]), float(cells[3].split()[0])
+    sys.exit(f"no `/r/:code` row for BF_FSYNC={fsync} in docs/benchmarks.md")
+
+
+def fmt_ms(v):
+    return f"{v:.1f}".rstrip("0").rstrip(".") if v < 1 else f"{round(v)}"
+
+
+def fmt_rps(v):
+    return f"{v / 1000:.1f}k"
+
 
 errors = []
-
-for bench_id, json_name, target, fsync in benchmarks:
-    json_path = os.path.join(results_dir, json_name)
-    if not os.path.exists(json_path):
-        errors.append(f"Missing benchmark JSON: {json_path}")
-        continue
-
-    with open(json_path, "r", encoding="utf-8") as jf:
-        data = json.load(jf)
-
-    # Compute expected numbers matching bench/run.sh format_row
-    rps_val = round(float(data["summary"]["requestsPerSec"]) * 100) / 100
-    expected_rps = str(rps_val)
-    if expected_rps.endswith(".0"):
-        expected_rps = expected_rps[:-2]
-
-    # Latencies
-    if "metrics" in data and "latency_ms" in data["metrics"] and data["metrics"]["latency_ms"].get("p50") is not None:
-        expected_p50 = f"{data['metrics']['latency_ms']['p50']} ms"
-        expected_p99 = f"{data['metrics']['latency_ms']['p99']} ms"
+for label, fsync in (("Tracker p50, fsync off", "off"), ("Tracker p50, fsync always", "always")):
+    rps, p50 = row(fsync)
+    expected = f"{fmt_ms(p50)} ms · {fmt_rps(rps)} req/s"
+    m = re.search(r'\["' + re.escape(label) + r'",\s*"([^"]*)"\]', brand)
+    if not m:
+        errors.append(f"fact row '{label}' not found in brand.js")
+    elif m.group(1) != expected:
+        errors.append(f"'{label}': brand.js has '{m.group(1)}', docs/benchmarks.md gives '{expected}'")
     else:
-        p50_val = round(data["latencyPercentiles"]["p50"] * 1000 * 100) / 100
-        p99_val = round(data["latencyPercentiles"]["p99"] * 1000 * 100) / 100
-        expected_p50 = f"{p50_val} ms"
-        expected_p99 = f"{p99_val} ms"
+        print(f"ok   {label}: {expected}")
 
-    # Find the row in site/index.html
-    row_match = re.search(r'<tr[^>]*data-benchmark=["\']' + re.escape(bench_id) + r'["\'][^>]*>(.*?)</tr>', html, re.DOTALL)
-    if not row_match:
-        errors.append(f"Row for benchmark '{bench_id}' not found in {site_file}")
-        continue
-
-    row_content = row_match.group(1)
-
-    # Extract rps, p50, p99 from row
-    rps_match = re.search(r'data-metric=["\']rps["\'][^>]*>([^<]+)<', row_content)
-    p50_match = re.search(r'data-metric=["\']p50["\'][^>]*>([^<]+)<', row_content)
-    p99_match = re.search(r'data-metric=["\']p99["\'][^>]*>([^<]+)<', row_content)
-
-    if not rps_match:
-        errors.append(f"[{bench_id}] rps metric not found in HTML row")
+# FAQ prose: "measured 0.4 ms p50" (off) and "p50 was about 13 ms" (always).
+_, off_p50 = row("off")
+_, on_p50 = row("always")
+for pat, want, what in (
+    (r"measured ([0-9.]+) ms p50", fmt_ms(off_p50), "FAQ fsync-off p50"),
+    (r"p50 was about ([0-9.]+) ms", fmt_ms(on_p50), "FAQ fsync-always p50"),
+):
+    m = re.search(pat, brand)
+    if not m:
+        errors.append(f"{what} sentence not found in brand.js")
+    elif m.group(1) != want:
+        errors.append(f"{what}: brand.js has {m.group(1)} ms, docs/benchmarks.md gives {want} ms")
     else:
-        actual_rps = rps_match.group(1).strip()
-        if actual_rps != expected_rps:
-            errors.append(f"[{bench_id}] RPS mismatch: HTML has '{actual_rps}', JSON expects '{expected_rps}'")
-
-    if not p50_match:
-        errors.append(f"[{bench_id}] p50 metric not found in HTML row")
-    else:
-        actual_p50 = p50_match.group(1).strip()
-        if actual_p50 != expected_p50:
-            errors.append(f"[{bench_id}] p50 mismatch: HTML has '{actual_p50}', JSON expects '{expected_p50}'")
-
-    if not p99_match:
-        errors.append(f"[{bench_id}] p99 metric not found in HTML row")
-    else:
-        actual_p99 = p99_match.group(1).strip()
-        if actual_p99 != expected_p99:
-            errors.append(f"[{bench_id}] p99 mismatch: HTML has '{actual_p99}', JSON expects '{expected_p99}'")
-
-    print(f"✓ [{bench_id}] target={target} fsync={fsync}: rps={expected_rps}, p50={expected_p50}, p99={expected_p99}")
+        print(f"ok   {what}: {want} ms")
 
 if errors:
-    print("\nBenchmark verification failed with errors:", file=sys.stderr)
-    for err in errors:
-        print(f"  - {err}", file=sys.stderr)
+    print("\nBenchmark verification failed:", file=sys.stderr)
+    for e in errors:
+        print(f"  - {e}", file=sys.stderr)
     sys.exit(1)
-
-print("\nAll benchmark numbers in site/index.html exactly match bench/results/*.json.")
-EOF
+print("\nAll benchmark numbers in site/src/brand.js match docs/benchmarks.md.")
+PY

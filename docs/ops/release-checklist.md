@@ -17,7 +17,7 @@ Branches: `prod` <- `staging` <- `feat/*`. Merge with `--no-ff` only. Never comm
 
 ## Push
 
-- `scripts/push-guard.sh` must pass: remote is `github.com/pratham-projects/*`, clean tree, passing
+- `scripts/push-guard.sh` must pass: remote is `github.com/PrathamBhavsar/*`, clean tree, passing
   `.gate/report.md`, no force flags. It refuses anything else.
 - Push `staging`, then merge `staging -> prod --no-ff` and push `prod`. Tag `vX.Y.Z` after the push.
 - No push until the user says so.
