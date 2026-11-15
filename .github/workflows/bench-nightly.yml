@@ -18,7 +18,7 @@ jobs:
       DATABASE_URL: ${{ vars.BENCH_DATABASE_URL }}
       BENCH_CLASS: bench-selfhosted
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Full bench run
         run: bench/run.sh
       - name: Compare to baseline
@@ -62,7 +62,7 @@ jobs:
       BENCH_CLASS: ubuntu-latest-hosted
       BENCH_NOISY: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: Swatinem/rust-cache@v2
       - name: Install pinned oha
         run: cargo install oha --version 1.16.0 --locked
