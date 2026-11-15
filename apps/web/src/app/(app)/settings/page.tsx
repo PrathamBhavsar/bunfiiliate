@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { NotifyChannelsSection } from "@/components/notify-channels-section";
+import { SecuritySection } from "@/components/security-section";
 import { Button } from "@/components/ui/button";
 import { Label, Textarea } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -73,6 +75,8 @@ export default function Page() {
         </h1>
         <p className="text-xs text-muted">Free-form configuration for this workspace.</p>
       </header>
+      <SecuritySection />
+      <NotifyChannelsSection />
       {q.isPending ? (
         <Skeleton className="h-64" />
       ) : q.isError ? (

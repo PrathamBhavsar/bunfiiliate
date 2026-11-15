@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Copy, Plus } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { FormDialog } from "@/components/form-dialog";
@@ -8,6 +9,7 @@ import { ResourceView, type ResourceConfig } from "@/components/resource-view";
 import { Button } from "@/components/ui/button";
 import { ok, refresh, required, toPage, usePrograms, type ReferralCode } from "@/lib/admin";
 import { api } from "@/lib/api";
+import { codeStatsHref } from "@/lib/nav";
 import type { ListFn } from "@/lib/use-resource";
 
 type Row = ReferralCode & { id: string };
@@ -51,7 +53,15 @@ export default function Page() {
       description: "Your referral codes. Share a link to attribute clicks and sales to you.",
       list,
       columns: [
-        { id: "code", header: "Code", cell: (c) => <code className="font-medium">{c.code}</code> },
+        {
+          id: "code",
+          header: "Code",
+          cell: (c) => (
+            <Link href={codeStatsHref(c.code, false)} className="font-medium hover:underline" aria-label={`Stats for ${c.code}`}>
+              <code>{c.code}</code>
+            </Link>
+          ),
+        },
         { id: "program", header: "Program", cell: (c) => programName(c.program_id) },
         { id: "landing", header: "Landing URL", className: "break-all", cell: (c) => c.landing_url },
         {

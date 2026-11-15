@@ -45,3 +45,37 @@ timestamp: 2026-10-26
 - **pnpm prompt hangs scripts**: after a pnpm version mix-up, `pnpm install` asks "modules directories will be removed... Proceed?" and `make e2e` (web build step) waits forever without a TTY. Run `CI=true pnpm install --frozen-lockfile` once; the pinned `packageManager` is 9.15.9, the global pnpm is 12.
 - **Ack after rollback**: the spool writer must undo a failed group (truncate) before it answers the writers' errors; the reverse order let a test (and a retrying caller) see the torn group, a 1-in-10 flake under load.
 - **Reload debounce vs UI**: delaying the tracker snapshot reload by a debounce made `/r/<code>` 404 right after the UI created it (caught by e2e). Reload on the first change, rate-limit the rest.
+
+## Shared CARGO_TARGET_DIR across worktrees
+Cargo's metadata hash ignores the checkout path, so concurrent worktrees on one target dir overwrite each other's artifacts and produce phantom errors (e.g. missing struct fields). Use a per-worktree target dir (`CARGO_PROFILE_DEV_DEBUG=0 CARGO_INCREMENTAL=0` keeps it small) or hold all gates until workers stop.
+
+## e2e 503 on a full host disk
+Spool disk-full shedding trips at 85% disk used; `scripts/e2e.sh` pins `BF_SPOOL_*` so the suite does not depend on host disk.
+
+## Per-code conversions
+`conversions` has no `code` column. Join `customers.first_click_id` to `clicks.code`; a code-less (recurring) conversion is not attributed to any code.
+
+## The e2e runner is not Playwright
+`e2e/` uses the `e2e` + `@e2e-dev/web` runner (CDP, `browser.route`, `browser.evaluate`), so `@axe-core/playwright` cannot be used. Inject `axe-core/axe.min.js` with `evaluate` and call `axe.run`. Tests share one database across files: mock list endpoints with `browser.route` when a test needs a known empty or failing state.
+
+
+## Disk at 100% shows up as e2e 503
+Finished worktrees hold about 4 GB each (own target dir). Remove a worktree as soon as its branch is merged or committed; check `df -h /tmp` before a gate. A full disk trips spool shedding and the e2e conversion ingest returns 503.
+
+## password_reset flake under load
+Six `password_reset` tests failed once with 401 while two workers were building, then passed alone and on a rerun of `make ci`. Not reproduced; if it recurs, check the TOTP step window and reset throttle first.
+
+## e2e rate limits and seeding
+Login is limited to 10/min per email and 30/min per IP, register/signup 5 per email and 10 per IP, all behind Caddy from one address. Seed through the api port directly (`E2E_API_URL`): no proxy header means only per-email limits apply. Give every suite its own workspace (self-serve `SIGNUP_ENABLED=1`, unique admin email) instead of reusing the bootstrap admin. Program secrets are returned only by create and rotate, not by GET. A fresh `/r/<code>` can 404 briefly: poll for the redirect. A comment line between `VAR=x \` continuation lines and the command in `e2e.sh` silently drops the env.
+
+## Duplicate OpenAPI operation ids
+utoipa takes the function name as operationId; `approve` exists for affiliates and conversions, so openapi-typescript merges them and the SDK types are wrong for one. Give new handlers a unique `operation_id`.
+
+## Stale postmaster.pid after a reboot
+`pg_ctl start` on the pg16 dir fails with "lock file postmaster.pid already exists ... PID N" when macOS reused N for another process. Check `ps -p N` and that no pg16 postmaster runs, then remove the pid file. Always call `/opt/homebrew/opt/postgresql@16/bin/pg_ctl` by full path: `pg_ctl` on PATH is pg18 and reports "database files are incompatible".
+
+## Compose passes unset vars as empty strings
+`VAR: ${VAR:-}` sets `VAR=""` in the container, which `std::env::var_os(..).is_some()` treats as set. `BF_GEOIP_DB=""` made the tracker try to open an empty path and exit on first boot. `Config::from_lookup` and the tracker now read an empty value as unset; new optional env vars must do the same.
+
+## Docs drift from code
+A review of the launch docs found wrong ports (metrics 9100 tracker, 9101 api), missing required env (`JWT_SECRET`, `BF_MASTER_KEYS`, `BF_IP_SALT`), a required CLI flag left out, Rust 1.80 vs edition 2024 (1.85), and a "two-step sign-in" claim the login route never enforced. Copy commands and env lists from `.env.example` and the clap definitions, and check security claims against the route that enforces them.

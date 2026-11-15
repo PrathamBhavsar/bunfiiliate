@@ -32,9 +32,12 @@ impl Api {
     fn new(pool: &PgPool) -> Self {
         Self(app(AppState {
             pool: pool.clone(),
-            jwt_secret: SECRET.into(),
+            jwt_keys: api::auth::JwtKeys::single(SECRET).into(),
+            version_cache: Default::default(),
+            vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
             secure_cookies: true,
             limiter: Default::default(),
+            tracker_url: Default::default(),
         }))
     }
 
@@ -49,9 +52,10 @@ impl Api {
             .method(method)
             .uri(uri)
             .header(HOST, "bf.test")
-            .header(ORIGIN, "https://bf.test");
+            .header(ORIGIN, "https://bf.test")
+            .header("x-csrf-token", "t");
         if let Some(c) = cookie {
-            b = b.header(COOKIE, c);
+            b = b.header(COOKIE, format!("{c}; bf_csrf=t"));
         }
         let body = body.map_or_else(Body::empty, |v| {
             b = std::mem::take(&mut b).header(CONTENT_TYPE, "application/json");

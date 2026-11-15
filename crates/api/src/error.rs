@@ -14,10 +14,18 @@ pub enum AppError {
     BadRequest(String),
     Unauthorized(&'static str),
     Forbidden(&'static str),
+    /// Missing or mismatched `X-CSRF-Token`.
+    Csrf,
     NotFound(&'static str),
+    /// A plan limit is hit; the message names it.
+    PaymentRequired(String),
+    /// The request is well formed but cannot be served (for example an unconfigured provider).
+    Unprocessable(String),
     Conflict(&'static str),
     TooManyRequests,
     PayloadTooLarge,
+    /// An internal upstream (the tracker) did not answer.
+    BadGateway,
     Internal,
 }
 
@@ -38,7 +46,14 @@ impl IntoResponse for AppError {
             Self::BadRequest(m) => (StatusCode::BAD_REQUEST, "bad_request", m),
             Self::Unauthorized(m) => (StatusCode::UNAUTHORIZED, "unauthorized", m.into()),
             Self::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m.into()),
+            Self::Csrf => (
+                StatusCode::FORBIDDEN,
+                "csrf",
+                "csrf token missing or invalid".into(),
+            ),
             Self::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.into()),
+            Self::PaymentRequired(m) => (StatusCode::PAYMENT_REQUIRED, "plan_limit", m),
+            Self::Unprocessable(m) => (StatusCode::UNPROCESSABLE_ENTITY, "unprocessable", m),
             Self::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.into()),
             Self::PayloadTooLarge => (
                 StatusCode::PAYLOAD_TOO_LARGE,
@@ -49,6 +64,11 @@ impl IntoResponse for AppError {
                 StatusCode::TOO_MANY_REQUESTS,
                 "too_many_requests",
                 "too many requests, try again later".into(),
+            ),
+            Self::BadGateway => (
+                StatusCode::BAD_GATEWAY,
+                "bad_gateway",
+                "upstream unreachable".into(),
             ),
             Self::Internal => (
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -92,6 +112,24 @@ impl<T: DeserializeOwned, S: Send + Sync> FromRequest<S> for AppJson<T> {
     type Rejection = AppError;
 
     async fn from_request(req: Request, state: &S) -> Result<Self, AppError> {
-        Ok(Self(Json::<T>::from_request(req, state).await?.0))
+        let Json(value) = Json::<serde_json::Value>::from_request(req, state).await?;
+        // Postgres text and jsonb reject U+0000; refuse it here instead of failing as a 500.
+        if has_nul(&value) {
+            return Err(AppError::BadRequest(
+                "strings must not contain NUL characters".into(),
+            ));
+        }
+        serde_json::from_value(value)
+            .map(Self)
+            .map_err(|e| AppError::BadRequest(format!("invalid request body: {e}")))
+    }
+}
+
+fn has_nul(v: &serde_json::Value) -> bool {
+    match v {
+        serde_json::Value::String(s) => s.contains('\0'),
+        serde_json::Value::Array(a) => a.iter().any(has_nul),
+        serde_json::Value::Object(m) => m.iter().any(|(k, v)| k.contains('\0') || has_nul(v)),
+        _ => false,
     }
 }

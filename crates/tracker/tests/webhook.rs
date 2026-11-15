@@ -165,13 +165,18 @@ async fn undrained(
     let (queue, rx) = mpsc::channel(100);
     let state = AppState {
         pool: pool.clone(),
-        snapshot: Arc::new(ArcSwap::from_pointee(Snapshot::load(pool).await.unwrap())),
+        snapshot: Arc::new(ArcSwap::from_pointee(
+            Snapshot::load(pool, &bf_core::secrets::Vault::plaintext())
+                .await
+                .unwrap(),
+        )),
         spool: SpoolWriter::open(SpoolConfig::new(dir)).await.unwrap(),
         queue,
         ip_salt: SALT.into(),
         trust: Default::default(),
         geo: Arc::new(Geo::disabled()),
         fraud: bf_core::default_rules().into(),
+        idem: Default::default(),
     };
     (state, rx)
 }
@@ -180,9 +185,15 @@ async fn undrained(
 async fn webhook_valid_signatures_are_stored(pool: PgPool) {
     seed(&pool).await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     assert_eq!(
@@ -228,9 +239,15 @@ async fn webhook_valid_signatures_are_stored(pool: PgPool) {
 async fn webhook_bad_requests_are_400_and_spool_nothing(pool: PgPool) {
     seed(&pool).await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
     let bad = StatusCode::BAD_REQUEST;
 
@@ -335,9 +352,15 @@ async fn webhook_bad_requests_are_400_and_spool_nothing(pool: PgPool) {
 async fn webhook_replay_beyond_tolerance_is_400(pool: PgPool) {
     seed(&pool).await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     for skew in [-301, 301, 3600] {
@@ -363,9 +386,15 @@ async fn webhook_replay_beyond_tolerance_is_400(pool: PgPool) {
 async fn webhook_duplicate_delivery_is_one_row(pool: PgPool) {
     seed(&pool).await;
     let dir = spool_dir();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     let app = router(t.state.clone());
 
     // Concurrent redeliveries of the same Stripe event and Paddle event, a generic
@@ -422,9 +451,15 @@ async fn webhook_crash_and_replay_is_one_row(pool: PgPool) {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Run 2: startup replays the spool.
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     assert_eq!(events(&pool).await, 2);
     assert_eq!(t.state.spool.read_checkpoint().unwrap(), spool_end(&dir));
     drop(t);
@@ -432,9 +467,15 @@ async fn webhook_crash_and_replay_is_one_row(pool: PgPool) {
     // DB flush done but checkpoint lost: replay again, still one row each; and the
     // provider redelivering after the restart adds nothing.
     bf_spool::write_checkpoint(&dir, 0).unwrap();
-    let t = start(pool.clone(), SpoolConfig::new(&dir), SALT, Geo::disabled())
-        .await
-        .unwrap();
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        SALT,
+        Geo::disabled(),
+        std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
     assert_eq!(events(&pool).await, 2);
     let app = router(t.state.clone());
     assert_eq!(

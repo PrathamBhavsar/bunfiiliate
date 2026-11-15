@@ -57,7 +57,7 @@ bunfiiliate is designed to run efficiently on a single modest VPS (e.g. 1–2 vC
 ### Step 1: Clone Repository & Prepare Environment
 
 ```bash
-git clone https://github.com/bunfiiliate/bunfiiliate.git /opt/bunfiiliate
+git clone https://github.com/PrathamBhavsar/bunfiiliate.git /opt/bunfiiliate
 cd /opt/bunfiiliate
 
 # Copy example environment configuration
@@ -76,6 +76,11 @@ POSTGRES_PASSWORD=your-strong-db-password
 # Secret salt for IP hashing in the tracker (required): openssl rand -hex 32
 BF_IP_SALT=your-random-ip-salt
 
+# Master key(s) that encrypt webhook/Stripe/Paddle secrets in the database (required).
+# Format kid:base64(32 bytes); the first entry is the active key.
+# Generate: echo "k1:$(head -c32 /dev/urandom | base64)"
+BF_MASTER_KEYS=k1:replace-with-generated-value
+
 # Domain for Caddy automatic TLS (required, an https hostname)
 SITE_ADDRESS=affiliates.example.com
 
@@ -92,7 +97,7 @@ Run the stack in the background:
 docker compose --env-file .env -f deploy/docker-compose.yml up -d
 ```
 
-Run it from the repo root. Compose looks for `.env` next to the compose file (`deploy/`), not in your shell's directory, so `--env-file .env` is required for the root `.env` to be read. `JWT_SECRET`, `POSTGRES_PASSWORD`, `BF_IP_SALT` and `SITE_ADDRESS` have no defaults: Compose refuses to start if any is unset. `deploy/docker-compose.yml` is the one canonical file; `deploy/compose.yml` is a symlink to it. Check your configuration with `docker compose --env-file .env -f deploy/docker-compose.yml config`.
+Run it from the repo root. Compose looks for `.env` next to the compose file (`deploy/`), not in your shell's directory, so `--env-file .env` is required for the root `.env` to be read. `JWT_SECRET`, `POSTGRES_PASSWORD`, `BF_IP_SALT`, `BF_MASTER_KEYS` and `SITE_ADDRESS` have no defaults: Compose refuses to start if any is unset. `deploy/docker-compose.yml` is the one canonical file; `deploy/compose.yml` is a symlink to it. Check your configuration with `docker compose --env-file .env -f deploy/docker-compose.yml config`.
 
 Compose launches four services:
 
@@ -104,6 +109,20 @@ Compose launches four services:
 Database schema migrations execute automatically when the `api` service starts.
 
 ---
+
+## Payout rails
+
+`POST /api/v1/payouts/batches/{id}/mark-paid` with no body marks a batch paid by hand (manual CSV). With `{"rail": "mock" | "paypal_payouts" | "wise"}` each payout line goes to a provider instead.
+
+- Credentials are per workspace, not env vars: `PUT /api/v1/payouts/rails/credentials` with `{"rail": "paypal_payouts", "sandbox": true, "credentials": {...}}` (`DELETE ...?rail=` removes them). PayPal: `client_id`, `client_secret`. Wise: `api_token`, `profile_id`. They are sealed with the master key (like webhook secrets), never returned, and `GET /api/v1/payouts/rails` shows only whether each rail is configured. A rail with no credentials answers `422`; `mock` is always available.
+- Line states: `pending -> submitted -> paid | failed`. No provider call runs inside a database transaction. The provider idempotency key is the payout line id, so retrying `mark-paid` re-sends failed lines (or lines whose outcome is unknown) without paying twice. The ledger posts only when the provider confirms `paid`; the batch becomes `paid` once every line is.
+- `POST /api/v1/payouts/batches/{id}/reconcile` asks the provider about lines it accepted but has not settled (PayPal and Wise settle asynchronously) and posts the confirmed ones. Run it until the batch is paid. While a line is in flight, marking the batch paid by hand is refused.
+- PayPal Payouts has a sandbox and a pay-as-you-go live tier. Wise: the adapter follows the documented quote, recipient, transfer, fund flow, but has not been run against the Wise sandbox, and live use needs a Wise business agreement and supported email-recipient currencies. Treat it as untested until you have verified it in your sandbox. Zero-decimal currencies (JPY, KRW, ...) are refused by both adapters.
+
+## Tax forms, invoices and currencies
+
+- **Tax forms.** Affiliates can record a W-8/W-9 under Profile (`PUT /api/v1/me/tax-form`). Only the last 4 digits of a tax id are accepted and stored; a longer value is refused. Admins get a per-payout invoice (`/api/v1/payouts/{id}/invoice.html`) and a 1099-style CSV (`/api/v1/reports/1099-style.csv?year=YYYY`): paid totals per affiliate and currency for the calendar year, at or above `TAX_REPORT_THRESHOLD_CENTS` (default `60000`, the US 1099-NEC figure used as a default only). This is bookkeeping, not tax advice; hand the CSV to your own accountant or compliance vendor.
+- **Exchange rates.** Programs keep one currency each. The worker fetches USD-based rates for the currencies in use once a day from `api.frankfurter.dev` (ECB data, no key; `api.frankfurter.app` redirects there) and caches them in `exchange_rates`. `GET /api/v1/analytics/summary-all?display_currency=XXX` converts every program day by day with the latest cached rate on or before that day, going through USD for cross rates and rounding half-even to cents. A program with no rate is left out of the totals and listed under `unconverted`; there is never a 1:1 fallback. If the fetch fails, the last cached rates stay in use. Display currencies that no program uses are only convertible once a rate for them is cached.
 
 ## 3. First-Run Bootstrap
 
@@ -167,11 +186,13 @@ The tracker assigns country codes to incoming click and conversion traffic:
 ./scripts/fetch-dbip.sh
 ```
 
-Then configure `BF_GEOIP_DB` in your `.env`:
+Then configure `BF_GEOIP_DB` in your `.env` (systemd install):
 
 ```dotenv
 BF_GEOIP_DB=data/dbip-country-lite.mmdb
 ```
+
+With Docker Compose the file has to be inside the tracker container: bind-mount it (for example `./data:/data:ro` on the `tracker` service) and set `BF_GEOIP_DB=/data/dbip-country-lite.mmdb`. Leave it unset to use the Cloudflare header only.
 
 > **Note on MaxMind**: Do not commit or vendor MaxMind GeoLite2 databases; use DB-IP Lite or the Cloudflare header.
 
@@ -226,6 +247,12 @@ DATABASE_URL=postgres://bunfiiliate:secret@localhost:5432/bunfiiliate
 API_PORT=8080
 TRACKER_PORT=8081
 JWT_SECRET=your-secure-random-secret-key-at-least-32-chars
+# Required by api and tracker: kid:base64(32 bytes), e.g. echo "k1:$(head -c32 /dev/urandom | base64)"
+BF_MASTER_KEYS=
+# Required by the tracker: openssl rand -hex 32
+BF_IP_SALT=
+# Caddy on the same host: believe its X-Forwarded-For
+BF_TRUSTED_PROXIES=127.0.0.1/32
 SPOOL_DIR=/var/spool/bunfiiliate
 RUST_LOG=info
 ```
@@ -275,6 +302,27 @@ gunzip -c /backups/bunfiiliate-2026-10-26.sql.gz | \
   docker compose --env-file .env -f deploy/docker-compose.yml exec -T postgres psql -U postgres -d bunfiiliate
 ```
 
+For scheduled dumps that include the spool, restore checks, and a restore drill, use `deploy/backup/` ([backup and restore](ops/backup-restore.md)). Disk-full behaviour of the tracker is in [spool disk](ops/spool-disk.md), alerting in [alerts](ops/alerts.md), and multi-node notes in [high availability](ops/ha.md).
+
+### Secrets at rest and master keys
+
+Webhook signing secrets, Stripe/Paddle secrets and endpoint secrets are stored encrypted (`bfenc1:` values: XChaCha20-Poly1305, a random data key per value wrapped by a master key). The API, worker and tracker all need `BF_MASTER_KEYS` (or `BF_MASTER_KEY_FILE`, same format, one key per line; set only one). Without it they refuse to start, unless `BF_ALLOW_PLAINTEXT_SECRETS=1`, which stores secrets in plaintext and logs a warning.
+
+**Back the keys up separately from the database dump.** A dump restored without its keys cannot be decrypted.
+
+Existing plaintext rows keep working and are encrypted by the re-encrypt command below.
+
+**Rotating the master key**
+
+1. Generate a new key and put it first, keeping the old one: `BF_MASTER_KEYS="k2:<new>,k1:<old>"` on the api, worker and tracker. Restart them.
+2. `api secrets reencrypt` seals any plaintext and re-wraps every value under `k2`. Use `--dry-run` to count first. It is idempotent and tells the tracker to reload.
+3. `api secrets check` exits 1 while any plaintext or old-key value remains. Run it until it exits 0.
+4. Remove `k1` from `BF_MASTER_KEYS` and restart.
+
+The tracker skips a program whose secrets will not decrypt (`bf_snapshot_decrypt_fail_total` counts them) and answers 503 for that program's key until the keys are fixed; other programs are unaffected.
+
+Other security variables: `BF_JWT_SECRETS` (`kid:secret` list, first signs; legacy `JWT_SECRET` is kid `legacy`), `BF_HSTS=1` (send HSTS once TLS is final), `BF_V1_SUNSET` (date for the tracker's v1 `Sunset` header), `SMTP_URL` (mail for password reset). `restore.sh --force` wipes the `public` schema before restoring; see [backup and restore](ops/backup-restore.md).
+
 ### WAL Spool Directory
 
 The spool directory (`/var/spool/bunfiiliate` or volume `spool_data`) stores in-flight event records. Segments are deleted only after the batch writer confirms database insertion. Ensure this directory is stored on persistent storage.
@@ -289,7 +337,8 @@ bunfiiliate migrations are non-destructive and backward-compatible.
 
 ```bash
 cd /opt/bunfiiliate
-git pull origin staging
+git fetch --tags origin
+git checkout vX.Y.Z   # the release you are upgrading to; track releases, not branches
 
 # Rebuild and restart services
 docker compose --env-file .env -f deploy/docker-compose.yml up -d --build

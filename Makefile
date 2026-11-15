@@ -1,11 +1,12 @@
-.PHONY: ci fmt clippy test deny web openapi openapi-check e2e
+.PHONY: backup-drill sql-lint migrations-check pentest ci fmt clippy test deny web openapi openapi-check e2e schemas-check js-test tracker-openapi-check
 
 ci:
 	cargo fmt --check
 	cargo clippy --workspace -- -D warnings
 	cargo test --workspace
 	cargo deny check
-	$(MAKE) web openapi-check
+	$(MAKE) sql-lint migrations-check
+	$(MAKE) web openapi-check tracker-openapi-check js-test
 
 fmt:
 	cargo fmt
@@ -25,6 +26,7 @@ web:
 	pnpm -C apps/web typecheck
 	pnpm -C apps/web lint
 	pnpm -C apps/web build
+	scripts/check-static-export.sh
 
 openapi:
 	cargo run -q -p api -- openapi > sdks/ts/openapi.json
@@ -40,3 +42,31 @@ openapi-check:
 
 e2e:
 	scripts/e2e.sh
+
+schemas-check:
+	npm --prefix scripts/schemas install --silent --no-audit --no-fund
+	node scripts/validate-schemas.mjs
+
+js-test:
+	node scripts/size-check.mjs
+	node --test scripts/ "sdks/js/test/*.test.ts"
+
+pentest:
+	scripts/pentest.sh
+
+sql-lint:
+	python3 -I scripts/sql-scope-lint.py --self-test
+	python3 -I scripts/sql-scope-lint.py
+
+tracker-openapi-check:
+	cargo run -q -p tracker -- openapi > /tmp/bf-tracker-openapi.json
+	diff -u docs/openapi/tracker-v2.json /tmp/bf-tracker-openapi.json || { echo "tracker openapi drift: cargo run -q -p tracker -- openapi > docs/openapi/tracker-v2.json"; exit 1; }
+
+migrations-check:
+	scripts/tests/ci_shape.sh
+	scripts/tests/check_migrations_test.sh
+	scripts/check-migrations.sh
+	cargo test -p bf-db --test upgrade
+
+backup-drill:
+	scripts/tests/backup_drill.sh

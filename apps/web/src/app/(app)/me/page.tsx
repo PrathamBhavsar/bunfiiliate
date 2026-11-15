@@ -1,12 +1,12 @@
 "use client";
 
+import { ErrorState } from "@/components/state";
 import { useQuery } from "@tanstack/react-query";
-import { Banknote, MousePointerClick, Percent, ReceiptText, TriangleAlert } from "lucide-react";
+import { Banknote, MousePointerClick, Percent, ReceiptText } from "lucide-react";
 import { StatCard } from "@/components/stat-card";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBps, formatCents, ok, usePrograms } from "@/lib/admin";
-import { api, errorMessage } from "@/lib/api";
+import { api } from "@/lib/api";
 
 type Day = { day: string; clicks: number; commission_cents: number };
 
@@ -69,14 +69,7 @@ export default function MeDashboardPage() {
       </header>
 
       {q.isError && !q.data ? (
-        <div role="alert" className="grid justify-items-center gap-2 rounded-lg border border-border bg-surface px-4 py-12 text-center">
-          <TriangleAlert aria-hidden className="size-5 text-danger" />
-          <p className="font-medium">Could not load your dashboard</p>
-          <p className="text-xs text-muted">{errorMessage(q.error)}</p>
-          <Button size="sm" onClick={() => q.refetch()}>
-            Retry
-          </Button>
-        </div>
+        <div className="rounded-lg border border-border bg-surface"><ErrorState error={q.error} what="your dashboard" onRetry={q.refetch} /></div>
       ) : !q.data ? (
         <div className="grid gap-3" aria-busy>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

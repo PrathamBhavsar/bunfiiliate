@@ -24,19 +24,14 @@ pub struct User {
 
 const USER_COLS: &str = "id, workspace_id, email::text AS email, password_hash, role";
 
+/// Creates the workspace and its default-plan subscription (B09) in one statement.
 pub async fn create_workspace(
     db: impl PgExecutor<'_>,
     id: Uuid,
     name: &str,
     slug: &str,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query("INSERT INTO workspaces (id, name, slug) VALUES ($1, $2, $3)")
-        .bind(id)
-        .bind(name)
-        .bind(slug)
-        .execute(db)
-        .await?;
-    Ok(())
+    crate::billing::create_workspace_with_subscription(db, id, name, slug).await
 }
 
 pub async fn create_user(db: impl PgExecutor<'_>, user: &User) -> Result<(), sqlx::Error> {
@@ -83,6 +78,23 @@ pub async fn user_by_id(db: impl PgExecutor<'_>, id: Uuid) -> Result<Option<User
         .bind(id)
         .fetch_optional(db)
         .await
+}
+
+/// Current `token_version` of a user; `None` if the user is gone.
+pub async fn token_version(db: impl PgExecutor<'_>, id: Uuid) -> Result<Option<i32>, sqlx::Error> {
+    sqlx::query_scalar("SELECT token_version FROM users WHERE id = $1")
+        .bind(id)
+        .fetch_optional(db)
+        .await
+}
+
+/// Invalidate every access token issued so far for the user.
+pub async fn bump_token_version(db: impl PgExecutor<'_>, id: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET token_version = token_version + 1 WHERE id = $1")
+        .bind(id)
+        .execute(db)
+        .await
+        .map(|_| ())
 }
 
 /// Start a new refresh-token family.
@@ -257,4 +269,44 @@ pub async fn insert_audit(db: impl PgExecutor<'_>, e: &AuditEntry<'_>) -> Result
     .execute(db)
     .await?;
     Ok(())
+}
+
+/// Replace the password hash of a user.
+pub async fn set_password_hash(
+    db: impl PgExecutor<'_>,
+    id: Uuid,
+    hash: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+        .bind(id)
+        .bind(hash)
+        .execute(db)
+        .await
+        .map(|_| ())
+}
+
+/// Delete every refresh token of a user (all sessions).
+pub async fn delete_refresh_tokens(db: impl PgExecutor<'_>, id: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query("DELETE FROM refresh_tokens WHERE user_id = $1")
+        .bind(id)
+        .execute(db)
+        .await
+        .map(|_| ())
+}
+
+/// In-app notification for a user.
+pub async fn insert_notification(
+    db: impl PgExecutor<'_>,
+    user_id: Uuid,
+    kind: &str,
+    body: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query("INSERT INTO notifications (id, user_id, kind, body) VALUES ($1, $2, $3, $4)")
+        .bind(Uuid::now_v7())
+        .bind(user_id)
+        .bind(kind)
+        .bind(body)
+        .execute(db)
+        .await
+        .map(|_| ())
 }

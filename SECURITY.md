@@ -76,7 +76,7 @@ We welcome reports regarding flaws that undermine the confidentiality, integrity
 The following areas are explicitly excluded from our threat model for v1 (see [`docs/PLAN.md`](docs/PLAN.md) and [`brain/decisions/0003-skip-list.md`](brain/decisions/0003-skip-list.md)):
 
 - **Plaintext Database Secrets**: Storing webhook secrets and third-party integration keys in database columns without a dedicated Key Management Service (KMS). bunfiiliate v1 operates on a trusted, single-VPS database model.
-- **Missing Enterprise Auth**: Lack of single sign-on (SSO), SAML, hardware tokens, or two-factor authentication (2FA) in v1.
+- **Missing Enterprise Auth**: Lack of single sign-on (SSO), SAML, hardware tokens, or two-factor authentication at sign-in in v1. Sign-in is password-only. TOTP authenticator codes and recovery codes exist, but they only reset your own password.
 - **Volumetric Denial of Service**: High-volume HTTP flood attacks against unauthenticated public endpoints (`/r/:code`, `/c`). Production instances are required to be deployed behind a reverse proxy (e.g., Caddy, Cloudflare) providing transport-level rate limiting and TLS termination.
 - **Compromised Host Environment**: Attacks requiring direct root or administrative shell access to the host server, or direct read/write access to the PostgreSQL database cluster port (`5433`).
 - **Insecure Development Flags**: Issues arising solely when `COOKIE_SECURE=0` or plain HTTP is deliberately configured by the operator.
@@ -90,4 +90,14 @@ The following areas are explicitly excluded from our threat model for v1 (see [`
 - **Webhook delivery**: deliveries are leased before the HTTP call, sent with bounded concurrency and a 2 s connect / 10 s total timeout, and never hold a database transaction open. A workspace may register at most 20 endpoints.
 - **Auth abuse limits**: login, register and contact-requests have an in-process per-IP and per-email sliding-window limiter (HTTP 429), and password hashing runs with bounded concurrency. This is best effort and per process: put real volumetric limits in Caddy or Cloudflare in front of the API.
 - **Refresh tokens**: re-presenting a token within 10 s of its rotation is a plain 401 and keeps the session; later reuse revokes the whole family and writes an `auth.refresh_reuse` audit entry. A session family cannot be refreshed past 90 days.
+- **Secrets at rest**: provider and webhook secrets are sealed (XChaCha20-Poly1305, per-value data key, row-bound AAD) under `BF_MASTER_KEYS`; rotate with `api secrets reencrypt` then `api secrets check`. Back keys up apart from the database.
+- **Account recovery**: TOTP (replayed steps rejected) and single-use recovery codes; reset failures are indistinguishable (unknown email, bad code, locked) and lock after 5 attempts.
+- **JWT**: strict `alg`/`kid`/`exp` parsing, key rotation via `BF_JWT_SECRETS`, instant revocation through `token_version`.
+- **Tenant isolation**: every tenant query carries a workspace id, enforced by a test matrix and `make sql-lint`. Postgres RLS was evaluated and is not enabled (brain ADR-0004).
 - **Request size**: the API rejects request bodies over 64 KB.
+
+---
+
+## Pentest suite
+
+The checklist of attack classes and the tests that cover them is in [docs/security/pentest-checklist.md](docs/security/pentest-checklist.md). Run `make pentest` (set `BASE_URL` to add live probes against a deployment).

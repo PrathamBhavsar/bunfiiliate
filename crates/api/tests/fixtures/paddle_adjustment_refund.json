@@ -1,0 +1,2 @@
+{"event_id": "evt_pdl_adj_1", "event_type": "adjustment.created",
+ "data": {"id": "adj_1", "action": "refund", "type": "full", "transaction_id": "txn_1"}}

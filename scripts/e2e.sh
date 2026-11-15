@@ -27,6 +27,8 @@ WORKSPACE_NAME="E2E Workspace"
 WORKSPACE_SLUG="e2e-workspace"
 JWT_SECRET="e2e-secret-e2e-secret-e2e-secret-e2e"
 BF_IP_SALT="e2e-ip-salt-e2e-ip-salt"
+# Throwaway master key (32 bytes, base64) for secrets at rest; never use outside e2e.
+BF_MASTER_KEYS="e2e1:ZTJlLWtleS1lMmUta2V5LWUyZS1rZXktZTJlLWtleSE="
 
 SPOOL_DIR="$(mktemp -d /tmp/bf_e2e_spool_XXXXXX)"
 WORK_DIR="$(mktemp -d /tmp/bf_e2e_work_XXXXXX)"
@@ -75,8 +77,14 @@ psql "$BASE_URL" -c "DROP DATABASE IF EXISTS $DB_NAME WITH (FORCE);" >/dev/null
 psql "$BASE_URL" -c "CREATE DATABASE $DB_NAME;" >/dev/null
 
 export DATABASE_URL="$SCRATCH_URL"
-export API_PORT TRACKER_PORT JWT_SECRET BF_IP_SALT SPOOL_DIR
+export API_PORT TRACKER_PORT JWT_SECRET BF_IP_SALT BF_MASTER_KEYS SPOOL_DIR
 export COOKIE_SECURE=0
+# tenant-ui.e2e.ts signs up a second workspace.
+export SIGNUP_ENABLED=1
+# The webhook tester posts to the tracker over loopback; the e2e tracker is not on the default port.
+export TRACKER_INTERNAL_URL="http://127.0.0.1:$TRACKER_PORT"
+# The suite is not about disk pressure (crates/spool/tests/disk_full.rs is): keep a busy dev host from shedding.
+export BF_SPOOL_HIGH_WATER_PCT=99 BF_SPOOL_LOW_WATER_PCT=98 BF_SPOOL_MIN_FREE_BYTES=1048576
 
 echo "=== Bootstrapping admin ==="
 "$API_BIN" bootstrap --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD" --workspace "$WORKSPACE_NAME"
@@ -102,11 +110,13 @@ echo "=== Running e2e ==="
 set +e
 (
   cd "$ROOT_DIR/e2e"
+  # E2E_GREP narrows by title regex, E2E_SHARD (i/n) slices; files are self-seeding, so any subset passes alone.
   E2E_APP_URL="http://localhost:$WEB_PORT" \
+  E2E_API_URL="http://127.0.0.1:$API_PORT" \
   E2E_ADMIN_EMAIL="$ADMIN_EMAIL" \
   E2E_ADMIN_PASSWORD="$ADMIN_PASSWORD" \
   E2E_WORKSPACE="$WORKSPACE_SLUG" \
-  npx e2e run
+  npx e2e run ${E2E_GREP:+--grep "$E2E_GREP"} ${E2E_SHARD:+--shard "$E2E_SHARD"}
 )
 status=$?
 set -e

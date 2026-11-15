@@ -222,11 +222,16 @@ pub async fn delete_enrollment(
     if res.rows_affected() == 0 {
         return Ok(false);
     }
-    sqlx::query("DELETE FROM referral_codes WHERE program_id = $1 AND affiliate_id = $2")
-        .bind(program_id)
-        .bind(affiliate_id)
-        .execute(conn)
-        .await?;
+    sqlx::query(
+        "DELETE FROM referral_codes c USING programs p \
+         WHERE p.id = c.program_id AND p.workspace_id = $3 \
+           AND c.program_id = $1 AND c.affiliate_id = $2",
+    )
+    .bind(program_id)
+    .bind(affiliate_id)
+    .bind(workspace_id)
+    .execute(conn)
+    .await?;
     Ok(true)
 }
 
@@ -265,11 +270,19 @@ pub async fn insert_code(
 }
 
 /// How many codes this affiliate holds, across programs.
-pub async fn count_codes(db: impl PgExecutor<'_>, affiliate_id: Uuid) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar("SELECT count(*) FROM referral_codes WHERE affiliate_id = $1")
-        .bind(affiliate_id)
-        .fetch_one(db)
-        .await
+pub async fn count_codes(
+    db: impl PgExecutor<'_>,
+    workspace_id: Uuid,
+    affiliate_id: Uuid,
+) -> Result<i64, sqlx::Error> {
+    sqlx::query_scalar(
+        "SELECT count(*) FROM referral_codes c JOIN affiliates a ON a.id = c.affiliate_id \
+         WHERE c.affiliate_id = $1 AND a.workspace_id = $2",
+    )
+    .bind(affiliate_id)
+    .bind(workspace_id)
+    .fetch_one(db)
+    .await
 }
 
 pub async fn list_codes(

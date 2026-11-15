@@ -4,6 +4,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::io::AsyncWriteExt;
 
+pub mod space;
+
 pub const HEADER_LEN: usize = 8;
 pub const MAX_RECORD_PAYLOAD_SIZE: usize = 64 * 1024 * 1024; // 64 MB
 
@@ -12,6 +14,8 @@ pub enum SpoolError {
     Io(io::Error),
     Corrupted(String),
     ChannelClosed,
+    /// The disk is full (ENOSPC). The batch was rolled back; nothing partial remains.
+    Full,
 }
 
 impl std::fmt::Display for SpoolError {
@@ -20,6 +24,7 @@ impl std::fmt::Display for SpoolError {
             Self::Io(e) => write!(f, "spool I/O error: {e}"),
             Self::Corrupted(msg) => write!(f, "spool corrupted: {msg}"),
             Self::ChannelClosed => write!(f, "spool channel closed"),
+            Self::Full => write!(f, "spool disk full"),
         }
     }
 }
@@ -47,6 +52,7 @@ impl From<SpoolError> for io::Error {
             SpoolError::ChannelClosed => {
                 io::Error::new(io::ErrorKind::BrokenPipe, "channel closed")
             }
+            SpoolError::Full => io::Error::new(io::ErrorKind::StorageFull, "spool disk full"),
         }
     }
 }
@@ -68,6 +74,8 @@ pub struct Fault {
     pub fail_syncs: AtomicU64,
     /// Fail the truncation that rolls a failed batch back.
     pub fail_truncates: AtomicU64,
+    /// Fail the write with ENOSPC (after half the record), like a full disk.
+    pub fail_enospc: AtomicU64,
 }
 
 impl Fault {
@@ -257,8 +265,31 @@ pub fn read_checkpoint(dir: impl AsRef<Path>) -> Result<u64, SpoolError> {
     Err(SpoolError::Corrupted("invalid checkpoint file".into()))
 }
 
+const GC_PAUSE_FILE: &str = "gc.paused";
+
+/// Stop `delete_segments_below` from removing anything (a backup is copying segments).
+pub fn pause_gc(dir: impl AsRef<Path>) -> Result<(), SpoolError> {
+    std::fs::create_dir_all(dir.as_ref())?;
+    std::fs::write(dir.as_ref().join(GC_PAUSE_FILE), b"")?;
+    Ok(())
+}
+
+pub fn resume_gc(dir: impl AsRef<Path>) -> Result<(), SpoolError> {
+    match std::fs::remove_file(dir.as_ref().join(GC_PAUSE_FILE)) {
+        Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e.into()),
+        _ => Ok(()),
+    }
+}
+
+pub fn gc_paused(dir: impl AsRef<Path>) -> bool {
+    dir.as_ref().join(GC_PAUSE_FILE).exists()
+}
+
 pub fn delete_segments_below(dir: impl AsRef<Path>, checkpoint: u64) -> Result<usize, SpoolError> {
     let dir = dir.as_ref();
+    if gc_paused(dir) {
+        return Ok(0);
+    }
     let segments = list_segments(dir)?;
     if segments.is_empty() {
         return Ok(0);
@@ -452,12 +483,19 @@ fn copy_err(e: &io::Error) -> io::Error {
 
 /// Answer a command with an error.
 fn fail(cmd: Command, e: &io::Error) {
+    let err = || {
+        if e.kind() == io::ErrorKind::StorageFull {
+            SpoolError::Full
+        } else {
+            SpoolError::Io(copy_err(e))
+        }
+    };
     match cmd {
         Command::Write { ack, .. } => {
-            let _ = ack.send(Err(SpoolError::Io(copy_err(e))));
+            let _ = ack.send(Err(err()));
         }
         Command::Flush { ack } => {
-            let _ = ack.send(Err(SpoolError::Io(copy_err(e))));
+            let _ = ack.send(Err(err()));
         }
     }
 }
@@ -467,6 +505,7 @@ pub struct SpoolWriter {
     tx: tokio::sync::mpsc::Sender<Command>,
     fsync_count: Arc<AtomicU64>,
     dir: PathBuf,
+    shedding: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl SpoolWriter {
@@ -521,6 +560,8 @@ impl SpoolWriter {
         let fsync_count = Arc::new(AtomicU64::new(0));
         let fsync_count_worker = Arc::clone(&fsync_count);
         let dir = config.dir.clone();
+        let shedding = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let shedding_worker = Arc::clone(&shedding);
         let (tx, mut rx) = tokio::sync::mpsc::channel::<Command>(config.channel_capacity);
 
         tokio::spawn(async move {
@@ -581,6 +622,13 @@ impl SpoolWriter {
                                 .await?;
                             current_size = 0;
                             rotated = true;
+                        }
+                        if fault
+                            .as_deref()
+                            .is_some_and(|f| Fault::take(&f.fail_enospc))
+                        {
+                            active_file.write_all(&encoded[..encoded.len() / 2]).await?;
+                            return Err(io::Error::from(io::ErrorKind::StorageFull));
                         }
                         if fault
                             .as_deref()
@@ -653,13 +701,24 @@ impl SpoolWriter {
                 } else {
                     poisoned = Some(copy_err(&err));
                 }
+                let full = err.kind() == io::ErrorKind::StorageFull;
+                if full {
+                    shedding_worker.store(true, Ordering::SeqCst);
+                }
+                let to_err = |e: &io::Error| {
+                    if full {
+                        SpoolError::Full
+                    } else {
+                        SpoolError::Io(copy_err(e))
+                    }
+                };
                 // Only now tell the writers: by the time one sees its error the file is back to its
                 // last good length, so a retry (or a reader of the file) never sees the torn group.
                 for (ack, _) in acks {
-                    let _ = ack.send(Err(SpoolError::Io(copy_err(&err))));
+                    let _ = ack.send(Err(to_err(&err)));
                 }
                 for ack in flushes {
-                    let _ = ack.send(Err(SpoolError::Io(copy_err(&err))));
+                    let _ = ack.send(Err(to_err(&err)));
                 }
                 for cmd in rest {
                     fail(cmd, &err);
@@ -675,6 +734,7 @@ impl SpoolWriter {
             tx,
             fsync_count,
             dir,
+            shedding,
         })
     }
 
@@ -697,6 +757,20 @@ impl SpoolWriter {
             .await
             .map_err(|_| SpoolError::ChannelClosed)?;
         ack_rx.await.map_err(|_| SpoolError::ChannelClosed)?
+    }
+
+    /// True while the disk is (nearly) full: ENOSPC seen, or the `space` sampler says so.
+    pub fn is_shedding(&self) -> bool {
+        self.shedding.load(Ordering::SeqCst)
+    }
+
+    /// Force the state (the sampler and tests).
+    pub fn set_shedding(&self, on: bool) {
+        self.shedding.store(on, Ordering::SeqCst);
+    }
+
+    pub(crate) fn shedding_flag(&self) -> &Arc<std::sync::atomic::AtomicBool> {
+        &self.shedding
     }
 
     pub fn fsync_count(&self) -> u64 {

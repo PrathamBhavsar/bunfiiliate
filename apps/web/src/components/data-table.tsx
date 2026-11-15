@@ -18,17 +18,20 @@ export function DataTable<T extends { id: string }>({
   columns,
   rows,
   loading,
+  label,
   selectedId,
   onRowClick,
 }: {
   columns: Column<T>[];
   rows: T[];
   loading?: boolean;
+  /** Accessible name of the table. */
+  label: string;
   selectedId?: string | null;
   onRowClick?: (row: T) => void;
 }) {
   return (
-    <Table aria-busy={loading}>
+    <Table aria-busy={loading} aria-label={label}>
       <thead>
         <tr>
           {columns.map((c) => (

@@ -24,9 +24,12 @@ impl Api {
     fn new(pool: &PgPool) -> Self {
         let state = AppState {
             pool: pool.clone(),
-            jwt_secret: SECRET.into(),
+            jwt_keys: api::auth::JwtKeys::single(SECRET).into(),
+            version_cache: Default::default(),
+            vault: std::sync::Arc::new(bf_core::secrets::Vault::plaintext()),
             secure_cookies: true,
             limiter: Default::default(),
+            tracker_url: Default::default(),
         };
         Self { app: app(state) }
     }
@@ -43,10 +46,17 @@ impl Api {
             .uri(uri)
             .header(HOST, "bf.test");
         if method != Method::GET {
-            b = b.header(ORIGIN, "https://bf.test");
+            b = b
+                .header(ORIGIN, "https://bf.test")
+                .header("x-csrf-token", "t");
         }
         if let Some(c) = cookie {
-            b = b.header(COOKIE, c);
+            let csrf = if method != Method::GET {
+                "; bf_csrf=t"
+            } else {
+                ""
+            };
+            b = b.header(COOKIE, format!("{c}{csrf}"));
         }
         let body = match body {
             Some(v) => {
@@ -245,10 +255,8 @@ async fn programs_role_guards(pool: PgPool) {
     assert!(listed["items"][0].get("webhook_secret").is_none());
     let (_, full) = api.get(&format!("/api/v1/programs/{p}"), &a.admin).await;
     assert!(
-        full["webhook_secret"]
-            .as_str()
-            .unwrap()
-            .starts_with("whsec_")
+        full.get("webhook_secret").is_none(),
+        "admin reads never return the secret; it is shown once on create"
     );
 }
 
@@ -716,7 +724,7 @@ async fn programs_affiliate_lifecycle(pool: PgPool) {
             Some(body),
         )
     };
-    let (st, aff) = public(reg("a", "new@x.io", "longenough")).await;
+    let (st, aff) = public(reg("a", "new@x.io", "longenough-pass")).await;
     assert_eq!(st, StatusCode::CREATED, "{aff}");
     assert_eq!(
         (aff["status"].as_str(), aff["email"].as_str()),
@@ -725,11 +733,11 @@ async fn programs_affiliate_lifecycle(pool: PgPool) {
     assert_eq!(aff["payout_email"], "pay@x.io");
     let id = aff["id"].as_str().unwrap().to_string();
     assert_eq!(
-        public(reg("a", "new@x.io", "longenough")).await.0,
+        public(reg("a", "new@x.io", "longenough-pass")).await.0,
         StatusCode::CONFLICT
     );
     assert_eq!(
-        public(reg("nope", "z@x.io", "longenough")).await.0,
+        public(reg("nope", "z@x.io", "longenough-pass")).await.0,
         StatusCode::NOT_FOUND
     );
     assert_eq!(
@@ -737,7 +745,7 @@ async fn programs_affiliate_lifecycle(pool: PgPool) {
         StatusCode::BAD_REQUEST
     );
     assert_eq!(
-        public(reg("a", "not-an-email", "longenough")).await.0,
+        public(reg("a", "not-an-email", "longenough-pass")).await.0,
         StatusCode::BAD_REQUEST
     );
     // register needs the Origin header like every mutation
@@ -746,7 +754,9 @@ async fn programs_affiliate_lifecycle(pool: PgPool) {
         .uri("/api/v1/affiliates/register")
         .header(HOST, "bf.test")
         .header(CONTENT_TYPE, "application/json")
-        .body(Body::from(reg("a", "q@x.io", "longenough").to_string()))
+        .body(Body::from(
+            reg("a", "q@x.io", "longenough-pass").to_string(),
+        ))
         .unwrap();
     assert_eq!(
         api.app.clone().oneshot(no_origin).await.unwrap().status(),
@@ -1027,7 +1037,7 @@ async fn programs_workspaces_members_and_audit(pool: PgPool) {
     );
 
     // super_admin seeds the first admin of the new workspace; that admin can log in as a member
-    let invite = json!({ "email": "boss@acme.io", "password": "longenough" });
+    let invite = json!({ "email": "boss@acme.io", "password": "longenough-pass" });
     let uri = format!("/api/v1/members?workspace_id={new_ws}");
     let (st, m) = api.post(&uri, &root, invite.clone()).await;
     assert_eq!(st, StatusCode::CREATED, "{m}");
@@ -1049,13 +1059,13 @@ async fn programs_workspaces_members_and_audit(pool: PgPool) {
     );
 
     // admins invite into their own workspace only
-    let own = json!({ "email": "peer@home.io", "password": "longenough" });
+    let own = json!({ "email": "peer@home.io", "password": "longenough-pass" });
     assert_eq!(
         api.post("/api/v1/members", &home.admin, own).await.0,
         StatusCode::CREATED
     );
     assert_eq!(api.get("/api/v1/members", &home.admin).await.1["total"], 3);
-    let foreign = json!({ "email": "sneak@home.io", "password": "longenough" });
+    let foreign = json!({ "email": "sneak@home.io", "password": "longenough-pass" });
     assert_eq!(
         api.post(&uri, &home.admin, foreign).await.0,
         StatusCode::FORBIDDEN

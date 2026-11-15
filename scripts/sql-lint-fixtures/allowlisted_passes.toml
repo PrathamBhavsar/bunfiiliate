@@ -1,0 +1,4 @@
+[[allow]]
+file = "_allowlisted_passes/allowlisted_passes.rs"
+fn = "sweep"
+reason = "system retention loop, no tenant context"

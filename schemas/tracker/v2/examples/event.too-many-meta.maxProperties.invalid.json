@@ -1,0 +1,37 @@
+{
+  "schema": "bf.event.v2",
+  "type": "sale",
+  "external_id": "ord_123",
+  "occurred_at": "2026-01-01T12:00:00Z",
+  "click_id": "01JABC",
+  "code": "AFF123",
+  "customer": {
+    "external_id": "cus_9",
+    "email_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "amount_cents": 4900,
+  "currency": "USD",
+  "meta": {
+    "k0": 0,
+    "k1": 1,
+    "k2": 2,
+    "k3": 3,
+    "k4": 4,
+    "k5": 5,
+    "k6": 6,
+    "k7": 7,
+    "k8": 8,
+    "k9": 9,
+    "k10": 10,
+    "k11": 11,
+    "k12": 12,
+    "k13": 13,
+    "k14": 14,
+    "k15": 15,
+    "k16": 16,
+    "k17": 17,
+    "k18": 18,
+    "k19": 19,
+    "k20": 20
+  }
+}

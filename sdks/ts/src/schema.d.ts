@@ -107,6 +107,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/alerts/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Alertmanager webhook receiver. Public route: authenticated by `BF_ALERT_TOKEN`; 404 when
+         *     the token is not configured.
+         */
+        post: operations["webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analytics/summary": {
         parameters: {
             query?: never;
@@ -116,6 +136,26 @@ export interface paths {
         };
         /** Totals for a day range, optionally broken down by a dimension. */
         get: operations["summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/analytics/summary-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Revenue and commission of every program, converted to one currency day by day with the
+         *     latest rate on or before each day (cross rates go through USD, rounded half-even to cents).
+         */
+        get: operations["summary_all"];
         put?: never;
         post?: never;
         delete?: never;
@@ -150,6 +190,26 @@ export interface paths {
         };
         /** The workspace's audit log, newest first. */
         get: operations["list_audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/csrf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * CSRF token for the double-submit check; sets the `bf_csrf` cookie if missing.
+         *     Send the token back as `X-CSRF-Token` on every mutating request, login included.
+         */
+        get: operations["csrf"];
         put?: never;
         post?: never;
         delete?: never;
@@ -209,6 +269,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/password/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset the password of an account that has TOTP enrolled. */
+        post: operations["reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/password/reset-with-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Set a new password with an admin-issued token. */
+        post: operations["reset_with_token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -226,6 +320,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/totp/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish enrolment with a current code and the password; returns the recovery codes once. */
+        post: operations["confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/totp/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn TOTP off and delete the secret and recovery codes. */
+        post: operations["disable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/totp/enrol": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start enrolment: returns the otpauth URI and secret. Replaces any unconfirmed secret. */
+        post: operations["enrol"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/totp/recovery-codes/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replace all recovery codes with ten new ones; the old ones stop working. */
+        post: operations["regenerate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/totp/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether TOTP is enrolled and how many recovery codes are left. */
+        get: operations["status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/checkout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a plan change. `mock` switches the plan at once; `lemonsqueezy` returns a hosted checkout. */
+        post: operations["checkout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plans an admin can switch to, cheapest first. Plans are instance-wide, not per workspace. */
+        get: operations["list_billing_plans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Providers with a webhook secret configured. The secret itself is never returned. */
+        get: operations["list_providers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/providers/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set a provider's webhook secret (sealed at rest). Enables the provider. */
+        put: operations["set_provider"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The workspace's plan, status and usage against its limits. */
+        get: operations["subscription"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contact-requests": {
         parameters: {
             query?: never;
@@ -233,7 +497,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List contact requests, newest first, optionally by status. */
+        /** List contact requests, newest first, optionally by status and kind. */
         get: operations["list_contacts"];
         put?: never;
         /** Public contact form: stores a `new` request for the workspace's admins. */
@@ -492,6 +756,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/payout-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in affiliate's own requests, newest first. */
+        get: operations["me_list"];
+        put?: never;
+        /** File a payout request for the signed-in affiliate. */
+        post: operations["me_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/payouts": {
         parameters: {
             query?: never;
@@ -544,6 +826,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/referral-codes/{code}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats of one of the signed-in affiliate's own referral codes. */
+        get: operations["me_code_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/tax-form": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in affiliate's tax form. */
+        get: operations["me_get"];
+        /** Submit or replace the signed-in affiliate's tax form. */
+        put: operations["me_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/members": {
         parameters: {
             query?: never;
@@ -590,6 +907,57 @@ export interface paths {
         put?: never;
         /** Mark one of the signed-in user's notifications read. */
         post: operations["mark_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payout-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Workspace payout requests, newest first. */
+        get: operations["admin_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payout-requests/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve: drafts a payout sized from the current balance. */
+        post: operations["payout_request_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payout-requests/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject with a reason shown to the affiliate. */
+        post: operations["payout_request_reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -694,8 +1062,83 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** `approved -> paid`: posts payable -> cash per payout. */
+        /**
+         * `approved -> paid`: posts payable -> cash per payout. With no body (or `manual_csv`) it
+         *     marks the whole batch paid by hand. With `{rail}` it sends each line through that provider
+         *     and posts the ledger only for lines the provider confirms paid; the response then carries an
+         *     `outcome`, and the batch stays `approved` until every line is paid (call again to retry
+         *     failures, or `reconcile` to collect pending ones).
+         */
         post: operations["mark_paid_route"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/batches/{id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask providers about submitted payout lines and settle the confirmed ones. */
+        post: operations["reconcile_route"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/rails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payout rails and whether each is usable. Credentials are never returned. */
+        get: operations["list_rails"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/rails/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Store (sealed) the workspace's credentials for a provider rail, replacing any existing. */
+        put: operations["put_credentials"];
+        post?: never;
+        /** Remove the workspace's credentials for a provider rail. */
+        delete: operations["delete_credentials"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payouts/{id}/invoice.html": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invoice of an approved or paid payout: the workspace admin, or the affiliate it belongs to. */
+        get: operations["invoice"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -727,7 +1170,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** One program. Secrets are included for admins only. */
+        /** One program. Secrets are never returned; they are shown once, on create and rotate. */
         get: operations["get_program"];
         put?: never;
         post?: never;
@@ -931,6 +1374,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/referral-codes/{code}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stats of one referral code in the workspace (live from clicks and conversions). */
+        get: operations["code_stats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/1099-style.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One row per affiliate and currency whose payouts paid in the year reach the threshold. */
+        get: operations["report_1099"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/reports/analytics.csv": {
         parameters: {
             query?: never;
@@ -960,6 +1437,92 @@ export interface paths {
         /** Replace the workspace's settings with the given JSON object (max 16 KiB). */
         put: operations["put_settings"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/notify-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Which notification channels are configured. URLs are never returned. */
+        get: operations["get_channels"];
+        /** Set or clear the Telegram and Discord webhook URLs (sealed at rest). */
+        put: operations["put_channels"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/settings/test-notify-channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a test message to a configured channel now, independent of the outbox. */
+        post: operations["test_channel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Self-serve signup: a new workspace with its first `admin`, signed in. 404 unless enabled. */
+        post: operations["signup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/{id}/password-reset-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue a one-hour password reset token for a user. */
+        post: operations["issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/billing/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Provider subscription webhook. Public; authenticated by the HMAC of the raw body. */
+        post: operations["webhook"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1040,6 +1603,64 @@ export interface paths {
         patch: operations["update_endpoint"];
         trace?: never;
     };
+    "/api/v1/webhooks/inbound": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Received deliveries (newest first) with their processing outcome. */
+        get: operations["list_inbound"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/inbound/{id}/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a stored delivery through the worker again. The signature is not re-checked: it
+         *     passed when the event was stored. Duplicate sales still dedupe on the external id.
+         */
+        post: operations["replay_inbound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/webhooks/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign `payload` with the program's own secret for `source` and deliver it to the tracker's
+         *     real inbound endpoint, returning the tracker's raw answer. Lets an admin check a secret
+         *     end to end without a provider account.
+         */
+        post: operations["test_webhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -1052,6 +1673,43 @@ export interface paths {
         put?: never;
         /** Create a workspace. */
         post: operations["create_workspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liveness: the process is up. No auth, no DB. */
+        get: operations["healthz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness: Postgres answers and the schema is at (or past) the migration head
+         *     this binary embeds. No auth.
+         */
+        get: operations["readyz"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1077,6 +1735,16 @@ export interface components {
             user_id: string;
             /** Format: uuid */
             workspace_id: string;
+        };
+        AlertAck: {
+            /** @description Alerts accepted from the payload. */
+            alerts: number;
+            /** @description Super admins each alert was delivered to. */
+            recipients: number;
+        };
+        Approved: {
+            /** Format: int64 */
+            amount_cents: number;
         };
         /** @enum {string} */
         AttributionModel: "first_touch" | "last_touch";
@@ -1131,16 +1799,94 @@ export interface components {
             /** Format: int64 */
             total_cents: number;
         };
+        ChannelsView: {
+            discord_set: boolean;
+            /** @description The URL itself is write-only. */
+            telegram_set: boolean;
+        };
+        CheckoutRequest: {
+            plan_key: string;
+            /** @description `mock` or `lemonsqueezy`; default `mock` when configured, else `lemonsqueezy`. */
+            provider?: string | null;
+        };
+        CheckoutResponse: {
+            /** @description `true` when the plan is already active (mock). */
+            activated: boolean;
+            /** @description Hosted checkout to send the admin to. */
+            url?: string | null;
+        };
+        CodeCountry: {
+            /** Format: int64 */
+            clicks: number;
+            country: string;
+        };
+        CodeDay: {
+            /** Format: int64 */
+            clicks: number;
+            /** Format: int64 */
+            commission_cents: number;
+            /** Format: int64 */
+            conversions: number;
+            /** @description `YYYY-MM-DD` (UTC); every day of the range is present. */
+            day: string;
+        };
+        CodeReferrer: {
+            /** Format: int64 */
+            clicks: number;
+            host: string;
+        };
+        CodeRequest: {
+            /** @description Six-digit authenticator code. */
+            code: string;
+            current_password: string;
+        };
+        CodeStats: {
+            code: string;
+            /** @description The program's currency; amounts are integer minor units. */
+            currency: string;
+            from: string;
+            series: components["schemas"]["CodeDay"][];
+            to: string;
+            /** @description Top 10 by clicks. */
+            top_countries: components["schemas"]["CodeCountry"][];
+            /** @description Top 10 by clicks. */
+            top_referrers: components["schemas"]["CodeReferrer"][];
+            totals: components["schemas"]["CodeTotals"];
+        };
+        CodeTotals: {
+            /** Format: int64 */
+            clicks: number;
+            /** Format: int64 */
+            commission_cents: number;
+            /** Format: int64 */
+            conversions: number;
+            /**
+             * Format: int64
+             * @description Clicks the tracker flagged (a subset of `clicks`).
+             */
+            flagged_clicks: number;
+            /** Format: int64 */
+            revenue_cents: number;
+        };
         ContactPatch: {
             /** @description `new`, `read` or `closed`. */
             status: string;
         };
         ContactRequest: {
+            /**
+             * Format: int64
+             * @description Disputed amount in cents; set together with `currency`.
+             */
+            amount_cents?: number | null;
             /** Format: date-time */
             created_at: string;
+            /** @description ISO 4217 code, upper case. */
+            currency?: string | null;
             email: string;
             /** Format: uuid */
             id: string;
+            /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+            kind: string;
             message: string;
             name: string;
             /** Format: uuid */
@@ -1192,6 +1938,9 @@ export interface components {
             /** Format: uuid */
             program_id: string;
         };
+        CsrfToken: {
+            token: string;
+        };
         Customer: {
             /** Format: uuid */
             affiliate_id?: string | null;
@@ -1238,6 +1987,11 @@ export interface components {
             events?: string[] | null;
             url?: string | null;
         };
+        EnrolRequest: Record<string, never>;
+        EnrolResponse: {
+            otpauth_uri: string;
+            secret_base32: string;
+        };
         Enrollment: {
             /** Format: uuid */
             affiliate_id: string;
@@ -1279,9 +2033,37 @@ export interface components {
             code: string;
             message: string;
         };
+        /** @enum {string} */
+        Granularity: "day";
+        /** @description A received provider/generic delivery, as stored. `processed_at` unset = still queued. */
+        InboundEventRow: {
+            error?: string | null;
+            external_id: string;
+            /** Format: uuid */
+            id: string;
+            payload: unknown;
+            /** Format: date-time */
+            processed_at?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            /** Format: date-time */
+            received_at: string;
+            source: string;
+        };
+        IssuedToken: {
+            /** Format: date-time */
+            expires_at: string;
+            /** @description Shown once. */
+            token: string;
+        };
         LoginRequest: {
             email: string;
             password: string;
+        };
+        /** @description Body of `mark-paid` when a provider rail is chosen. */
+        MarkPaidRail: {
+            /** @description `manual_csv` (default), `paypal_payouts`, `wise` or `mock`. */
+            rail: string;
         };
         Member: {
             email: string;
@@ -1336,7 +2118,16 @@ export interface components {
             program_id: string;
         };
         NewContact: {
+            /**
+             * Format: int64
+             * @description Disputed amount in cents; requires `currency`.
+             */
+            amount_cents?: number | null;
+            /** @description ISO 4217 code; requires `amount_cents`. */
+            currency?: string | null;
             email: string;
+            /** @description `general_inquiry` (default), `technical_support`, `account_issue` or `payout_dispute`. */
+            kind?: string | null;
             message: string;
             name: string;
             /** Format: uuid */
@@ -1418,6 +2209,13 @@ export interface components {
             hold_days?: number | null;
             name: string;
         };
+        NewRequest: {
+            currency: string;
+            /** Format: uuid */
+            program_id: string;
+            /** Format: int64 */
+            requested_cents: number;
+        };
         NewSite: {
             /** @description Bare host, e.g. `shop.example.com`. */
             domain: string;
@@ -1443,6 +2241,26 @@ export interface components {
             kind: string;
             /** Format: date-time */
             read_at?: string | null;
+        };
+        /** @description What a dispatch or reconcile pass did. */
+        Outcome: {
+            /** @description The whole batch is now paid. */
+            batch_paid: boolean;
+            /**
+             * Format: int32
+             * @description Lines the provider refused.
+             */
+            failed: number;
+            /**
+             * Format: int32
+             * @description Lines confirmed paid (ledger posted) in this pass.
+             */
+            paid: number;
+            /**
+             * Format: int32
+             * @description Lines left at the provider, not yet confirmed.
+             */
+            submitted: number;
         };
         Paged_Affiliate: {
             items: {
@@ -1552,11 +2370,20 @@ export interface components {
         };
         Paged_ContactRequest: {
             items: {
+                /**
+                 * Format: int64
+                 * @description Disputed amount in cents; set together with `currency`.
+                 */
+                amount_cents?: number | null;
                 /** Format: date-time */
                 created_at: string;
+                /** @description ISO 4217 code, upper case. */
+                currency?: string | null;
                 email: string;
                 /** Format: uuid */
                 id: string;
+                /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+                kind: string;
                 message: string;
                 name: string;
                 /** Format: uuid */
@@ -1764,6 +2591,31 @@ export interface components {
              */
             total: number;
         };
+        Paged_InboundEventRow: {
+            items: {
+                error?: string | null;
+                external_id: string;
+                /** Format: uuid */
+                id: string;
+                payload: unknown;
+                /** Format: date-time */
+                processed_at?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                /** Format: date-time */
+                received_at: string;
+                source: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_Member: {
             items: {
                 email: string;
@@ -1905,6 +2757,35 @@ export interface components {
              */
             total: number;
         };
+        Paged_RequestView: {
+            items: {
+                /** Format: uuid */
+                affiliate_id: string;
+                created_at: string;
+                currency: string;
+                decided_at?: string | null;
+                /** Format: uuid */
+                id: string;
+                /** Format: uuid */
+                payout_id?: string | null;
+                /** Format: uuid */
+                program_id: string;
+                rejection_reason?: string | null;
+                /** Format: int64 */
+                requested_cents: number;
+                /** @description `pending`, `approved`, `rejected` or `paid`. */
+                status: string;
+            }[];
+            /** Format: int64 */
+            limit: number;
+            /** Format: int32 */
+            page: number;
+            /**
+             * Format: int64
+             * @description Matching rows across all pages.
+             */
+            total: number;
+        };
         Paged_Site: {
             items: {
                 domain: string;
@@ -2005,6 +2886,13 @@ export interface components {
              * @description The `AffPayable -> Cash` ledger txn, once paid.
              */
             ledger_txn_id?: string | null;
+            /** @description `manual_csv`, `paypal_payouts`, `wise` or `mock`. */
+            rail: string;
+            rail_error?: string | null;
+            /** @description Provider dispatch: `pending`, `submitted`, `paid` or `failed`; null on the manual rail. */
+            rail_state?: string | null;
+            /** @description The provider's last reported status. */
+            rail_status?: string | null;
             /** @description `draft`, `approved`, `paid` or `cancelled`. */
             status: string;
         };
@@ -2037,6 +2925,19 @@ export interface components {
         PlanDuration: "one_month" | "x_months" | "lifetime";
         /** @enum {string} */
         PlanKind: "percent" | "flat";
+        PlanView: {
+            currency: string;
+            key: string;
+            /** Format: int32 */
+            max_affiliates?: number | null;
+            /** Format: int64 */
+            max_monthly_clicks?: number | null;
+            /** Format: int32 */
+            max_programs?: number | null;
+            name: string;
+            /** Format: int64 */
+            price_cents: number;
+        };
         Point: components["schemas"]["Metrics"] & {
             /** @description `YYYY-MM-DD` (UTC). */
             day: string;
@@ -2076,6 +2977,43 @@ export interface components {
             hold_days?: number | null;
             name?: string | null;
         };
+        ProviderView: {
+            provider: string;
+            /** @description The webhook secret is write-only; this only says one is stored. */
+            webhook_secret_set: boolean;
+        };
+        PutChannels: {
+            discord_url?: string | null;
+            /** @description Absent: unchanged. `null` or empty: cleared. */
+            telegram_url?: string | null;
+        };
+        PutCredentials: {
+            /** @description `paypal_payouts`: `client_id`, `client_secret`. `wise`: `api_token`, `profile_id`. */
+            credentials: {
+                [key: string]: string;
+            };
+            /** @description `paypal_payouts` or `wise`. */
+            rail: string;
+            /** @description Use the provider sandbox (default true). */
+            sandbox?: boolean | null;
+        };
+        /** @description A batch dispatched or reconciled, with what this pass did. */
+        RailResult: components["schemas"]["BatchDetail"] & {
+            outcome: components["schemas"]["Outcome"];
+        };
+        /** @description Redacted view of a rail: whether it can be selected, never its credentials. */
+        RailView: {
+            /** @description Can be chosen for `mark-paid`. */
+            available: boolean;
+            /** @description Credentials are stored (they are never returned). */
+            configured: boolean;
+            rail: string;
+            sandbox?: boolean | null;
+        };
+        RecoveryCodes: {
+            /** @description Shown once; only salted hashes are stored. */
+            recovery_codes: string[];
+        };
         ReferralCode: {
             /** Format: uuid */
             affiliate_id: string;
@@ -2086,11 +3024,52 @@ export interface components {
         };
         Register: {
             email: string;
-            /** @description Min 8 characters. */
+            /** @description Min 12 characters. */
             password: string;
             payout_email?: string | null;
             /** @description Slug of the workspace to join. */
             workspace: string;
+        };
+        RejectBody: {
+            reason: string;
+        };
+        RequestView: {
+            /** Format: uuid */
+            affiliate_id: string;
+            created_at: string;
+            currency: string;
+            decided_at?: string | null;
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            payout_id?: string | null;
+            /** Format: uuid */
+            program_id: string;
+            rejection_reason?: string | null;
+            /** Format: int64 */
+            requested_cents: number;
+            /** @description `pending`, `approved`, `rejected` or `paid`. */
+            status: string;
+        };
+        ResetRequest: {
+            /** @description Six-digit authenticator code, or a recovery code (`xxxxx-xxxxx`). */
+            code: string;
+            email: string;
+            /** @description 12 to 256 characters. */
+            new_password: string;
+        };
+        ResetWithTokenRequest: {
+            /** @description 12 to 256 characters. */
+            new_password: string;
+            token: string;
+        };
+        SetSecret: {
+            webhook_secret: string;
+        };
+        SignupRequest: {
+            admin_email: string;
+            admin_password: string;
+            workspace_name: string;
         };
         Site: {
             domain: string;
@@ -2099,6 +3078,14 @@ export interface components {
             /** @description Value of the dimension; empty = unknown. */
             dim_value: string;
         };
+        SubscriptionView: {
+            /** Format: date-time */
+            current_period_end?: string | null;
+            plan: components["schemas"]["PlanView"];
+            provider: string;
+            status: string;
+            usage: components["schemas"]["UsageView"];
+        };
         Summary: components["schemas"]["Metrics"] & {
             /** @description Top 200 values of `dim` by clicks; their sums equal the totals when there are fewer. */
             breakdown: components["schemas"]["Slice"][];
@@ -2106,9 +3093,91 @@ export interface components {
             from: string;
             to: string;
         };
+        SummaryAll: {
+            /** Format: int64 */
+            commission_cents: number;
+            display_currency: string;
+            from: string;
+            /**
+             * Format: int64
+             * @description Converted revenue of every program with a rate, in `display_currency` cents.
+             */
+            revenue_cents: number;
+            to: string;
+            /** @description Programs left out of the totals; never silently converted 1:1. */
+            unconverted: components["schemas"]["Unconverted"][];
+        };
+        TaxForm: {
+            /** @description ISO 3166 alpha-2, upper case. */
+            country?: string | null;
+            /** @description `w8`, `w9`, or `none` when nothing was submitted. */
+            kind: string;
+            legal_name?: string | null;
+            /** @description RFC 3339 UTC. */
+            submitted_at?: string | null;
+            /** @description Last 4 digits of the tax id; the full id is never stored. */
+            tax_id_last4?: string | null;
+        };
+        TaxFormInput: {
+            /** @description Two letters. */
+            country: string;
+            /** @description `w8` or `w9`. */
+            kind: string;
+            legal_name: string;
+            /** @description Exactly 4 digits when present. Anything longer is refused, never truncated. */
+            tax_id_last4?: string | null;
+        };
         TemplatePatch: {
             body?: string | null;
             subject?: string | null;
+        };
+        TestRequest: {
+            /** @description `telegram` or `discord`. */
+            channel: string;
+        };
+        TestResult: {
+            sent: boolean;
+        };
+        TestWebhook: {
+            /** @description The event body to deliver. */
+            payload: unknown;
+            /** Format: uuid */
+            program_id: string;
+            /** @description `generic`, `stripe` or `paddle`. */
+            source: string;
+        };
+        TestWebhookResult: {
+            /** @description The tracker's response body (first 4 KiB). */
+            body: string;
+            /**
+             * Format: int32
+             * @description The tracker's HTTP status.
+             */
+            status: number;
+        };
+        TotpStatus: {
+            enrolled: boolean;
+            /** Format: int64 */
+            recovery_codes_remaining: number;
+        };
+        /** @description Money of a program that could not be converted: no cached rate on or before the day. */
+        Unconverted: {
+            /** Format: int64 */
+            commission_cents: number;
+            /** @description The program's own currency; amounts are in its minor unit. */
+            currency: string;
+            /** Format: uuid */
+            program_id: string;
+            /** Format: int64 */
+            revenue_cents: number;
+        };
+        UsageView: {
+            /** Format: int64 */
+            affiliates: number;
+            /** Format: int64 */
+            monthly_clicks: number;
+            /** Format: int64 */
+            programs: number;
         };
         UserView: {
             email: string;
@@ -2118,6 +3187,10 @@ export interface components {
             role: string;
             /** Format: uuid */
             workspace_id?: string | null;
+        };
+        WebhookAck: {
+            /** @description `applied`, `duplicate`, or `ignored` (stale event or unknown workspace). */
+            result: string;
         };
         /**
          * @description One endpoint x outbox row. `next_attempt_at` set = still pending; unset with a 2xx
@@ -2440,6 +3513,57 @@ export interface operations {
             };
         };
     };
+    webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertAck"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     summary: {
         parameters: {
             query?: {
@@ -2474,6 +3598,48 @@ export interface operations {
             };
             /** @description Unknown program or other affiliate */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    summary_all: {
+        parameters: {
+            query?: {
+                /** @description ISO 4217 code every program's money is converted to. Default `USD`. */
+                display_currency?: string;
+                /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
+                from?: string;
+                /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryAll"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2564,6 +3730,25 @@ export interface operations {
             };
         };
     };
+    csrf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CsrfToken"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -2642,6 +3827,104 @@ export interface operations {
             };
         };
     };
+    reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed; every session revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description New password too short or too long */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Reset failed (same body for every cause) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reset_with_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetWithTokenRequest"];
+            };
+        };
+        responses: {
+            /** @description Password changed; every session revoked */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description New password too short or too long */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Reset failed (same body for every cause) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     refresh: {
         parameters: {
             query?: never;
@@ -2671,11 +3954,348 @@ export interface operations {
             };
         };
     };
+    confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            /** @description Wrong password or code */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Already enrolled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Disabled */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Wrong password or code */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not enrolled */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    enrol: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EnrolRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnrolResponse"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Already enrolled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    regenerate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            /** @description Wrong password or code */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not enrolled */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotpStatus"];
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    checkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckoutRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutResponse"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_billing_plans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanView"][];
+                };
+            };
+        };
+    };
+    list_providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderView"][];
+                };
+            };
+        };
+    };
+    set_provider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description mock or lemonsqueezy */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetSecret"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    subscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubscriptionView"];
+                };
+            };
+        };
+    };
     list_contacts: {
         parameters: {
             query?: {
                 /** @description `new`, `read` or `closed`. */
                 status?: string;
+                /** @description `general_inquiry`, `technical_support`, `account_issue` or `payout_dispute`. */
+                kind?: string;
                 /** @description 1-based page number (default 1). */
                 page?: number;
                 /** @description Items per page (default 50, max 200). */
@@ -2693,6 +4313,14 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Paged_ContactRequest"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             403: {
@@ -3410,6 +5038,91 @@ export interface operations {
             };
         };
     };
+    me_list: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `pending`, `approved`, `rejected` or `paid`. */
+                status?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_RequestView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    me_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewRequest"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestView"];
+                };
+            };
+            /** @description Over balance, under minimum or wrong currency */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Not enrolled */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A request is already pending */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     me_payouts: {
         parameters: {
             query?: {
@@ -3533,6 +5246,119 @@ export interface operations {
                 content?: never;
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    me_code_stats: {
+        parameters: {
+            query?: {
+                /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
+                from?: string;
+                /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
+                to?: string;
+                /** @description Series bucket; only `day` is supported. */
+                granularity?: components["schemas"]["Granularity"];
+            };
+            header?: never;
+            path: {
+                /** @description Referral code */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStats"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown code or not the caller's */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxForm"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    me_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaxFormInput"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaxForm"];
+                };
+            };
+            /** @description Bad kind, name, country or tax id */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3682,6 +5508,130 @@ export interface operations {
                 };
             };
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    admin_list: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `pending`, `approved`, `rejected` or `paid`. */
+                status?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_RequestView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    payout_request_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description RequestView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Approved"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Decided already, or nothing payable */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    payout_request_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description RequestView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectBody"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing reason */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Decided already */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3916,14 +5866,27 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        /** @description Optional rail */
+        requestBody?: {
+            content: {
+                "application/json": null | components["schemas"]["MarkPaidRail"];
+            };
+        };
         responses: {
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BatchDetail"];
+                    "application/json": components["schemas"]["RailResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
                 };
             };
             404: {
@@ -3936,6 +5899,172 @@ export interface operations {
             };
             /** @description Not approved */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Rail not configured */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    reconcile_route: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description BatchView id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailResult"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description A rail lost its credentials */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    list_rails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailView"][];
+                };
+            };
+        };
+    };
+    put_credentials: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutCredentials"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RailView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    delete_credentials: {
+        parameters: {
+            query: {
+                /** @description `paypal_payouts` or `wise`. */
+                rail: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    invoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Payout id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description text/html */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Unknown, draft, or someone else's payout */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4717,6 +6846,83 @@ export interface operations {
             };
         };
     };
+    code_stats: {
+        parameters: {
+            query?: {
+                /** @description First day, `YYYY-MM-DD` UTC, inclusive. Default: 29 days before `to`. */
+                from?: string;
+                /** @description Last day, `YYYY-MM-DD` UTC, inclusive. Default: today. */
+                to?: string;
+                /** @description Series bucket; only `day` is supported. */
+                granularity?: components["schemas"]["Granularity"];
+            };
+            header?: never;
+            path: {
+                /** @description Referral code */
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeStats"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Unknown code or code of another workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    report_1099: {
+        parameters: {
+            query?: {
+                /** @description Calendar year (UTC) of the payout's paid date. Default: the current year. */
+                year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description text/csv */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     report_csv: {
         parameters: {
             query?: {
@@ -4821,6 +7027,237 @@ export interface operations {
                 };
             };
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    get_channels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelsView"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    put_channels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PutChannels"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelsView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    test_channel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    signup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Workspace created, signed in */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserView"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Signup disabled */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Email or slug taken */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IssuedToken"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description mock or lemonsqueezy */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookAck"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5073,6 +7510,136 @@ export interface operations {
             };
         };
     };
+    list_inbound: {
+        parameters: {
+            query?: {
+                program_id?: string;
+                /** @description `generic`, `stripe` or `paddle`. */
+                source?: string;
+                /** @description 1-based page number (default 1). */
+                page?: number;
+                /** @description Items per page (default 50, max 200). */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Paged_InboundEventRow"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    replay_inbound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Inbound event id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundEventRow"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Still queued */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
+    test_webhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestWebhook"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestWebhookResult"];
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+            /** @description Tracker unreachable */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorBody"];
+                };
+            };
+        };
+    };
     list_workspaces: {
         parameters: {
             query?: {
@@ -5150,6 +7717,49 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorBody"];
                 };
+            };
+        };
+    };
+    healthz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description alive */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readyz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ready */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description not ready */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

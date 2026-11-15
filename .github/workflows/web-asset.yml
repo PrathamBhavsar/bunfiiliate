@@ -1,0 +1,52 @@
+name: web-asset
+
+# Builds the static web export and attaches it to the GitHub release that
+# release.yml (cargo-dist) creates for the same tag. Releases created with
+# GITHUB_TOKEN do not fire `release: published`, so trigger on the tag and wait.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  web-asset:
+    name: web-asset
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 20
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build static export
+        run: pnpm --dir apps/web build
+      - name: Package
+        run: |
+          test -f apps/web/out/index.html
+          tar -C apps/web/out -czf bunfiiliate-web-static.tar.gz .
+          sha256sum bunfiiliate-web-static.tar.gz > bunfiiliate-web-static.tar.gz.sha256
+      - name: Wait for release
+        run: |
+          for i in $(seq 1 90); do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "release $TAG exists"
+              exit 0
+            fi
+            echo "waiting for release $TAG ($i/90)"
+            sleep 30
+          done
+          echo "release $TAG never appeared" >&2
+          exit 1
+      - name: Upload to release
+        run: |
+          gh release upload "$TAG" \
+            bunfiiliate-web-static.tar.gz \
+            bunfiiliate-web-static.tar.gz.sha256 \
+            --clobber --repo "$GITHUB_REPOSITORY"

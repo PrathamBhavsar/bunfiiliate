@@ -1,22 +1,36 @@
 //! bunfiiliate API: auth, roles, OpenAPI.
 
+pub mod admin_reset;
 pub mod affiliates;
+pub mod alerts;
 pub mod analytics;
 pub mod audit;
 pub mod auth;
+pub mod billing;
 pub mod bootstrap;
 pub mod dispatch;
 pub mod error;
+pub mod fx;
+pub mod headers;
+pub mod invoice;
 pub mod limit;
 pub mod mail;
 pub mod metrics;
 pub mod money;
+pub mod notify;
+pub mod notify_channels;
 pub mod ops;
 pub mod page;
+pub mod password_reset;
+pub mod payout_rails;
+pub mod payout_requests;
 pub mod payouts;
 pub mod programs;
 pub mod routes;
+pub mod secrets;
 pub mod ssrf;
+pub mod tax;
+pub mod totp;
 pub mod webhooks;
 pub mod worker;
 pub mod workspaces;
@@ -31,20 +45,43 @@ use sqlx::PgPool;
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
-    pub jwt_secret: Arc<str>,
+    pub jwt_keys: Arc<auth::JwtKeys>,
+    /// Per-instance cache of `users.token_version`.
+    pub version_cache: Arc<auth::VersionCache>,
+    /// Master keys for secrets at rest.
+    pub vault: Arc<bf_core::secrets::Vault>,
     /// Add `Secure` to cookies; turn off only for plain-http local dev.
     pub secure_cookies: bool,
     /// Rate limits for the public routes; per process, shared by every clone of the state.
     pub limiter: Arc<limit::Limiter>,
+    /// Base URL of the tracker's inbound endpoints (`TRACKER_INTERNAL_URL`).
+    pub tracker_url: TrackerUrl,
+}
+
+/// Where the API reaches the tracker over the internal network. Default reads
+/// `TRACKER_INTERNAL_URL`, falling back to `http://127.0.0.1:8081`.
+#[derive(Clone, Debug)]
+pub struct TrackerUrl(pub Arc<str>);
+
+impl Default for TrackerUrl {
+    fn default() -> Self {
+        let url = std::env::var("TRACKER_INTERNAL_URL")
+            .ok()
+            .filter(|u| !u.trim().is_empty())
+            .unwrap_or_else(|| "http://127.0.0.1:8081".into());
+        Self(url.trim_end_matches('/').into())
+    }
 }
 
 /// Largest request body any API route accepts.
 const MAX_BODY_BYTES: usize = 64 * 1024;
 
-/// Wrap routes with the Origin check, the body limit and state.
+/// Wrap routes with security headers, the Origin check, the CSRF check, the body limit and state.
 pub fn build(routes: Router<AppState>, state: AppState) -> Router {
     routes
+        .layer(from_fn(auth::check_csrf))
         .layer(from_fn(auth::check_origin))
+        .layer(from_fn(headers::security_headers))
         .layer(DefaultBodyLimit::max(MAX_BODY_BYTES))
         .with_state(state)
 }

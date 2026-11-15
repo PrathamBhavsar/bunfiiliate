@@ -8,9 +8,11 @@
 //!   network error schedules the next attempt with exponential backoff; after [`MAX_ATTEMPTS`]
 //!   the delivery is dead (`next_attempt_at` null).
 
+use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::Utc;
+use bf_core::secrets::Vault;
+use chrono::{DateTime, Utc};
 use hmac::{Hmac, Mac};
 use serde_json::{Value, json};
 use sha2::Sha256;
@@ -19,6 +21,7 @@ use uuid::Uuid;
 
 use crate::mail::{Mailer, default_template, render, template_key, vars};
 use crate::metrics;
+use crate::notify_channels::{self, Channels};
 use crate::ssrf;
 
 pub const MAX_ATTEMPTS: i32 = 8;
@@ -74,8 +77,25 @@ fn uuid_field(payload: &Value, key: &str) -> Option<Uuid> {
 
 /// Dispatch every ready outbox row; returns how many were claimed.
 pub async fn dispatch_outbox(pool: &PgPool, mailer: &Mailer) -> Result<u64, sqlx::Error> {
+    dispatch_all(pool, mailer, None).await
+}
+
+/// [`dispatch_outbox`] that also forwards default topics to the workspace's notify channels.
+pub async fn dispatch_outbox_notify(
+    pool: &PgPool,
+    mailer: &Mailer,
+    channels: &Channels,
+) -> Result<u64, sqlx::Error> {
+    dispatch_all(pool, mailer, Some(channels)).await
+}
+
+async fn dispatch_all(
+    pool: &PgPool,
+    mailer: &Mailer,
+    channels: Option<&Channels>,
+) -> Result<u64, sqlx::Error> {
     let mut n = 0;
-    while dispatch_next(pool, mailer).await? {
+    while dispatch_next(pool, mailer, channels).await? {
         n += 1;
     }
     Ok(n)
@@ -87,7 +107,11 @@ struct Mail {
     body: String,
 }
 
-async fn dispatch_next(pool: &PgPool, mailer: &Mailer) -> Result<bool, sqlx::Error> {
+async fn dispatch_next(
+    pool: &PgPool,
+    mailer: &Mailer,
+    channels: Option<&Channels>,
+) -> Result<bool, sqlx::Error> {
     let mut tx = pool.begin().await?;
     let Some((id, topic, payload)) = sqlx::query_as::<_, (i64, String, Value)>(
         "SELECT id, topic, payload FROM outbox \
@@ -101,7 +125,8 @@ async fn dispatch_next(pool: &PgPool, mailer: &Mailer) -> Result<bool, sqlx::Err
     };
 
     let mut mail = None;
-    if let Some(program) = uuid_field(&payload, "program_id") {
+    let program = uuid_field(&payload, "program_id");
+    if let Some(program) = program {
         queue_deliveries(&mut tx, id, &topic, program).await?;
         mail = notify(&mut tx, &topic, &payload, program).await?;
     }
@@ -111,6 +136,11 @@ async fn dispatch_next(pool: &PgPool, mailer: &Mailer) -> Result<bool, sqlx::Err
         .await?;
     tx.commit().await?;
 
+    if let (Some(ch), Some(program)) = (channels, program)
+        && let Err(e) = notify_channels::forward(ch, pool, program, &topic, &payload).await
+    {
+        tracing::warn!(outbox = id, error = %e, "notify channels failed");
+    }
     if let Some(m) = mail
         && let Err(e) = mailer.send(&m.to, &m.subject, &m.body).await
     {
@@ -208,7 +238,11 @@ const DELIVER_PER_TICK: i64 = (DELIVER_CONCURRENCY * 6) as i64;
 /// Rows are leased (their `next_attempt_at` pushed out and committed) before any HTTP call, so
 /// no transaction or row lock is held while a slow endpoint answers, and a slow endpoint only
 /// holds up its own request, not the worker's other ticks.
-pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, sqlx::Error> {
+pub async fn deliver_due(
+    pool: &PgPool,
+    http: &reqwest::Client,
+    vault: &Arc<Vault>,
+) -> Result<u64, sqlx::Error> {
     let due = lease_due(pool).await?;
     let attempted = due.len() as u64;
     let mut due = due.into_iter();
@@ -217,8 +251,8 @@ pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, s
         // Keep the window full: start the next send as soon as one finishes.
         while sends.len() < DELIVER_CONCURRENCY {
             let Some(d) = due.next() else { break };
-            let (pool, http) = (pool.clone(), http.clone());
-            sends.spawn(async move { send_one(&pool, &http, d).await });
+            let (pool, http, vault) = (pool.clone(), http.clone(), vault.clone());
+            sends.spawn(async move { send_one(&pool, &http, &vault, d).await });
         }
         match sends.join_next().await {
             None => return Ok(attempted),
@@ -233,11 +267,14 @@ pub async fn deliver_due(pool: &PgPool, http: &reqwest::Client) -> Result<u64, s
 struct Due {
     id: Uuid,
     attempt: i32,
+    endpoint_id: Uuid,
     url: String,
     secret: String,
+    api_version: String,
     outbox_id: i64,
     topic: String,
     payload: Value,
+    available_at: DateTime<Utc>,
 }
 
 /// Claim up to [`DELIVER_PER_TICK`] due deliveries by pushing their next attempt [`LEASE_SECS`]
@@ -252,7 +289,7 @@ async fn lease_due(pool: &PgPool) -> Result<Vec<Due>, sqlx::Error> {
          leased AS ( \
              UPDATE webhook_deliveries d SET next_attempt_at = now() + $2 * interval '1 second' \
              FROM due WHERE d.id = due.id RETURNING d.id, d.attempt, d.endpoint_id, d.outbox_id) \
-         SELECT l.id, l.attempt, e.url, e.secret, o.id AS outbox_id, o.topic, o.payload \
+         SELECT l.id, l.attempt, l.endpoint_id, e.url, e.secret, e.api_version, o.id AS outbox_id, o.topic, o.payload, o.available_at \
          FROM leased l JOIN webhook_endpoints e ON e.id = l.endpoint_id \
          JOIN outbox o ON o.id = l.outbox_id",
     )
@@ -262,22 +299,64 @@ async fn lease_due(pool: &PgPool) -> Result<Vec<Due>, sqlx::Error> {
     .await
 }
 
+/// Stable per outbox row, so a retry carries the same event id (`evt_<uuid>`).
+fn event_id(outbox_id: i64) -> String {
+    format!("evt_{}", Uuid::from_u64_pair(0, outbox_id as u64))
+}
+
+/// The v2 body (schema `outbound-envelope`): `{id, api_version, type, created_at, data}`.
+fn envelope_v2(d: &Due) -> Value {
+    let data = if d.payload.is_object() {
+        d.payload.clone()
+    } else {
+        json!({ "value": d.payload })
+    };
+    json!({
+        "id": event_id(d.outbox_id),
+        "api_version": "2",
+        "type": d.topic,
+        "created_at": d.available_at.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        "data": data,
+    })
+}
+
 /// POST one leased delivery and record the outcome.
-async fn send_one(pool: &PgPool, http: &reqwest::Client, d: Due) -> Result<(), sqlx::Error> {
-    let body = json!({ "id": d.outbox_id, "topic": d.topic, "data": d.payload }).to_string();
+async fn send_one(
+    pool: &PgPool,
+    http: &reqwest::Client,
+    vault: &Vault,
+    d: Due,
+) -> Result<(), sqlx::Error> {
+    let v2 = d.api_version == "v2";
+    let body = if v2 {
+        envelope_v2(&d)
+    } else {
+        json!({ "id": d.outbox_id, "topic": d.topic, "data": d.payload })
+    }
+    .to_string();
     let ts = Utc::now().timestamp();
-    let sent = match ssrf::check_literal_host(&d.url) {
-        Err(_) => Err("url points at a private address".to_string()),
-        Ok(()) => http
-            .post(&d.url)
-            .header("content-type", "application/json")
-            .header("x-bf-event", &d.topic)
-            .header("x-bf-delivery", d.id.to_string())
-            .header("x-bf-signature", signature(&d.secret, ts, &body))
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| e.to_string()),
+    let secret = vault.open_col("webhook_endpoints", "secret", d.endpoint_id, &d.secret);
+    let sent = match (ssrf::check_literal_host(&d.url), secret) {
+        (Err(_), _) => Err("url points at a private address".to_string()),
+        (Ok(()), Err(e)) => Err(format!("cannot open endpoint secret: {e}")),
+        (Ok(()), Ok(secret)) => {
+            let sig = signature(&secret, ts, &body);
+            let mut req = http
+                .post(&d.url)
+                .header("content-type", "application/json")
+                .header("x-bf-event", &d.topic)
+                .header("x-bf-delivery", d.id.to_string())
+                .header("x-bf-signature", &sig);
+            if v2 {
+                // v2 endpoints get the new headers next to the legacy ones (dual headers).
+                req = req
+                    .header("bf-signature", &sig)
+                    .header("bf-event-id", event_id(d.outbox_id))
+                    .header("bf-event-type", &d.topic)
+                    .header("bf-api-version", "2");
+            }
+            req.body(body).send().await.map_err(|e| e.to_string())
+        }
     };
     let (status, delivered) = match &sent {
         Ok(r) => (

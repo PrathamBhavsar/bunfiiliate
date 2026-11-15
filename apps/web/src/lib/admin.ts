@@ -3,7 +3,7 @@
 import { type components } from "@bunfiiliate/sdk";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { api, errorMessage, meKey } from "./api";
+import { ApiError, api, errorMessage, meKey } from "./api";
 import { queryClient } from "./query";
 import type { Page } from "./use-resource";
 
@@ -26,7 +26,7 @@ export const MAX_LIMIT = 200;
 /** Unwrap an SDK call: throw the API's error message on a non-2xx, return the body (undefined on 204). */
 export async function ok<T>(call: Promise<{ data?: T; error?: unknown; response: Response }>): Promise<T> {
   const { data, error, response } = await call;
-  if (!response.ok) throw new Error(errorMessage(error));
+  if (!response.ok) throw new ApiError(errorMessage(error), response.status);
   return data as T;
 }
 
@@ -108,3 +108,12 @@ export function required(raw: string, label: string) {
 
 /** RFC 3339 timestamp as `2026-03-07 14:05 UTC`. */
 export const formatTime = (iso: string) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
+
+/** A money amount typed as `12` or `12.34` to integer cents; no floats involved. */
+export function parseCents(raw: string, label: string) {
+  const m = /^(\d{1,9})(?:\.(\d{1,2}))?$/.exec(raw.trim());
+  if (!m) throw new Error(`${label} must be an amount like 25 or 25.50`);
+  const cents = Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0") || 0);
+  if (cents <= 0) throw new Error(`${label} must be more than zero`);
+  return cents;
+}

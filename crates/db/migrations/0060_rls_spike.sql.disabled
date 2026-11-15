@@ -1,0 +1,18 @@
+-- C05 SPIKE, NOT APPLIED. The `.disabled` suffix keeps sqlx and scripts/check-migrations.sh from
+-- picking it up. crates/db/tests/rls_spike.rs (#[ignore]) runs this text against a scratch database.
+-- See brain/decisions/0004-rls.md. Do not rename without a new ADR.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'bf_app') THEN
+        CREATE ROLE bf_app NOLOGIN NOSUPERUSER NOBYPASSRLS;
+    END IF;
+EXCEPTION WHEN duplicate_object OR unique_violation THEN NULL; -- roles are cluster-wide; parallel runs race
+END $$;
+GRANT USAGE ON SCHEMA public TO bf_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON programs TO bf_app;
+
+ALTER TABLE programs ENABLE ROW LEVEL SECURITY;
+-- No FORCE: the table owner (migrations, tracker/worker if they connect as owner) bypasses.
+-- `current_setting(..., true)` is NULL when unset, so an unset app.ws matches no rows (fail closed).
+CREATE POLICY ws ON programs
+    USING (workspace_id = nullif(current_setting('app.ws', true), '')::uuid)
+    WITH CHECK (workspace_id = nullif(current_setting('app.ws', true), '')::uuid);

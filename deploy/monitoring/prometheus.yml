@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+scrape_configs:
+  # Metrics listen on 127.0.0.1 by default; set BF_METRICS_ADDR=0.0.0.0:910x on a private
+  # network (and BF_METRICS_TOKEN, see docs/ops/alerts.md) before scraping from a container.
+  - job_name: bf-tracker
+    static_configs:
+      - targets: ["tracker:9100"]
+  - job_name: bf-api
+    static_configs:
+      - targets: ["api:9101"]

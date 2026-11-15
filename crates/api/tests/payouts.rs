@@ -10,6 +10,7 @@ use uuid::Uuid;
 
 /// A program (USD, 10% lifetime, manual or auto approve) with two active affiliates.
 struct Seed {
+    workspace: Uuid,
     program: Uuid,
     admin: Uuid,
     a: Uuid,
@@ -99,6 +100,7 @@ async fn seed(pool: &PgPool, auto_approve: bool) -> Seed {
         .await
         .unwrap();
     Seed {
+        workspace,
         program,
         admin: user(pool, workspace, "admin").await,
         a: affiliate(pool, workspace, program, &format!("A{program}"), "a@x.io").await,
@@ -194,12 +196,14 @@ async fn assert_books(pool: &PgPool) {
 }
 
 async fn pay(pool: &PgPool, s: &Seed) -> Uuid {
-    let batch = create_batch(pool, s.program, s.admin)
+    let batch = create_batch(pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
-    approve_batch(pool, batch, s.admin).await.unwrap();
-    mark_paid(pool, batch).await.unwrap();
+    approve_batch(pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
+    mark_paid(pool, s.workspace, batch).await.unwrap();
     batch
 }
 
@@ -213,10 +217,15 @@ async fn payouts_batch_respects_minimum_and_never_double_claims(pool: PgPool) {
         .unwrap();
     sale(&pool, &s, "o1", 10_000, s.a).await; // 1000 each
     sale(&pool, &s, "o2", 10_000, s.b).await;
-    assert_eq!(create_batch(&pool, s.program, s.admin).await.unwrap(), None); // none approved yet
+    assert_eq!(
+        create_batch(&pool, s.workspace, s.program, s.admin)
+            .await
+            .unwrap(),
+        None
+    ); // none approved yet
     approve_due(&pool).await.unwrap();
 
-    let batch = create_batch(&pool, s.program, s.admin)
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
@@ -235,13 +244,18 @@ async fn payouts_batch_respects_minimum_and_never_double_claims(pool: PgPool) {
             .unwrap();
     assert_eq!(claimed, 1);
     // A's payable is already in the open batch.
-    assert_eq!(create_batch(&pool, s.program, s.admin).await.unwrap(), None);
+    assert_eq!(
+        create_batch(&pool, s.workspace, s.program, s.admin)
+            .await
+            .unwrap(),
+        None
+    );
 
     // B reaches its minimum with a second sale; A earns a little more.
     sale(&pool, &s, "o3", 40_000, s.b).await; // +4000 -> 5000
     sale(&pool, &s, "o4", 1_000, s.a).await; // +100
     approve_due(&pool).await.unwrap();
-    let second = create_batch(&pool, s.program, s.admin)
+    let second = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
@@ -264,27 +278,29 @@ async fn payouts_paid_flow_balances_and_double_pay_is_rejected(pool: PgPool) {
     sale(&pool, &s, "o3", 5_000, s.b).await;
     approve_due(&pool).await.unwrap();
 
-    let batch = create_batch(&pool, s.program, s.admin)
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
     // A draft batch cannot be paid.
     assert!(matches!(
-        mark_paid(&pool, batch).await,
+        mark_paid(&pool, s.workspace, batch).await,
         Err(AppError::Conflict(_))
     ));
-    approve_batch(&pool, batch, s.admin).await.unwrap();
+    approve_batch(&pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
     assert!(matches!(
-        approve_batch(&pool, batch, s.admin).await,
+        approve_batch(&pool, s.workspace, batch, s.admin).await,
         Err(AppError::Conflict(_))
     ));
     assert!(matches!(
-        cancel_batch(&pool, batch).await,
+        cancel_batch(&pool, s.workspace, batch).await,
         Err(AppError::Conflict(_))
     ));
     assert_books(&pool).await;
 
-    mark_paid(&pool, batch).await.unwrap();
+    mark_paid(&pool, s.workspace, batch).await.unwrap();
     assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
     assert_eq!(balance(&pool, &s, s.b).await, (0, 0));
     for order in ["o1", "o2", "o3"] {
@@ -317,12 +333,12 @@ async fn payouts_paid_flow_balances_and_double_pay_is_rejected(pool: PgPool) {
 
     let before = ledger_ids(&pool).await;
     assert!(matches!(
-        mark_paid(&pool, batch).await,
+        mark_paid(&pool, s.workspace, batch).await,
         Err(AppError::Conflict(_))
     ));
     assert_eq!(ledger_ids(&pool).await, before);
     assert!(matches!(
-        mark_paid(&pool, Uuid::now_v7()).await,
+        mark_paid(&pool, s.workspace, Uuid::now_v7()).await,
         Err(AppError::NotFound(_))
     ));
 }
@@ -371,7 +387,12 @@ async fn payouts_chargeback_after_payout_nets_the_next_batch(pool: PgPool) {
     assert_eq!(after.len(), past.len() + 2);
     assert_books(&pool).await;
     // Nothing is owed while the affiliate is in debt.
-    assert_eq!(create_batch(&pool, s.program, s.admin).await.unwrap(), None);
+    assert_eq!(
+        create_batch(&pool, s.workspace, s.program, s.admin)
+            .await
+            .unwrap(),
+        None
+    );
 
     sale(&pool, &s, "o2", 15_000, s.a).await; // 1500 - 1000 clawback
     approve_due(&pool).await.unwrap();
@@ -394,14 +415,16 @@ async fn payouts_reversal_inside_an_open_batch_shrinks_the_payout(pool: PgPool) 
     sale(&pool, &s, "o1", 10_000, s.a).await;
     sale(&pool, &s, "o2", 30_000, s.a).await;
     approve_due(&pool).await.unwrap();
-    let batch = create_batch(&pool, s.program, s.admin)
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
-    approve_batch(&pool, batch, s.admin).await.unwrap();
+    approve_batch(&pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
 
     reverse(&pool, &s, "refund", "o2").await; // 3000 of the 4000
-    mark_paid(&pool, batch).await.unwrap();
+    mark_paid(&pool, s.workspace, batch).await.unwrap();
     let amount: i64 = sqlx::query_scalar("SELECT amount_cents FROM payouts WHERE batch_id = $1")
         .bind(batch)
         .fetch_one(&pool)
@@ -411,6 +434,37 @@ async fn payouts_reversal_inside_an_open_batch_shrinks_the_payout(pool: PgPool) 
     assert_eq!(status_of(&pool, "o1").await, "paid");
     assert_eq!(status_of(&pool, "o2").await, "reversed");
     assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_reversal_after_the_rail_took_the_line_keeps_the_sent_amount(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    sale(&pool, &s, "o1", 10_000, s.a).await;
+    sale(&pool, &s, "o2", 30_000, s.a).await;
+    approve_due(&pool).await.unwrap();
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    approve_batch(&pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
+    // The provider holds the full 4000 for this line (submitted, outcome unknown).
+    sqlx::query("UPDATE payouts SET rail_state = 'submitted' WHERE batch_id = $1")
+        .bind(batch)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    reverse(&pool, &s, "refund", "o2").await;
+    let amount: i64 = sqlx::query_scalar("SELECT amount_cents FROM payouts WHERE batch_id = $1")
+        .bind(batch)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(amount, 4_000, "amount sent to the provider must not shrink");
+    assert_eq!(status_of(&pool, "o2").await, "reversed");
     assert_books(&pool).await;
 }
 
@@ -474,24 +528,26 @@ async fn payouts_cancelled_batch_releases_its_conversions(pool: PgPool) {
     let s = seed(&pool, true).await;
     sale(&pool, &s, "o1", 10_000, s.a).await;
     approve_due(&pool).await.unwrap();
-    let first = create_batch(&pool, s.program, s.admin)
+    let first = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
-    cancel_batch(&pool, first).await.unwrap();
+    cancel_batch(&pool, s.workspace, first).await.unwrap();
     assert!(matches!(
-        approve_batch(&pool, first, s.admin).await,
+        approve_batch(&pool, s.workspace, first, s.admin).await,
         Err(AppError::Conflict(_))
     ));
     assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
 
-    let second = create_batch(&pool, s.program, s.admin)
+    let second = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
     assert_ne!(first, second);
-    approve_batch(&pool, second, s.admin).await.unwrap();
-    mark_paid(&pool, second).await.unwrap();
+    approve_batch(&pool, s.workspace, second, s.admin)
+        .await
+        .unwrap();
+    mark_paid(&pool, s.workspace, second).await.unwrap();
     assert_eq!(status_of(&pool, "o1").await, "paid");
     assert_books(&pool).await;
 }
@@ -502,16 +558,16 @@ async fn payouts_csv_export_is_exact(pool: PgPool) {
     sale(&pool, &s, "o1", 12_345, s.a).await; // 10% of 12345 = 1234.5, rounds half up to 1235
     sale(&pool, &s, "o2", 5_000, s.b).await;
     approve_due(&pool).await.unwrap();
-    let batch = create_batch(&pool, s.program, s.admin)
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(
-        batch_csv(&pool, batch).await.unwrap(),
+        batch_csv(&pool, s.workspace, batch).await.unwrap(),
         "email,amount,currency\na@x.io,12.35,USD\nb@x.io,5.00,USD\n"
     );
     assert!(matches!(
-        batch_csv(&pool, Uuid::now_v7()).await,
+        batch_csv(&pool, s.workspace, Uuid::now_v7()).await,
         Err(AppError::NotFound(_))
     ));
 }
@@ -549,11 +605,13 @@ async fn payouts_clawback_then_refund_in_open_batch_stays_payable(pool: PgPool) 
     reverse(&pool, &s, "chargeback", "o1").await; // payable -1000
     sale(&pool, &s, "o2", 15_000, s.a).await; // +1500 -> 500
     approve_due(&pool).await.unwrap();
-    let batch = create_batch(&pool, s.program, s.admin)
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
-    approve_batch(&pool, batch, s.admin).await.unwrap();
+    approve_batch(&pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
 
     // The 500 payout claimed a 1500 commission; refunding it must not go below zero.
     reverse(&pool, &s, "refund", "o2").await;
@@ -563,12 +621,12 @@ async fn payouts_clawback_then_refund_in_open_batch_stays_payable(pool: PgPool) 
         .await
         .unwrap();
     assert_eq!(amount, 0, "clamped, not -1000");
-    mark_paid(&pool, batch)
+    mark_paid(&pool, s.workspace, batch)
         .await
         .expect("batch is still payable");
     assert_eq!(status_of(&pool, "o2").await, "reversed");
     assert_eq!(
-        batch_csv(&pool, batch).await.unwrap(),
+        batch_csv(&pool, s.workspace, batch).await.unwrap(),
         "email,amount,currency\n"
     );
     assert_books(&pool).await;
@@ -771,18 +829,399 @@ async fn payouts_email_is_snapshotted_when_the_batch_is_drafted(pool: PgPool) {
     let s = seed(&pool, true).await;
     sale(&pool, &s, "o1", 10_000, s.a).await;
     approve_due(&pool).await.unwrap();
-    let batch = create_batch(&pool, s.program, s.admin)
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
         .await
         .unwrap()
         .unwrap();
-    approve_batch(&pool, batch, s.admin).await.unwrap();
+    approve_batch(&pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
 
     sqlx::query("UPDATE affiliates SET payout_email = 'attacker@evil.io' WHERE id = $1")
         .bind(s.a)
         .execute(&pool)
         .await
         .unwrap();
-    let csv = batch_csv(&pool, batch).await.unwrap();
+    let csv = batch_csv(&pool, s.workspace, batch).await.unwrap();
     assert!(csv.contains("a@x.io,10.00,USD"), "{csv}");
     assert!(!csv.contains("evil"), "{csv}");
+}
+
+// ---- C04: db/api fns refuse a foreign workspace even when the handler check is skipped
+
+async fn other_workspace(pool: &PgPool) -> Uuid {
+    let id = Uuid::now_v7();
+    sqlx::query("INSERT INTO workspaces (id, name, slug) VALUES ($1, 'o', $2)")
+        .bind(id)
+        .bind(id.to_string())
+        .execute(pool)
+        .await
+        .unwrap();
+    id
+}
+
+async fn batch_status(pool: &PgPool, batch: Uuid) -> String {
+    sqlx::query_scalar("SELECT status::text FROM payout_batches WHERE id = $1")
+        .bind(batch)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn leak_payout_create_batch_1(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    sale(&pool, &s, "o1", 10_000, s.a).await;
+    approve_due(&pool).await.unwrap();
+    let other = other_workspace(&pool).await;
+    assert!(matches!(
+        create_batch(&pool, other, s.program, s.admin).await,
+        Err(AppError::NotFound(_))
+    ));
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM payout_batches")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 0);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn leak_payout_batch_actions_2(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    sale(&pool, &s, "o1", 10_000, s.a).await;
+    approve_due(&pool).await.unwrap();
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    let other = other_workspace(&pool).await;
+    assert!(matches!(
+        approve_batch(&pool, other, batch, s.admin).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        cancel_batch(&pool, other, batch).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert!(matches!(
+        mark_paid(&pool, other, batch).await,
+        Err(AppError::NotFound(_))
+    ));
+    assert_eq!(batch_status(&pool, batch).await, "draft");
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn leak_payout_batch_csv_3(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    sale(&pool, &s, "o1", 10_000, s.a).await;
+    approve_due(&pool).await.unwrap();
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    let other = other_workspace(&pool).await;
+    assert!(matches!(
+        batch_csv(&pool, other, batch).await,
+        Err(AppError::NotFound(_))
+    ));
+    let mut conn = pool.acquire().await.unwrap();
+    assert!(
+        bf_db::payouts::batch_rows(&mut conn, other, batch)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        bf_db::payouts::owed(&mut conn, other, s.program)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn leak_db_code_and_delivery_fns_4(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    let other = other_workspace(&pool).await;
+    // count_codes: a foreign workspace sees zero codes for this affiliate.
+    assert_eq!(
+        bf_db::affiliates::count_codes(&pool, other, s.a)
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        bf_db::affiliates::count_codes(&pool, s.workspace, s.a)
+            .await
+            .unwrap(),
+        1
+    );
+    // delete_offsite_codes: the foreign workspace deletes nothing (the seed code is offsite: no sites).
+    assert_eq!(
+        bf_db::programs::delete_offsite_codes(&pool, other, s.program)
+            .await
+            .unwrap(),
+        0
+    );
+    let n: i64 = sqlx::query_scalar("SELECT count(*) FROM referral_codes")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(n, 2);
+}
+
+// ---- payout rails (B04)
+
+use api::payout_rails::{MockRail, RailClient, dispatch, load_client, reconcile};
+use bf_core::Rail;
+use bf_core::secrets::Vault;
+use std::collections::HashMap;
+use std::sync::Arc;
+
+/// Two affiliates owed 1000 each, batch drafted and approved but not paid.
+async fn approved_batch(pool: &PgPool) -> (Seed, Uuid) {
+    let s = seed(pool, true).await;
+    sale(pool, &s, "o1", 10_000, s.a).await;
+    sale(pool, &s, "o2", 10_000, s.b).await;
+    approve_due(pool).await.unwrap();
+    let batch = create_batch(pool, s.workspace, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    approve_batch(pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
+    (s, batch)
+}
+
+fn mock() -> (Arc<MockRail>, RailClient) {
+    let m = Arc::new(MockRail::default());
+    (m.clone(), RailClient::Mock(m))
+}
+
+async fn line_states(pool: &PgPool, batch: Uuid) -> Vec<(String, String, Option<String>)> {
+    sqlx::query_as(
+        "SELECT COALESCE(payout_email, ''), status::text, rail_state FROM payouts \
+         WHERE batch_id = $1 ORDER BY payout_email",
+    )
+    .bind(batch)
+    .fetch_all(pool)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_manual_csv_leaves_rail_columns_empty(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    mark_paid(&pool, s.workspace, batch).await.unwrap();
+    let rows = line_states(&pool, batch).await;
+    assert!(rows.iter().all(|r| r.1 == "paid" && r.2.is_none()));
+    let rails: Vec<String> = sqlx::query_scalar("SELECT DISTINCT rail FROM payouts")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(rails, ["manual_csv"]);
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_mock_pays_each_line_once_and_posts_ledger(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.probe(pool.clone());
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.failed, out.submitted), (2, 0, 0));
+    assert!(out.batch_paid);
+    assert_eq!(batch_status(&pool, batch).await, "paid");
+    assert_eq!((m.accepted(), m.total_cents()), (2, 2_000));
+    let rows = line_states(&pool, batch).await;
+    assert!(
+        rows.iter()
+            .all(|r| r.1 == "paid" && r.2.as_deref() == Some("paid"))
+    );
+    let receipts: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM payouts WHERE rail_receipt IS NOT NULL")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(receipts, 2);
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_books(&pool).await;
+    // A paid batch cannot be sent again.
+    assert!(
+        dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+            .await
+            .is_err()
+    );
+    assert_eq!(m.accepted(), 2);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_provider_call_runs_outside_any_db_transaction(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.probe(pool.clone());
+    dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(m.calls(), 2);
+    assert_eq!(m.idle_in_tx_seen(), 0);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_provider_failure_mid_batch_then_retry_never_double_pays(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.reject("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    // a fails, b (processed after the failure) still goes out.
+    assert_eq!((out.paid, out.failed), (1, 1));
+    assert!(!out.batch_paid);
+    assert_eq!(batch_status(&pool, batch).await, "approved");
+    let rows = line_states(&pool, batch).await;
+    assert_eq!(
+        rows,
+        [
+            ("a@x.io".into(), "approved".into(), Some("failed".into())),
+            ("b@x.io".into(), "paid".into(), Some("paid".into())),
+        ]
+    );
+    // Only the confirmed line hit the ledger.
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+    assert_eq!(balance(&pool, &s, s.b).await, (0, 0));
+    let err: Option<String> =
+        sqlx::query_scalar("SELECT rail_error FROM payouts WHERE payout_email = 'a@x.io'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(err.unwrap().contains("refused"));
+    assert_books(&pool).await;
+
+    // Manual pay is allowed for a failed line only once nothing is in flight; here retry the rail.
+    m.heal("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.failed), (1, 0));
+    assert!(out.batch_paid);
+    // Two lines, two keys, 2000 total: b was not sent again.
+    assert_eq!((m.accepted(), m.total_cents()), (2, 2_000));
+    assert_eq!(m.calls(), 4 - 1);
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_timeout_is_retried_with_the_same_key(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.transient("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.submitted), (1, 1));
+    // Unknown outcome: stays submitted, no receipt, nothing posted for it.
+    let rows = line_states(&pool, batch).await;
+    assert_eq!(rows[0].2.as_deref(), Some("submitted"));
+    assert_eq!(rows[0].1, "approved");
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+    // Pay-by-hand is refused while the provider may have the money.
+    assert!(matches!(
+        mark_paid(&pool, s.workspace, batch).await,
+        Err(AppError::Conflict(_))
+    ));
+    m.heal("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(out.paid, 1);
+    assert!(out.batch_paid);
+    assert_eq!(m.accepted(), 2);
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_pending_posts_ledger_only_after_reconcile_confirms(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    let (m, client) = mock();
+    m.hold("a@x.io");
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.submitted), (1, 1));
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000)); // not paid yet
+    let st: (String, Option<String>) =
+        sqlx::query_as("SELECT rail_state, rail_status FROM payouts WHERE payout_email = 'a@x.io'")
+            .fetch_one(&pool)
+            .await
+            .map(|r: (Option<String>, Option<String>)| (r.0.unwrap(), r.1))
+            .unwrap();
+    assert_eq!(st, ("submitted".into(), Some("pending".into())));
+
+    // Re-dispatch does not send the held line again.
+    dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(m.calls(), 2);
+
+    let clients = HashMap::from([(Rail::Mock, client.clone())]);
+    let out = reconcile(&pool, s.workspace, batch, &clients)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.submitted, out.batch_paid), (0, 1, false));
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+
+    m.release();
+    let out = reconcile(&pool, s.workspace, batch, &clients)
+        .await
+        .unwrap();
+    assert_eq!((out.paid, out.batch_paid), (1, true));
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 0));
+    assert_eq!(batch_status(&pool, batch).await, "paid");
+    assert_books(&pool).await;
+    // Reconciling again changes nothing.
+    let before = ledger_ids(&pool).await;
+    reconcile(&pool, s.workspace, batch, &clients)
+        .await
+        .unwrap();
+    assert_eq!(ledger_ids(&pool).await, before);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_unconfigured_provider_is_422_and_touches_nothing(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    for rail in [Rail::PaypalPayouts, Rail::Wise] {
+        let err = load_client(&pool, &Vault::plaintext(), s.workspace, rail)
+            .await
+            .err()
+            .unwrap();
+        assert!(matches!(err, AppError::Unprocessable(_)));
+    }
+    assert_eq!(batch_status(&pool, batch).await, "approved");
+    assert!(
+        line_states(&pool, batch)
+            .await
+            .iter()
+            .all(|r| r.1 == "approved" && r.2.is_none())
+    );
+    assert_eq!(balance(&pool, &s, s.a).await, (0, 1_000));
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn payout_rail_zero_amount_line_is_closed_without_a_provider_call(pool: PgPool) {
+    let (s, batch) = approved_batch(&pool).await;
+    sale(&pool, &s, "o3", 5_000, s.b).await; // unrelated; keeps b earning
+    reverse(&pool, &s, "refund", "o2").await; // shrinks b's open payout to 0
+    let (m, client) = mock();
+    let out = dispatch(&pool, s.workspace, batch, Rail::Mock, &client)
+        .await
+        .unwrap();
+    assert_eq!(out.paid, 1);
+    assert!(out.batch_paid);
+    assert_eq!(m.accepted(), 1);
+    assert_books(&pool).await;
 }

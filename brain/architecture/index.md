@@ -10,3 +10,4 @@
 - [Analytics Rollups & Reports](/architecture/analytics.md) — T23 rollup tick, watermark, summary/timeseries/CSV routes
 - [Ops Routes, Webhooks and Email](/architecture/ops.md) — T24 outbox dispatcher, signed webhooks + retry, lettre templates, notifications, contacts, settings, audit
 - [Observability](/architecture/observability.md) — T41 Prometheus `/metrics`, series list, separate metrics port
+- [Secrets and Tracker Contract](/architecture/secrets.md) — envelope sealing, key ring, v2 contract enforcement, isolation

@@ -5,6 +5,10 @@ use bf_spool::{FsyncMode, SpoolConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if std::env::args().nth(1).as_deref() == Some("openapi") {
+        println!("{}", tracker::openapi::json());
+        return Ok(());
+    }
     bf_rt::init_tracing();
     let cfg = Config::from_env()?;
     let fsync = match std::env::var("BF_FSYNC").as_deref() {
@@ -14,7 +18,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let pool = bf_db::connect(&cfg.database_url).await?;
     let spool = SpoolConfig::new(&cfg.spool_dir).with_fsync_mode(fsync);
     // Optional DB-IP lite country database (`scripts/fetch-dbip.sh`); unset = header only.
-    let geo = match std::env::var_os("BF_GEOIP_DB") {
+    // Compose passes an unset `BF_GEOIP_DB` as an empty string: that also means "disabled".
+    let geo = match std::env::var_os("BF_GEOIP_DB").filter(|p| !p.is_empty()) {
         Some(path) => tracker::geo::Geo::open(path.as_ref())?,
         None => tracker::geo::Geo::disabled(),
     };
@@ -27,8 +32,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         );
     }
     let trust = tracker::proxy::Trust::from_lookup(|k| std::env::var(k).ok())?;
-    let mut tracker = tracker::start(pool, spool, &ip_salt, geo).await?;
+    let vault = std::sync::Arc::new(load_vault()?);
+    let mut tracker = tracker::start(pool, spool, &ip_salt, geo, vault).await?;
     tracker.state.trust = std::sync::Arc::new(trust);
+    let _space = bf_spool::space::spawn_sampler(
+        tracker.state.spool.clone(),
+        bf_spool::space::SpaceConfig::from_lookup(|k| std::env::var(k).ok()),
+        tracker::metrics::spool_report,
+    );
 
     let metrics = tokio::spawn(bf_rt::metrics::serve(
         "127.0.0.1:9100",
@@ -38,13 +49,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!(port = cfg.tracker_port, "tracker started");
     let app = tracker::router(tracker.state).into_make_service_with_connect_info::<SocketAddr>();
     axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
+        .with_graceful_shutdown(bf_rt::shutdown_signal())
         .await?;
     // The router is gone, so the queue is closed: let the writer drain it.
     tracker.writer.await?;
     tracker.watcher.abort();
     metrics.abort();
     Ok(())
+}
+
+/// Master keys from `BF_MASTER_KEYS` / `BF_MASTER_KEY_FILE`; plaintext only with
+/// `BF_ALLOW_PLAINTEXT_SECRETS=1`.
+fn load_vault() -> Result<bf_core::secrets::Vault, bf_core::secrets::SecretsError> {
+    let allow = matches!(
+        std::env::var("BF_ALLOW_PLAINTEXT_SECRETS").as_deref(),
+        Ok("1" | "true")
+    );
+    bf_core::secrets::Vault::from_env(allow)
 }

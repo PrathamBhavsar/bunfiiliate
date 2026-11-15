@@ -30,16 +30,28 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
       API_PORT: 8080
       TRACKER_PORT: 8081
+      TRACKER_INTERNAL_URL: http://tracker:8081
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
+      BF_MASTER_KEYS: ${BF_MASTER_KEYS:?set BF_MASTER_KEYS in .env (see docs/self-hosting.md)}
       SPOOL_DIR: /var/spool/bunfiiliate
       SMTP_URL: ${SMTP_URL:-}
       SMTP_FROM: ${SMTP_FROM:-bunfiiliate <noreply@example.com>}
       # Secure cookies need https; set COOKIE_SECURE=0 only with SITE_ADDRESS=:80 for local use.
       COOKIE_SECURE: ${COOKIE_SECURE:-1}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-0}
+      BF_HSTS: ${BF_HSTS:-0}
+      BF_JWT_SECRETS: ${BF_JWT_SECRETS:-}
+      TAX_REPORT_THRESHOLD_CENTS: ${TAX_REPORT_THRESHOLD_CENTS:-60000}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - spool_data:/var/spool/bunfiiliate
       - web_static:/var/www/html
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
 
   tracker:
     build:
@@ -55,17 +67,25 @@ services:
       API_PORT: 8080
       TRACKER_PORT: 8081
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (openssl rand -hex 32)}
+      BF_MASTER_KEYS: ${BF_MASTER_KEYS:?set BF_MASTER_KEYS in .env (see docs/self-hosting.md)}
       SPOOL_DIR: /var/spool/bunfiiliate
       BF_FSYNC: ${BF_FSYNC:-always}
       BF_GEOIP_DB: ${BF_GEOIP_DB:-}
       BF_IP_SALT: ${BF_IP_SALT:?set BF_IP_SALT in .env (openssl rand -hex 32)}
       BF_TRUST_CF: ${BF_TRUST_CF:-0}
+      BF_V1_SUNSET: ${BF_V1_SUNSET:-}
       # Caddy reaches the tracker over the compose network; believe its X-Forwarded-For, or
       # every click would be attributed to Caddy's own address.
       BF_TRUSTED_PROXIES: ${BF_TRUSTED_PROXIES:-172.16.0.0/12,10.0.0.0/8,192.168.0.0/16}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - spool_data:/var/spool/bunfiiliate
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
 
   caddy:
     image: caddy:2-alpine

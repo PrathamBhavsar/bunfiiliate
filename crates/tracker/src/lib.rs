@@ -1,11 +1,15 @@
 //! Tracker: validates against an in-memory snapshot, spools every click durably,
 //! then batches it into Postgres. No DB call on the request path.
 
+pub mod deprecation;
 pub mod event;
 pub mod geo;
+pub mod idem;
 pub mod metrics;
+pub mod openapi;
 pub mod proxy;
 pub mod snapshot;
+pub mod v2;
 pub mod webhook;
 pub mod writer;
 
@@ -37,19 +41,22 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
+use bf_core::secrets::Vault;
 use event::{clip, ip_hash, normalize_ua, referrer_host, url_path, with_click};
 use geo::Geo;
 use proxy::Trust;
 use snapshot::{CodeEntry, Snapshot};
+use v2::ApiError;
 use webhook::Source;
 use writer::{Error, Queued, Record};
 
-const TRACKER_JS: &[u8] = include_bytes!("../js/tracker.min.js");
+const TRACKER_JS: &[u8] = include_bytes!("../js/tracker.v2.min.js");
 const QUEUE_CAPACITY: usize = 10_000;
 /// Share of the queue (a tenth) clicks may not take: a click flood must not make Stripe or
 /// Paddle deliveries get 503 (they retry, but late conversions delay payouts).
 const EVENT_RESERVE_DIVISOR: usize = 10;
 const MAX_BODY: usize = 8 * 1024;
+const V2_MAX_BEACON: usize = 4 * 1024;
 const MAX_EVENT_BODY: usize = 256 * 1024;
 
 static TRACKER_JS_ETAG: LazyLock<String> = LazyLock::new(|| {
@@ -69,6 +76,8 @@ pub struct AppState {
     pub trust: Arc<Trust>,
     pub geo: Arc<Geo>,
     pub fraud: Arc<[Box<dyn FraudRule>]>,
+    /// `/v2` duplicate detection (in memory, bounded).
+    pub idem: Arc<idem::Idem>,
 }
 
 pub struct Tracker {
@@ -84,12 +93,13 @@ pub async fn start(
     spool: SpoolConfig,
     ip_salt: &str,
     geo: Geo,
+    vault: Arc<Vault>,
 ) -> Result<Tracker, Error> {
     let spool = SpoolWriter::open(spool).await?;
     let checkpoint = writer::replay(&pool, &spool).await?;
     metrics::SPOOL_BYTES.max(checkpoint);
     metrics::SPOOL_CHECKPOINT.set(checkpoint);
-    let (snapshot, watcher) = snapshot::load_and_watch(pool.clone()).await?;
+    let (snapshot, watcher) = snapshot::load_and_watch(pool.clone(), vault).await?;
     let (queue, rx) = mpsc::channel(QUEUE_CAPACITY);
     let writer = writer::spawn(pool.clone(), spool.clone(), rx, checkpoint);
     let state = AppState {
@@ -101,6 +111,7 @@ pub async fn start(
         trust: Arc::default(),
         geo: Arc::new(geo),
         fraud: default_rules().into(),
+        idem: Arc::default(),
     };
     Ok(Tracker {
         state,
@@ -111,22 +122,45 @@ pub async fn start(
 
 pub fn router(state: AppState) -> Router {
     // Conversion payloads (Stripe events especially) outgrow the click body limit.
+    let v2_events = Router::new()
+        .route("/v2/events/{key}", post(v2_event))
+        .route("/v2/webhooks/stripe/{key}", post(v2_stripe))
+        .route("/v2/webhooks/paddle/{key}", post(v2_paddle))
+        .layer(DefaultBodyLimit::max(MAX_EVENT_BODY))
+        .layer(map_response(v2::json_errors));
+    let v2_beacon = Router::new()
+        .route(
+            "/v2/c",
+            post(v2_beacon)
+                .options(preflight)
+                .layer(map_response(cors))
+                .layer(map_response(v2::json_errors)),
+        )
+        .layer(DefaultBodyLimit::max(V2_MAX_BEACON));
     let events = Router::new()
         .route("/v1/events/{key}", post(generic_event))
         .route("/v1/webhooks/stripe/{key}", post(stripe_webhook))
         .route("/v1/webhooks/paddle/{key}", post(paddle_webhook))
-        .layer(DefaultBodyLimit::max(MAX_EVENT_BODY));
+        .layer(DefaultBodyLimit::max(MAX_EVENT_BODY))
+        .route_layer(axum::middleware::from_fn(deprecation::v1));
     Router::new()
+        .route("/v2/openapi.json", get(openapi::serve))
         .route("/t.js", get(tracker_js))
         .route("/r/{code}", get(redirect))
         .route(
             "/c",
-            post(beacon).options(preflight).layer(map_response(cors)),
+            post(beacon)
+                .options(preflight)
+                .layer(map_response(cors))
+                .route_layer(axum::middleware::from_fn(deprecation::v1)),
         )
         .route("/healthz", get(|| async { "ok" }))
         .route("/readyz", get(readyz))
         .layer(DefaultBodyLimit::max(MAX_BODY))
         .merge(events)
+        .merge(v2_events)
+        .merge(v2_beacon)
+        .layer(map_response(retry_after))
         .with_state(state)
 }
 
@@ -138,6 +172,16 @@ async fn tracker_js(headers: HeaderMap) -> Response {
     }
     let js = [(CONTENT_TYPE, "application/javascript; charset=utf-8")];
     (cache, js, TRACKER_JS).into_response()
+}
+
+/// Every 503 tells clients when to come back (writer queue full or spool disk full).
+async fn retry_after(mut res: Response) -> Response {
+    if res.status() == StatusCode::SERVICE_UNAVAILABLE {
+        res.headers_mut()
+            .entry(axum::http::header::RETRY_AFTER)
+            .or_insert(HeaderValue::from_static("5"));
+    }
+    res
 }
 
 async fn readyz(State(s): State<AppState>) -> StatusCode {
@@ -173,6 +217,12 @@ async fn redirect(
     let Ok(location) = HeaderValue::try_from(location) else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
+    // Spool disk full: the visitor still gets to the landing page, but the click is lost
+    // (counted in `bf_spool_shed_total{route="r"}`). Redirecting beats a dead link.
+    if s.spool.is_shedding() {
+        metrics::spool_shed("r");
+        return (StatusCode::FOUND, [(LOCATION, location)]).into_response();
+    }
     match ingest(s, Record::Click(click)).await {
         Ok(()) => (StatusCode::FOUND, [(LOCATION, location)]).into_response(),
         Err(status) => status.into_response(),
@@ -269,6 +319,9 @@ async fn conversion(
 ) -> StatusCode {
     let snap = s.snapshot.load_full();
     let Some(program) = snap.programs.get(key) else {
+        if snap.broken.contains(key) {
+            return StatusCode::SERVICE_UNAVAILABLE;
+        }
         return StatusCode::NOT_FOUND;
     };
     let Some(secret) = source.secret(program) else {
@@ -300,6 +353,160 @@ async fn conversion(
         Ok(()) => source.accepted(),
         Err(status) => status,
     }
+}
+
+async fn v2_beacon(
+    State(s): State<AppState>,
+    headers: HeaderMap,
+    ext: Extensions,
+    body: Bytes,
+) -> Result<StatusCode, ApiError> {
+    let b = v2::parse_beacon(&body)?;
+    // A click id alone was recorded by `/r`: recording again would double count.
+    let Some(code) = b.code.as_deref() else {
+        return Ok(StatusCode::NO_CONTENT);
+    };
+    let snap = s.snapshot.load_full();
+    let Some(entry) = snap.codes.get(code) else {
+        return Err(ApiError::new(
+            StatusCode::NOT_FOUND,
+            "unknown_code",
+            "unknown referral code",
+        ));
+    };
+    let click = s.click(
+        code,
+        entry,
+        Some(&b.vid),
+        b.referrer.as_deref(),
+        &b.url,
+        &headers,
+        &ext,
+    );
+    ingest(s, Record::Click(click))
+        .await
+        .map(|()| StatusCode::NO_CONTENT)
+        .map_err(ApiError::from_status)
+}
+
+async fn v2_event(
+    State(s): State<AppState>,
+    Path(key): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiError> {
+    v2_conversion(Source::GenericV2, s, &key, &headers, &body).await
+}
+
+async fn v2_stripe(
+    State(s): State<AppState>,
+    Path(key): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiError> {
+    v2_conversion(Source::Stripe, s, &key, &headers, &body).await
+}
+
+async fn v2_paddle(
+    State(s): State<AppState>,
+    Path(key): Path<String>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, ApiError> {
+    v2_conversion(Source::Paddle, s, &key, &headers, &body).await
+}
+
+/// `/v2` ingest. Order: program (404), Idempotency-Key shape (400), signature (401), body
+/// validation (400). Nothing is spooled unless every check passes. Duplicate detection is
+/// A12b: a repeated key answers 200 with the first id (409 if the body differs).
+async fn v2_conversion(
+    source: Source,
+    s: AppState,
+    key: &str,
+    headers: &HeaderMap,
+    body: &[u8],
+) -> Result<Response, ApiError> {
+    let snap = s.snapshot.load_full();
+    let program = if v2::valid_program_key(key) {
+        snap.programs.get(key)
+    } else {
+        None
+    };
+    let Some(program) = program else {
+        return Err(if snap.broken.contains(key) {
+            ApiError::from_status(StatusCode::SERVICE_UNAVAILABLE)
+        } else {
+            ApiError::new(
+                StatusCode::NOT_FOUND,
+                "unknown_program",
+                "unknown program key",
+            )
+        });
+    };
+    if source == Source::GenericV2 {
+        let ok = v2::header(headers, "idempotency-key").is_some_and(v2::valid_idempotency_key);
+        if !ok {
+            return Err(ApiError::invalid(
+                "Idempotency-Key required, [A-Za-z0-9_-]{1,64}",
+            ));
+        }
+    }
+    let Some(secret) = source.secret(program) else {
+        return Err(ApiError::invalid("no secret configured for this source"));
+    };
+    if let Err(e) = source.verify(headers, body, secret) {
+        tracing::debug!(error = ?e, source = source.name(), "v2 webhook rejected");
+        return Err(ApiError::new(
+            StatusCode::UNAUTHORIZED,
+            "invalid_signature",
+            "signature missing, malformed, wrong or expired",
+        ));
+    }
+    let payload = if source == Source::GenericV2 {
+        v2::parse_event(body)?.payload
+    } else {
+        if v2::has_nul(body) {
+            return Err(ApiError::invalid("NUL character in body"));
+        }
+        serde_json::from_slice::<Value>(body).map_err(|e| ApiError::invalid(e.to_string()))?
+    };
+    let Some(external_id) = source.external_id(headers, &payload) else {
+        return Err(ApiError::invalid("missing event id"));
+    };
+    let id = Uuid::now_v7();
+    let (pid, name) = (program.program_id, source.name());
+    let claim = s
+        .idem
+        .claim(pid, name, &external_id, idem::digest(body), id);
+    match claim {
+        idem::Claim::Duplicate(first) => {
+            let body = axum::Json(serde_json::json!({"status": "duplicate", "id": first}));
+            return Ok((StatusCode::OK, body).into_response());
+        }
+        idem::Claim::Conflict => {
+            return Err(ApiError::new(
+                StatusCode::CONFLICT,
+                "idempotency_conflict",
+                "Idempotency-Key was already used with a different body",
+            ));
+        }
+        idem::Claim::New => {}
+    }
+    let event = InboundEvent {
+        id,
+        program_id: pid,
+        source: name.to_owned(),
+        external_id: external_id.clone(),
+        payload,
+        received_ms: now_ms(),
+    };
+    let idem_state = s.idem.clone();
+    if let Err(status) = ingest(s, Record::Event(event)).await {
+        idem_state.release(pid, name, &external_id);
+        return Err(ApiError::from_status(status));
+    }
+    let body = axum::Json(serde_json::json!({"status": "accepted", "id": id}));
+    Ok((source.accepted(), body).into_response())
 }
 
 async fn preflight(headers: HeaderMap) -> impl IntoResponse {
@@ -389,6 +596,16 @@ impl AppState {
 /// ack), then hand it to the DB writer. Runs detached so a dropped client connection
 /// cannot strand a spooled record outside the queue and stall the checkpoint.
 async fn ingest(state: AppState, record: Record) -> Result<(), StatusCode> {
+    // Disk full: 503 before taking a queue slot. `/c` and the event routes land here;
+    // `/r` is handled in `redirect` so it can still redirect.
+    if state.spool.is_shedding() {
+        metrics::spool_shed(if matches!(record, Record::Click(_)) {
+            "c"
+        } else {
+            "events"
+        });
+        return Err(StatusCode::SERVICE_UNAVAILABLE);
+    }
     let started = Instant::now();
     let task = tokio::spawn(async move {
         // Clicks leave the last tenth of the queue to signed conversion events.
@@ -405,6 +622,14 @@ async fn ingest(state: AppState, record: Record) -> Result<(), StatusCode> {
             })?;
         let payload = serde_json::to_vec(&record).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         let end = state.spool.write(&payload).await.map_err(|e| {
+            if matches!(e, bf_spool::SpoolError::Full) {
+                metrics::spool_shed(if matches!(record, Record::Click(_)) {
+                    "c"
+                } else {
+                    "events"
+                });
+                return StatusCode::SERVICE_UNAVAILABLE;
+            }
             tracing::error!(error = %e, "spool write failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;

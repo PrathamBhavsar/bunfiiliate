@@ -1,0 +1,229 @@
+#!/usr/bin/env python3
+"""Render docs/benchmarks.md and the site/index.html datasheet from a full bench result.
+
+  python -I bench/gen_docs.py RESULT.json          # write docs + site
+  python -I bench/gen_docs.py --check RESULT.json  # verify site numbers == result (exit 1 on drift)
+  python -I bench/gen_docs.py --latest             # print path of latest full result, if any
+"""
+import glob
+import json
+import os
+import re
+import sys
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SITE = os.path.join(ROOT, "site", "index.html")
+DOCS = os.path.join(ROOT, "docs", "benchmarks.md")
+
+# (row id, endpoint, fsync) -- row ids are the data-benchmark keys in site/index.html.
+ROWS = [
+    ("fsync_always_c", "/c", "always"),
+    ("fsync_always_r", "/r/:code", "always"),
+    ("fsync_always_webhook", "/v1/events/:key", "always"),
+    ("fsync_off_c", "/c", "off"),
+    ("fsync_off_r", "/r/:code", "off"),
+    ("fsync_off_webhook", "/v1/events/:key", "off"),
+]
+
+
+def num(x):
+    x = round(float(x), 3)
+    s = repr(x)
+    return s[:-2] if s.endswith(".0") else s
+
+
+def rps(x):
+    s = repr(round(float(x), 2))
+    return s[:-2] if s.endswith(".0") else s
+
+
+def ms(x):
+    return f"{num(x)} ms"
+
+
+def status_str(ep):
+    tot = {}
+    for r in ep["runs"]:
+        for k, v in r.get("status", {}).items():
+            tot[k] = tot.get(k, 0) + v
+    return ", ".join(f"{k}: {v}" for k, v in sorted(tot.items())) or "N/A"
+
+
+def status_html(ep):
+    tot = {}
+    for r in ep["runs"]:
+        for k, v in r.get("status", {}).items():
+            tot[k] = tot.get(k, 0) + v
+    return ", ".join(f'{k}: <span class="num">{v}</span>' for k, v in sorted(tot.items())) or "N/A"
+
+
+def values(doc):
+    by = {(r["endpoint"], r["fsync"]): r for r in doc["results"]}
+    out = {}
+    for rid, ep, fs in ROWS:
+        r = by[(ep, fs)]
+        out[rid] = {
+            "rps": rps(r["median_rps"]),
+            "p50": ms(r["median_p50_ms"]),
+            "p95": ms(r["median_p95_ms"]),
+            "p99": ms(r["median_p99_ms"]),
+            "errors": str(r["errors_total"]),
+            "status": status_str(r),
+            "status_html": status_html(r),
+        }
+    return out
+
+
+def load(path):
+    with open(path, "r", encoding="utf-8") as f:
+        doc = json.load(f)
+    if doc.get("schema_version") != 1 or doc.get("quick"):
+        sys.exit(f"{path}: not a full schema_version=1 result")
+    return doc
+
+
+def latest():
+    files = sorted(
+        p for p in glob.glob(os.path.join(ROOT, "bench", "results", "*.json")) if not p.endswith("-quick.json")
+    )
+    for p in reversed(files):
+        try:
+            with open(p, encoding="utf-8") as f:
+                if json.load(f).get("schema_version") == 1:
+                    return p
+        except ValueError:
+            pass
+    return None
+
+
+ROW_RE = r'(<tr[^>]*data-benchmark="{id}"[^>]*>)(.*?)(</tr>)'
+METRIC_RE = r'(data-metric="{m}"[^>]*>)([^<]*)(<)'
+
+
+def render_site(html, vals):
+    for rid, _, _ in ROWS:
+        m = re.search(ROW_RE.format(id=rid), html, re.DOTALL)
+        if not m:
+            sys.exit(f"site row {rid} not found")
+        body = m.group(2)
+        v = vals[rid]
+        order = [v["rps"], v["p50"], v["p95"], v["p99"], v["errors"]]
+        it = iter(order)
+        body = re.sub(r'(<span class="num"[^>]*>)([^<]*)(</span>)', lambda mm: mm.group(1) + next(it, mm.group(2)) + mm.group(3), body, count=5)
+        body = re.sub(r"(<td>)(?:(?!<td).)*?(</td>\s*)$", lambda mm: mm.group(1) + v["status_html"] + mm.group(2), body, flags=re.DOTALL)
+        html = html[: m.start(2)] + body + html[m.end(2) :]
+    return html
+
+
+def check(doc, html):
+    vals = values(doc)
+    errs = []
+    for rid, _, _ in ROWS:
+        m = re.search(ROW_RE.format(id=rid), html, re.DOTALL)
+        if not m:
+            errs.append(f"row {rid} not found in site/index.html")
+            continue
+        for metric in ("rps", "p50", "p99"):
+            mm = re.search(METRIC_RE.format(m=metric), m.group(2))
+            got = mm.group(2).strip() if mm else None
+            if got != vals[rid][metric]:
+                errs.append(f"[{rid}] {metric}: site has {got!r}, result expects {vals[rid][metric]!r}")
+    return errs
+
+
+def md(doc):
+    hw, p = doc["hardware"], doc["params"]
+    rows = []
+    by = {(r["endpoint"], r["fsync"]): r for r in doc["results"]}
+    for fs in ("always", "off"):
+        for ep in ("/c", "/r/:code", "/v1/events/:key"):
+            r = by[(ep, fs)]
+            rows.append(
+                f"| `{ep}` | {fs} | {rps(r['median_rps'])} ({rps(r['min_rps'])} to {rps(r['max_rps'])}) "
+                f"| {ms(r['median_p50_ms'])} | {ms(r['median_p95_ms'])} | {ms(r['median_p99_ms'])} "
+                f"| {r['errors_total']} | {status_str(r)} |"
+            )
+    table = "\n".join(rows)
+    return f"""# Load Benchmarks
+
+<!-- generated by `bench/run.sh --write-docs` from bench/results/{doc['date']}-{doc['git_sha']}.json; do not edit the generated section by hand -->
+
+Load test results for the `tracker` ingress endpoints.
+
+## Test Environment
+
+- **CPU**: {hw['cpu']} ({hw['cores']} cores)
+- **RAM**: {hw['ram_gb']} GB
+- **Operating System**: {hw['os']}
+- **PostgreSQL**: {hw['pg_version']}
+- **Rust Toolchain**: {hw['rustc']}
+- **Load Generator**: {hw['oha_version']}
+- **Git SHA**: `{doc['git_sha']}`
+- **Hardware class**: `{hw['class']}`
+- **Spool filesystem**: {hw['spool_fs']}
+- **`BF_FSYNC` modes**: {', '.join(hw['fsync_modes'])} (reported separately, never mixed)
+- **Parameters**: {p['concurrency']} connections, {p['duration_s']} s per run, {p['repeats']} repeats per endpoint and mode, {p['warmup_s']} s discarded warm-up, seed {p['seed']}
+
+> [!NOTE]
+> **Single-Machine Localhost Run**: All tests ran on a single machine. The load generator (`oha`), the `tracker` binary, and PostgreSQL shared the same CPU cores, RAM, and SSD I/O bandwidth. Treat these numbers as a floor for this machine, not a production capacity claim.
+
+## Results Summary
+
+Requests/sec is the median of {p['repeats']} runs with (min to max). Latencies are medians across runs.
+
+| Endpoint | `BF_FSYNC` | Requests/sec (min to max) | Latency p50 | Latency p95 | Latency p99 | Errors | Status Codes |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+{table}
+
+## Architecture & Analysis
+
+1. **Hot-Path Validation**: Every request is validated against an in-memory snapshot (`Snapshot` in `ArcSwap`). There are zero synchronous database round-trips during request handling.
+2. **Durability Modes**:
+   - **`BF_FSYNC=always`**: The spool writer groups requests and issues an `fdatasync`/`fsync` per group before acknowledging the HTTP request. Latency is dominated by the flush wait.
+   - **`BF_FSYNC=off`**: Spool writes enter the OS page cache immediately. A host crash can lose recent clicks. Throughput is much higher with sub-millisecond p50.
+3. **Decoupled Postgres Ingest**: A background worker batch-inserts spooled records into Postgres using `UNNEST` and advances the WAL checkpoint asynchronously, shielding ingress from database lock contention.
+
+{RULES}"""
+
+
+RULES = """## Publishing Rules
+
+These rules apply to every benchmark number in this repo, the README, and `site/index.html`.
+
+1. Numbers are published only from a full `bench/run.sh` run whose result JSON (with its `hardware` block and git sha) is committed under `bench/results/`. Quick runs (`--quick`) are never published.
+2. Always state the hardware, the `BF_FSYNC` mode, and the localhost single-machine caveat (the NOTE above).
+3. Never mix `BF_FSYNC` modes in one claim. Quote `always` and `off` separately.
+4. These numbers are a floor for the measured machine, not a capacity claim.
+5. No comparison claims against other products without a run of both on the same hardware.
+6. Regenerate with `bench/run.sh --write-docs`. It rewrites this file and the datasheet in `site/index.html`. `scripts/check-bench-numbers.sh` (part of the final gate) fails if the site drifts from the latest result.
+7. Regression gating: `python -I bench/compare.py RESULT BASELINE` against `bench/baseline/<hardware class>.json`. Updating a baseline requires a PR that touches `bench/baseline/*` and states the reason in the description.
+"""
+
+
+def main(argv):
+    if argv[:1] == ["--latest"]:
+        p = latest()
+        print(p or "")
+        return 0 if p else 1
+    if argv[:1] == ["--check"]:
+        doc = load(argv[1])
+        site = argv[2] if len(argv) > 2 else SITE
+        errs = check(doc, open(site, encoding="utf-8").read())
+        for e in errs:
+            print("  -", e, file=sys.stderr)
+        return 1 if errs else 0
+    if len(argv) != 1:
+        print(__doc__, file=sys.stderr)
+        return 2
+    doc = load(argv[0])
+    with open(DOCS, "w", encoding="utf-8") as f:
+        f.write(md(doc))
+    html = open(SITE, encoding="utf-8").read()
+    with open(SITE, "w", encoding="utf-8") as f:
+        f.write(render_site(html, values(doc)))
+    print(f"wrote {DOCS} and {SITE}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

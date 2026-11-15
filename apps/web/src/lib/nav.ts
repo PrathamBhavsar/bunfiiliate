@@ -3,6 +3,7 @@ import {
   Bell,
   BookOpen,
   Boxes,
+  CreditCard,
   ChartLine,
   FileDown,
   Inbox,
@@ -39,6 +40,7 @@ export const NAV: NavItem[] = [
   { href: "/email-templates", label: "Email templates", icon: Mail, group: "Operations", role: "admin" },
   { href: "/contact-requests", label: "Contact requests", icon: Inbox, group: "Operations", role: "admin" },
   { href: "/audit-log", label: "Audit log", icon: ScrollText, group: "Operations", role: "admin" },
+  { href: "/settings/billing", label: "Billing", icon: CreditCard, group: "Operations", role: "admin" },
   { href: "/settings", label: "Settings", icon: Settings, group: "Operations", role: "admin" },
   { href: "/me", label: "Dashboard", icon: LayoutDashboard, group: "Portal", role: "affiliate" },
   { href: "/me/links", label: "Links", icon: Link2, group: "Portal", role: "affiliate" },
@@ -57,5 +59,10 @@ export const homeFor = (role: Role) => (isAdmin(role) ? "/dashboard" : "/me");
 
 export function canAccess(role: Role, pathname: string) {
   const path = pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname;
-  return navFor(role).some((item) => item.href === path);
+  // A page under a nav item (`/webhooks/test`, `/referral-codes/detail`) is reachable with its parent.
+  return navFor(role).some((item) => item.href === path || path.startsWith(`${item.href}/`));
 }
+
+/** Detail pages are query-string routes (ADR-0006): the static export has no runtime path segments. */
+export const codeStatsHref = (code: string, admin: boolean) =>
+  `${admin ? "/referral-codes/detail" : "/me/links/detail"}?code=${encodeURIComponent(code)}`;

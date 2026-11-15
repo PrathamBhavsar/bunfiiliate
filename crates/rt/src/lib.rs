@@ -10,7 +10,10 @@ pub struct Config {
     pub database_url: String,
     pub api_port: u16,
     pub tracker_port: u16,
-    pub jwt_secret: String,
+    /// Legacy single secret (`JWT_SECRET`), kid `legacy`.
+    pub jwt_secret: Option<String>,
+    /// `BF_JWT_SECRETS`: `kid:secret,...`, first signs.
+    pub jwt_secrets: Option<String>,
     pub spool_dir: PathBuf,
 }
 
@@ -51,30 +54,46 @@ impl Config {
     }
 
     pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
+        // An empty value is an unset one (Compose passes `${VAR:-}` as an empty string).
+        let get = |k: &str| get(k).filter(|v| !v.trim().is_empty());
         let required = |key: &'static str| get(key).ok_or(ConfigError::Missing(key));
         let port = |key: &'static str| {
             required(key)?
                 .parse()
                 .map_err(|_| ConfigError::Invalid(key))
         };
-        let jwt_secret = required("JWT_SECRET")?;
-        if jwt_secret.len() < MIN_JWT_SECRET_LEN {
-            return Err(ConfigError::Weak(
-                "JWT_SECRET",
-                "must be at least 32 bytes; generate one with `openssl rand -hex 32`",
-            ));
+        let jwt_secret = get("JWT_SECRET");
+        let jwt_secrets = get("BF_JWT_SECRETS");
+        if jwt_secret.is_none() && jwt_secrets.is_none() {
+            return Err(ConfigError::Missing("JWT_SECRET"));
         }
-        if KNOWN_JWT_SECRETS.contains(&jwt_secret.as_str()) {
-            return Err(ConfigError::Weak(
-                "JWT_SECRET",
-                "is a published placeholder; generate one with `openssl rand -hex 32`",
-            ));
+        let candidates = jwt_secret
+            .iter()
+            .map(String::as_str)
+            .chain(jwt_secrets.iter().flat_map(|v| {
+                v.split(',')
+                    .filter_map(|e| e.split_once(':').map(|(_, s)| s))
+            }));
+        for secret in candidates {
+            if secret.len() < MIN_JWT_SECRET_LEN {
+                return Err(ConfigError::Weak(
+                    "JWT_SECRET",
+                    "must be at least 32 bytes; generate one with `openssl rand -hex 32`",
+                ));
+            }
+            if KNOWN_JWT_SECRETS.contains(&secret) {
+                return Err(ConfigError::Weak(
+                    "JWT_SECRET",
+                    "is a published placeholder; generate one with `openssl rand -hex 32`",
+                ));
+            }
         }
         Ok(Self {
             database_url: required("DATABASE_URL")?,
             api_port: port("API_PORT")?,
             tracker_port: port("TRACKER_PORT")?,
             jwt_secret,
+            jwt_secrets,
             spool_dir: required("SPOOL_DIR")?.into(),
         })
     }
@@ -116,6 +135,27 @@ mod tests {
     }
 
     #[test]
+    fn empty_value_counts_as_unset() {
+        // Compose passes unset optional vars as "": an empty JWT_SECRETS must not matter, an
+        // empty required one must read as missing.
+        let empty_list = |k: &str| {
+            (k == "BF_JWT_SECRETS")
+                .then(String::new)
+                .or_else(|| lookup(k))
+        };
+        assert!(Config::from_lookup(empty_list).is_ok());
+        let empty_secret = |k: &str| {
+            if k == "JWT_SECRET" {
+                Some(String::new())
+            } else {
+                lookup(k)
+            }
+        };
+        let err = Config::from_lookup(empty_secret).unwrap_err();
+        assert_eq!(err, ConfigError::Missing("JWT_SECRET"));
+    }
+
+    #[test]
     fn rejects_short_jwt_secret() {
         let short = |k: &str| {
             (k == "JWT_SECRET")
@@ -139,4 +179,38 @@ mod tests {
             assert!(matches!(err, ConfigError::Weak("JWT_SECRET", _)), "{known}");
         }
     }
+
+    #[test]
+    fn jwt_secrets_list_replaces_legacy_secret() {
+        let cfg = Config::from_lookup(|k| match k {
+            "JWT_SECRET" => None,
+            "BF_JWT_SECRETS" => Some("k1:0123456789abcdef0123456789abcdef".into()),
+            other => lookup(other),
+        })
+        .unwrap();
+        assert!(cfg.jwt_secret.is_none());
+        let err = Config::from_lookup(|k| match k {
+            "JWT_SECRET" => None,
+            "BF_JWT_SECRETS" => Some("k1:short".into()),
+            other => lookup(other),
+        })
+        .unwrap_err();
+        assert!(matches!(err, ConfigError::Weak(..)));
+    }
+}
+
+/// Resolves on SIGINT, or on SIGTERM (what `docker stop` and systemd send) on unix.
+pub async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        if let Ok(mut term) = signal(SignalKind::terminate()) {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {}
+                _ = term.recv() => {}
+            }
+            return;
+        }
+    }
+    let _ = tokio::signal::ctrl_c().await;
 }

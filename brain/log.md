@@ -1,5 +1,155 @@
 # Changelog
 
+## [2026-11-16] Release readiness review + fixes (feat/release-gate-fix)
+
+- **Verdict before fixes**: not ready. Fresh gate on staging 094baf1: everything ok except `bench-numbers` (checked a deleted `site/index.html`); `ocr` never ran. prod is 154 commits behind staging, no tag or release exists, `origin/staging` is 32 commits behind, remote CI last ran Nov 7 (failed), Docker never run locally.
+- **Review**: owner chose delegated `ocr` (`OCR_MODE=delegated`): three read-only reviewers over `prod..HEAD` (api/db, tracker/core/spool/deploy, web/CI/site/docs). Results in `docs/audit/findings.md` (fixed R1-R11, open O1-O12).
+- **Fixed**: Caddy did not route `/v2/*` to the tracker (all v2 traffic lost in compose); empty `BF_GEOIP_DB` from compose crashed the tracker; refund after a rail-submitted payout shrank the booked amount; billing `canceled` for another subscription id downgraded a workspace; UI claimed two-step sign-in but login is password-only (copy fixed, enforcement is O1); one-time secrets survived logout; no SIGTERM handling; stale root Dockerfile lacked curl; docs and quickstart errors; bench check and push guard (remote is `PrathamBhavsar/*`).
+- **Decisions**: remote stays `PrathamBhavsar/bunfiiliate`; first release `v0.1.0`, GitHub pre-release; Dependabot majors (sqlx 0.9, utoipa 6, argon2 0.6, sha2 0.11) after the release.
+- **Lessons**: [Time-Traps](/wisdom/time-traps.md) (stale pg lock, empty compose env, docs drift from code). Docker was never run, so deploy bugs hide until a real `docker compose up`.
+- **Final gate** (head aa4dd41, `OCR_MODE=delegated`, PG16 :5433):
+
+  | step | result | seconds |
+  | --- | --- | --- |
+  | ci | ok | 414 |
+  | sql-lint | ok | 0 |
+  | migrations | ok | 1 |
+  | tenant-matrix | ok | 5 |
+  | spool-disk-full | ok | 0 |
+  | alerts | ok | 14 |
+  | backup-drill | ok | 6 |
+  | e2e-1 | ok | 59 |
+  | e2e-2 | ok | 35 |
+  | bench-quick | ok | 81 |
+  | bench-numbers | ok | 0 |
+  | ocr | ok | 0 |
+  | brain | ok | 0 |
+  | hygiene | ok | 2 |
+  ALL STEPS PASSED
+
+- **Open**: needs owner (see release checklist): Docker smoke on a clean host, live rail and billing tests, secrets, SMTP, Pages, branch protection, private vulnerability reporting, Satoshi licence.
+
+## [2026-11-13] Site copy humanizer pass
+
+- **Done**: every string on the site (`brand.js`, `content/docs/*.md`, kit headings, FAQ, footers) read against blader/humanizer v4. Removed staged headings ("Everything it does, listed.", "Built in the open."), "not X, Y" footers, fragment rows, decorative bold labels, inflated blurbs ("Hardened from the first commit."), stock words. No facts, numbers, commands or claims changed. Smoke test now asserts the hero screenshot instead of the ASCII canvas.
+- **Rule kept**: contrasts stay where both halves carry information (`404`, not `403`). Docs stay plain reference text.
+
+## [2026-11-13] UI accent to green + screenshot hero
+
+- **Done** on `feat/ui-green`: product UI accent moved from safety orange `#ff5a1f` to the site's acid green `#b8ff3c` (tokens in `apps/web/src/app/globals.css` only; text-sized green on light is `#3f6212`, chart series now blue/green/violet). Site hero swaps the rain scene for a framed Analytics screenshot (`site/public/shots/analytics-dark.webp`, dark-only via `brand.shot.only`).
+- **Fixed**: `LineChart` figure overflowed its grid cell (SVG starts 600px wide, grid items default to `min-width:auto`); now `min-w-0 grid-cols-[minmax(0,1fr)]`.
+- **Lessons**: demo data = `bf_demo` scratch DB on pg16 :5433, api/tracker/`scripts/dev.mjs`; open the dev UI on `localhost`, not `127.0.0.1` (Next `allowedDevOrigins` stops hydration). Seed through the API, backdate `clicks.ts` + `conversions.occurred_at`, then `delete from daily_rollups` so the worker rebuilds. `ledger_entries` is append-only: never backdate it. Sample data only in public shots.
+
+## [2026-11-13] Site theme pass
+
+- **Done**: Decision: bunfiiliate site stays as the dark pixel reference (acid green). Sister sites (learnpuppy, sendesk) now follow their own product UIs. Follow-up idea: move this product UI accent from orange to site green.
+
+## [2026-11-13] Merge pin-actions, CI rerun, de-flake
+
+- **Done**: `fix/pin-actions` merged to staging. `make ci` green on staging after `fix/flaky-tax-test` (invoice test asserted no "1234" in HTML that contains random UUIDs; now strips UUIDs first).
+- **Lessons**: `make ci` needs `DATABASE_URL=postgres://pratham@localhost:5433/postgres` (pg16 cluster). Port 5432 is pg18 for other projects and has no `postgres` role. Never assert absence of short digit strings in output containing UUIDs.
+
+## [2026-11-11] Action pins + final gate rerun
+
+- **Done** on `fix/pin-actions` (a2f37c5): third-party actions in `docker.yml`, `web-asset.yml` pinned to commit SHAs. `release.yml` untouched (cargo-dist regenerates it).
+- **Gate** (`.gate/report.md`): ci, sql-lint, migrations, tenant-matrix, spool-disk-full, alerts, backup-drill, e2e x2, bench-quick ok. brain, hygiene ok. **bench-numbers FAIL**: `feat/site` replaced static `site/index.html` (datasheet rows gone). `ocr` fails: no LLM endpoint configured.
+- **Lessons**: dev Postgres must be pg16 on port 5433 (`pg_ctl -D /opt/homebrew/var/postgresql@16 -o "-p 5433" start`; brew service fails, pg18 holds 5432). Export `DATABASE_URL=postgres://pratham@localhost:5433/postgres` before `make ci`.
+
+## [2026-11-07] R1 release automation
+
+- **Done**: cargo-dist 0.34.0 (`dist-workspace.toml`, `.github/workflows/release.yml`), `web-asset.yml` (pnpm build, uploads `bunfiiliate-web-static.tar.gz` to the release), `docker.yml` (GHCR multi-arch), `docs/releasing.md`. `repository` added to workspace package; `[package.metadata.dist] dist = true` on api and tracker.
+- **Lessons**: `publish = false` hides bins from dist until `dist = true`. GITHUB_TOKEN-created releases do not fire `release: published`, so web-asset triggers on the tag and polls. No sqlx `query!` macros, so no offline data needed.
+- **Unverified**: real tag run (never pushed).
+## [2026-11-07] S1 marketing + docs site (feat/site)
+- **Review pass**: finish reviewer round 2 = ship. Fixed: mobile ledger sheet, Money group as ledger rows, FAQ plus is a Hugeicons icon, footer blurb via `md()`, live column links to benchmarks and ledger spec, `.btn` nowrap. Wrong clone URL in `docs/self-hosting.md` fixed on `fix/docs-clone-url` (unmerged).
+
+- **Done**: `site/` Vite (vanilla JS, custom-element components) landing + docs. Geist Pixel Square display, Satoshi body, Geist Mono code, Hugeicons. `<x-ascii>` canvas with the `rain` scene (clicks land in a ledger that sums to 0.00). Docs from `site/content/docs/*.md`, hash routed, search on `/`, `llms.txt` generated at build. `.github/workflows/site.yml` builds, smoke-tests (`site/scripts/smoke.mjs`) and deploys to Pages from `prod`.
+- **Decision**: kit (`site/src/kit`) is canonical here and copied to sendesk and learnpuppy with `site/scripts/sync-kit.sh`. Copy states only verified facts: "sub-millisecond" is quoted as 0.4 ms p50 with `BF_FSYNC=off` and 13 ms with `always`, per `docs/benchmarks.md`. No usage claims; the stats block reads live GitHub numbers.
+- **Lessons**: README says payouts are CSV only but `docs/self-hosting.md` documents PayPal and Wise rails (Wise unverified); check code and docs, not one README. `docs/self-hosting.md` clones `github.com/bunfiiliate/bunfiiliate`, which is not the real remote.
+- **Open**: Satoshi (Fontshare licence) is committed as woff2; confirm redistribution terms before the repo is promoted.
+
+## [2026-11-07] C34 + C90 final gate
+
+- **Merged**: C34 e2e growth (5 suites, 26+ tests, coverage table), admin payout-request UI, `scripts/final-gate.sh`, `push-guard.sh`, `hygiene-check.sh`, `docs/ops/release-checklist.md`.
+- **Gate run** (`.gate/report.md`, head b70723a): ci, sql-lint, migrations, tenant-matrix, spool-disk-full, alerts, backup-drill, e2e x2, bench-quick, bench-numbers all ok. `ocr` failed: no LLM endpoint configured (needs `ocr config provider` or `OCR_LLM_*`). Brain validator and hygiene pass when run by hand.
+- **Lessons**: `pnpm install` prompts without a TTY unless `CI=true`; the drill needs `PG_BIN` matching the server major (PATH had pg_dump 18 against a 16 server: `transaction_timeout`). Five early commits carry attribution trailers; the owner accepted them (`docs/audit/hygiene-exceptions.txt`); no new ones.
+- **Open**: run `ocr` on `prod..HEAD`, triage findings into `docs/audit/findings.md`, re-run the gate.
+
+## [2026-11-07] C34 e2e growth + payout request admin UI (tribe #41)
+
+- **Done**: e2e split into six files (39 tests) over `e2e/fixtures/seed.ts`; each file seeds its own workspace through the API (`seedWorld`), so it passes alone and in any order; `E2E_GREP` / `E2E_SHARD` in `scripts/e2e.sh`; `docs/ui/e2e-plan.md` page-to-test table guarded by `scripts/e2e-plan.test.mjs` (runs in `make ci` via `js-test`); tenant UI tests (WS A admin and affiliate vs WS B code pages); code stats Playwright cases; "Payout requests" section on admin `/payouts` (approve confirm, reject with required reason, 409 shown) with e2e.
+- **API change**: `payout_request_approve` / `payout_request_reject` operation ids (the generic `approve` id is shared by affiliates and conversions, so the SDK typed the call wrongly). SDK regenerated. No new routes.
+- **Lessons**: see [Time-Traps](/wisdom/time-traps.md) (login limits, direct api seeding).
+- **Known limits**: the shared `approve`/`reject` operation ids of affiliates and conversions are still duplicated in the OpenAPI doc.
+
+## [2026-11-07] C24 + C05 + A16 closeout (tribe #40)
+
+- **Done**: drill fingerprint has per-partition click counts (`drill_counts_per_partition`); ADR-0004 RLS (not enabled, disabled spike `0060_rls_spike.sql.disabled`); A16 ADRs 0007-0009, `architecture/secrets.md`, anti-patterns 32-39, README env table, SECURITY.md, self-hosting.
+- **Lessons**: `pg_restore --clean` fails on partitioned tables (inherited PK drop), so `--force` now drops the schema first. Plan A16 numbered anti-patterns 31-37 but C04 took 31: renumbered 32-38. `BF_MAIL_PROVIDER` from the plan does not exist in code (mail is `SMTP_URL`), so it is not documented. Run the drill test with `PG_BIN` set to the PG16 bin dir when the default pg_dump is newer.
+- **Known limits**: RLS cost on `ledger_entries` not measured.
+
+## [2026-11-07] C33 states and a11y, B01/B03/B04 web UI (tribe #38)
+
+- **Done**: `components/state.tsx` (`EmptyState`, `ErrorState`, `LoadingRows`), `ApiError` keeps the HTTP status so a 403 shows "No access" without Retry, `DataTable` takes a required accessible `label`, `ResourceView` takes `headingLevel` for a second list on a page. New pages: `/webhooks/test` (tester + inbound replay), payout request dialog and request list on `/me/payouts`, rail select on Mark paid plus Reconcile in the batch sheet. No new API routes.
+- **Lessons**: see `wisdom/time-traps.md` (e2e runner is not Playwright).
+- **Known limits**: admin approve/reject UI for payout requests is not built; axe runs through `axe-core` injected by `evaluate` (no `@axe-core/playwright`: the runner has no Playwright Page).
+
+## [2026-11-07] Plan v2 wave 8a (tribe)
+
+- **Merged**: C30, C31, C32, notify channel URL redaction (webhook/bot tokens no longer reach logs via reqwest errors; use `Error::without_url`).
+- **Lessons**: a claude account at its 5-hour limit exits with no commits and leaves an empty worktree and branch: remove both and reset the board status before relaunching.
+- **Validation**: `make ci` and `make e2e` pass before merge.
+
+## [2026-11-07] C32 + C30 + C31 code stats (tribe #37)
+
+- **Done**: ADR-0006 (detail pages are `?code=` query routes; Caddy `try_files` already fits, `trailingSlash` unset), per-code stats API (admin + `/me`), stats pages with KPIs, charts, top countries/referrers, links from both list pages.
+- **Lessons**: a conversion has no code column; attribute it through `customers.first_click_id` -> `clicks.code`. The click query is bounded on `ts` both sides (test `per_code_stats_query_has_ts_bound`). Query keys are `["admin"|"portal","code-stats",...]`, never `"me"`.
+- **Known limits**: Playwright cases for the stats pages belong to C34.
+
+## [2026-11-07] C40-C42 bench (tribe #39)
+
+- **Done on `feat/c40-42-bench`**: `bench/run.sh` (pinned oha 1.16.0, exit 2 if missing, warm-up, repeats, seeded codes, `--quick`, `--write-docs`), result schema v1 with hardware block, `bench/compare.py` (0/1/3, noisy downgrade), `bench-nightly.yml` (self-hosted authoritative, hosted advisory), `bench/gen_docs.py`, publishing rules in `docs/benchmarks.md`, `check-bench-numbers.sh` reads the new schema.
+- **Lessons**: see [Bench](/wisdom/bench.md).
+- **Known limits**: no baseline and no schema v1 full result committed: the full run fails its own error gate (503 shedding on `/r` off mode, see wisdom). Quick run, helper tests, compare self-test, docs/site check pass.
+
+## [2026-11-07] Plan v2 wave 7 + billing variant fix (tribe)
+
+- **Merged**: B05, B06, B07, B11, C10-C13, C20-C22, billing plan-from-variant fix. Migrations 0074-0076, 0080, 0082 (0081 intentionally unused).
+- **Lessons**: Cargo's metadata hash ignores the checkout path, so worktrees sharing `CARGO_TARGET_DIR` clobber each other's artifacts (stale-field errors in clippy): give concurrent workers their own target dirs, or run no gate while workers build. The spool disk-full shedding (C11) makes e2e return 503 on a host above 85% disk used: `scripts/e2e.sh` pins the thresholds. LemonSqueezy plan must come from the purchased variant, never from `custom_data`.
+- **Known limits**: web UI for B01, B03, B04 rail selector still open.
+- **Validation**: `make ci` and `make e2e` pass on the integration branch before merge.
+
+## [2026-11-07] Plan v2 wave 6 (tribe)
+
+- **Merged**: B00, B01, B02, B04, B08, B10. Migrations 0070, 0071, 0073, 0078, 0079.
+- **Lessons**: parallel workers collide on shared files (`routes.rs`, `secrets.rs` PROTECTED, `tenant-annotations.toml`, `checksums.txt`, `Cargo.toml`, `AppState`, `AppError`): the coordinator resolves and regenerates, then runs the full gate. Two workers adding the same enum variant with different payload types is the usual semantic clash. A worker on an account that hits its 5-hour limit exits with no commits; reset its board status to pending and relaunch after the reset time.
+- **Known limits**: B04 in-flight reversal shrink and web rail selector not done; B01/B02 web UI not done.
+- **Validation**: `make ci` and `make e2e` pass before merge.
+
+## [2026-11-07] Plan v2 waves 4-5 (tribe)
+
+- **Merged**: A10, A13, A15, web auth pages, B09, B03, C03, C04, C14, C15, C16. Migrations 0072, 0077. New gates in `make ci`: `sql-lint`, `migrations-check`, `tracker-openapi-check`, `js-test`.
+- **Lessons**: when two branches both add to `tenant-annotations.toml`, keep-both conflict resolution can glue entries together (a lost `[[route]]` header): re-run the inventory test after every merge. New migrations need `UPDATE_CHECKSUMS=1 cargo test -p bf-db --test upgrade`. The SQL lint catches unscoped queries in code written before the lint existed; scope by `workspace_id` rather than allowlisting. Workers share `CARGO_TARGET_DIR` to save disk.
+- **Validation**: `make ci` and `make e2e` pass before merge.
+
+## [2026-11-07] Plan v2 waves 1-3 (tribe)
+
+- **Process**: three goldfish reviews returned revise; `docs/plan/REVISIONS.md` is the binding addendum (migration numbers, sealed credentials, payout idempotency, C20 safety). Workers run in their own worktrees and delete them after merge: four worktrees held about 15 GB and filled the disk once.
+- **Merged**: A05-A09, A11, A12a/b, A14, C01, C02. Migrations 0061-0066. New: TOTP enrol, password reset (TOTP or recovery code), reset throttles, admin-assisted reset + Notifier, JWT kid rotation + token_version, CSRF double-submit (cookie auth only) + security headers, tracker /v2 routes, tenant route inventory + cross-tenant matrix.
+- **Lessons**: a time-based test must replay the consumed step, not "now" (flaked at the 30 s boundary); every new route needs an entry in `docs/audit/tenant-annotations.toml` and the matrix needs a resource mapping.
+- **Validation**: `make ci` and `make e2e` pass on the integration branch before merge.
+
+## [2026-11-07] Plan A: A01-A04 secrets at rest and TOTP core
+
+- **Creation**: `bf-core::secrets` (KeyRing, Vault), `bf-core::totp`; migration 0060; `api::secrets` (PROTECTED list, `reencrypt`, `check`); tracker snapshot decrypts once per reload, skips bad rows (503 for their key, `bf_snapshot_decrypt_fail_total`).
+- **Behaviour changes**: `BF_MASTER_KEYS` required by api, worker and tracker (or `BF_ALLOW_PLAINTEXT_SECRETS=1`); program and endpoint secrets are never returned by GET/PATCH, only once on create/rotate; web keeps them in memory per tab; Stripe/Paddle secrets are write-only.
+- **Validation**: `make ci` and `make e2e` pass with sealed secrets end to end.
+
+## [2026-11-07] Plan v2 specs A/B/C
+
+- **Creation**: `docs/plan/` holds three design specs (A auth/security/tracker, B product parity/billing/payouts, C ops/tenant/UI/bench). Specs only, nothing implemented; their reviews are still open.
+- **Validation**: `make ci` and `make e2e` pass on staging code (needs PG16 on 5433 and `DATABASE_URL`). Coordination files `.coord/` and `BOARD.md` are gitignored.
+
 ## [2026-10-27] Review fixes F1-F4
 
 - **Update**: three review reports (auth/api, money/tracker, web/deploy) fixed on four branches, see [Tasks](/tasks/index.md) F1-F4. Workers hit a usage limit part-way; the coordinator finished and merged them.

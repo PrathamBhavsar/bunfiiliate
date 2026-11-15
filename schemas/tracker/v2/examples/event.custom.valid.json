@@ -1,0 +1,6 @@
+{
+  "schema": "bf.event.v2",
+  "type": "custom:trial_started",
+  "external_id": "t_1",
+  "occurred_at": "2026-01-01T12:00:00Z"
+}

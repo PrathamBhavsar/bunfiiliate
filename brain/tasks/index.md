@@ -40,4 +40,55 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | F4 | feat/fix-tracker-spool | done, merged (coordinator); spool all-or-nothing + poison, dead-letter, trusted proxies, event queue lane, signed-timestamp generic webhook, tracker.js |
 | T60 | final gate (make ci, ocr, e2e) | done; `make ci` and `make e2e` green on staging, merged to local prod (not pushed); ocr not re-run on the full diff |
 
+| REL | feat/release-gate-fix | done, gate green (14 steps, delegated ocr), merged to local staging and prod; push, tag and manual checks await owner |
+
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).
+| A01 | feat/plan-a | done (envelope crypto, bf-core::secrets + Vault) |
+| A02 | feat/plan-a | done (sealed columns, shown once on create/rotate, web one-time reveal) |
+| A03 | feat/plan-a | done (tracker decrypt at load, `api secrets reencrypt/check`, runbook) |
+| A04 | feat/plan-a | done (TOTP RFC 6238 + recovery codes; recovery hashing is salted argon2 in A05, not SHA-256) |
+| A05 | feat/totp-enrol | done, merged (API only; web settings UI still open) |
+| A06a | feat/password-reset | done, merged (web page still open) |
+| A06b | feat/auth-throttle | done, merged |
+| A07 | feat/admin-reset-notify | done, merged |
+| A08 | feat/jwt-hardening | done, merged (token_version is migration 0065) |
+| A09 | feat/csrf-headers | done, merged |
+| A11 | feat/tracker-v2-spec | done, merged |
+| A12a | feat/tracker-v2-impl | done, merged |
+| A12b | feat/tracker-v2-idem | done, merged (idempotency map is in memory, per instance) |
+| A14 | feat/js-sdk | done, merged |
+| C01 | feat/c-inventory | done, merged |
+| C02 | feat/c-matrix | done, merged (known_leaks.txt empty: no leaks found) |
+| A10 | feat/pentest-suite | done, merged (`make pentest`, checklist PT-01..21) |
+| A13 | feat/tracker-v1-compat | done, merged (Deprecation/Sunset on v1; /t.js serves v2) |
+| A15 | feat/tracker-contract-tests | done, merged (tracker OpenAPI + contract tests in make ci) |
+| A-web | feat/web-auth-pages | done, merged (TOTP settings, reset-password, admin issue token) |
+| B09 | feat/b-billing-schema | done, merged (0077) |
+| B03 | feat/b-payout-requests | done, merged (0072; web UI still open) |
+| C03+C04 | feat/c-sql-lint-guard | done, merged (`make sql-lint` in ci) |
+| C14+C15+C16 | feat/c-migrations-ops | done, merged (migration checksums, api /healthz /readyz) |
+| B00 | feat/b-signup-contact | done, merged (0070, SIGNUP_ENABLED default off) |
+| B01 | feat/b-webhook-chargeback | done, merged (TRACKER_INTERNAL_URL) |
+| B02 | feat/b-webhook-chargeback | done, merged (0071; matching was already on staging, fixtures added) |
+| B04 | feat/b-payout-providers | done, merged (0073; mock/paypal/wise; web rail selector and Wise live test open) |
+| B08 | feat/b-signup-contact | done, merged (0079) |
+| B10 | feat/b-billing-trait | done, merged (0078; mock + lemonsqueezy) |
+| B05+B06 | feat/b-tax-currency | done, merged (0074 tax forms/invoices, 0075 exchange rates) |
+| B07+B11 | feat/b-notify-billing-ui | done, merged (0076 notify channels; billing UI) |
+| C20+C21+C22 | feat/c-partitions | done, merged (0080 clicks partitioning, partition upkeep) |
+| C10-C13 | feat/c-ops | done, merged (backup drill, spool disk-full shedding, alerts, HA docs) |
+| C32 | feat/c30-code-stats | done (ADR-0006 query-string detail routes, `docs/ui/routes.md`, `scripts/check-static-export.sh` in `make web`) |
+| C30 | feat/c30-code-stats | done (`/referral-codes/{code}/stats`, `/me/...`; live clicks with ts bounds, no rollup dependency) |
+| C31 | feat/c30-code-stats | done (`/referral-codes/detail?code=`, `/me/links/detail?code=`; Playwright cases are C34) |
+| billing-variant | feat/billing-variant-plan | done, merged (0082; plan from purchased variant, store check) |
+| C30+C31+C32 | feat/c30-code-stats | done, merged (per-code stats API + pages, routing ADR 0006) |
+| notify-redact | fix/notify-redact-url | done, merged (reqwest errors stripped of channel URL) |
+| C40+C41+C42 | feat/c40-42-bench | done on branch; reproducible `bench/run.sh` (schema v1, pinned oha, median of repeats), `bench/compare.py` + thresholds + nightly workflow, benchmark publishing rules + `gen_docs.py` |
+| C24 | feat/c24-c05-a16-closeout | done (drill verifies per-partition click counts; `restore.sh --force` wipes schema, `--clean` failed on partitions) |
+| C05 | feat/c24-c05-a16-closeout | done (ADR-0004: RLS not enabled; disabled spike + `#[ignore]` tests pass on PG16) |
+| A16 | feat/c24-c05-a16-closeout | done (ADRs 0007-0009, secrets page, anti-patterns 32-39, README/SECURITY/self-hosting) |
+| C33 | feat/c33-ui-states-a11y | done (shared `state.tsx`, 403 "No access", table labels, axe smoke; web UI for B01 `/webhooks/test`, B03 `/me/payouts` request, B04 rail selector + reconcile) |
+| C34 | feat/c34-e2e-coverage | done (e2e split into admin-core, money, portal, code-stats, states-a11y, tenant-ui; `e2e/fixtures/seed.ts` seeds a workspace per world via API; `docs/ui/e2e-plan.md` + `scripts/e2e-plan.test.mjs`; admin payout-request approve/reject UI on `/payouts`; 39 tests, `make e2e` twice green) |
+| C90 | feat/c90-final-gate | scripts done (`final-gate.sh`, `push-guard.sh`, `hygiene-check.sh`, release checklist); gate passes every step except `ocr` (no LLM endpoint configured) |
+| R1 | feat/release | done, merged (release.yml, web-asset.yml, docker.yml, docs/releasing.md) |
+| S1 | feat/site | done, merged (Vite vanilla marketing + docs site in `site/`, shared kit, rain ASCII scene, Pages workflow + smoke test; PRODUCT.md; finish review pending merge) |

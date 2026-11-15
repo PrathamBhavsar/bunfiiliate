@@ -70,3 +70,12 @@ pub async fn list_admins(
     .await?;
     Ok((items, total))
 }
+
+/// Tag a workspace as created through public signup.
+pub async fn mark_self_serve(db: impl PgExecutor<'_>, id: Uuid) -> Result<(), sqlx::Error> {
+    sqlx::query("UPDATE workspaces SET created_via = 'self_serve' WHERE id = $1")
+        .bind(id)
+        .execute(db)
+        .await?;
+    Ok(())
+}

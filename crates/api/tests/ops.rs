@@ -31,9 +31,12 @@ impl Api {
         api::ssrf::allow_private_targets();
         let state = AppState {
             pool: pool.clone(),
-            jwt_secret: SECRET.into(),
+            jwt_keys: api::auth::JwtKeys::single(SECRET).into(),
+            version_cache: Default::default(),
+            vault: vault(),
             secure_cookies: true,
             limiter: Default::default(),
+            tracker_url: Default::default(),
         };
         Self { app: app(state) }
     }
@@ -50,10 +53,17 @@ impl Api {
             .uri(uri)
             .header(HOST, "bf.test");
         if method != Method::GET {
-            b = b.header(ORIGIN, "https://bf.test");
+            b = b
+                .header(ORIGIN, "https://bf.test")
+                .header("x-csrf-token", "t");
         }
         if let Some(c) = cookie {
-            b = b.header(COOKIE, c);
+            let csrf = if method != Method::GET {
+                "; bf_csrf=t"
+            } else {
+                ""
+            };
+            b = b.header(COOKIE, format!("{c}{csrf}"));
         }
         let body = match body {
             Some(v) => {
@@ -282,10 +292,10 @@ async fn ops_webhook_signed_retried_then_delivered(pool: PgPool) {
     assert_eq!(delivery(&pool).await, (0, None, true));
 
     // first attempt: receiver answers 500 -> recorded, retry scheduled in the future
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+    assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
     assert_eq!(delivery(&pool).await, (1, Some(500), true));
     assert_eq!(
-        deliver_due(&pool, &http).await.unwrap(),
+        deliver_due(&pool, &http, &vault()).await.unwrap(),
         0,
         "backoff not elapsed"
     );
@@ -302,10 +312,10 @@ async fn ops_webhook_signed_retried_then_delivered(pool: PgPool) {
 
     // backoff elapsed: second attempt succeeds
     make_due(&pool).await;
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+    assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
     assert_eq!(delivery(&pool).await, (2, Some(200), false));
     assert_eq!(
-        deliver_due(&pool, &http).await.unwrap(),
+        deliver_due(&pool, &http, &vault()).await.unwrap(),
         0,
         "delivered once"
     );
@@ -357,7 +367,10 @@ async fn ops_webhook_targets_only_active_matching_endpoints(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(n, 0);
-    assert_eq!(deliver_due(&pool, &http_client()).await.unwrap(), 0);
+    assert_eq!(
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
+        0
+    );
     assert!(seen.lock().unwrap().is_empty());
 
     // an endpoint switched off after queueing gets nothing either
@@ -374,7 +387,10 @@ async fn ops_webhook_targets_only_active_matching_endpoints(pool: PgPool) {
         live["id"].as_str().unwrap()
     );
     api.patch(&uri, &t.admin, json!({ "active": false })).await;
-    assert_eq!(deliver_due(&pool, &http_client()).await.unwrap(), 0);
+    assert_eq!(
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
+        0
+    );
     assert!(seen.lock().unwrap().is_empty());
 }
 
@@ -399,7 +415,7 @@ async fn ops_webhook_dead_after_max_attempts_then_redeliver(pool: PgPool) {
     let redeliver = format!("/api/v1/webhooks/deliveries/{delivery_id}/redeliver");
 
     for attempt in 1..=MAX_ATTEMPTS {
-        assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+        assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
         let pending = attempt < MAX_ATTEMPTS;
         assert_eq!(delivery(&pool).await, (attempt, Some(503), pending));
         if pending {
@@ -409,12 +425,16 @@ async fn ops_webhook_dead_after_max_attempts_then_redeliver(pool: PgPool) {
         }
     }
     assert_eq!(seen.lock().unwrap().len(), MAX_ATTEMPTS as usize);
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 0, "dead");
+    assert_eq!(
+        deliver_due(&pool, &http, &vault()).await.unwrap(),
+        0,
+        "dead"
+    );
 
     let (st, d) = api.post_empty(&redeliver, &t.admin).await;
     assert_eq!(st, StatusCode::OK, "{d}");
     assert_eq!(d["attempt"], 0);
-    assert_eq!(deliver_due(&pool, &http).await.unwrap(), 1);
+    assert_eq!(deliver_due(&pool, &http, &vault()).await.unwrap(), 1);
     assert_eq!(delivery(&pool).await, (1, Some(200), false));
 
     let (_, list) = api.get("/api/v1/webhooks/deliveries", &t.admin).await;
@@ -464,7 +484,7 @@ async fn ops_webhook_endpoint_crud_scoping_and_guards(pool: PgPool) {
         (st, &upd["url"], &upd["events"]),
         (StatusCode::OK, &json!("https://y.io/h"), &json!([]))
     );
-    assert_eq!(upd["secret"], e["secret"], "update keeps the secret");
+    assert_eq!(upd["secret"], "", "update never returns the secret");
 
     // guards and tenancy
     assert_eq!(
@@ -850,7 +870,7 @@ async fn ops_slow_endpoint_holds_no_lock_while_in_flight(pool: PgPool) {
     dispatch_outbox(&pool, &Mailer::Log).await.unwrap();
 
     let p = pool.clone();
-    let sending = tokio::spawn(async move { deliver_due(&p, &http_client()).await });
+    let sending = tokio::spawn(async move { deliver_due(&p, &http_client(), &vault()).await });
     tokio::time::sleep(std::time::Duration::from_millis(700)).await;
 
     // The request is still in flight, yet the row is leased (not due again for a while) and
@@ -869,7 +889,7 @@ async fn ops_slow_endpoint_holds_no_lock_while_in_flight(pool: PgPool) {
         .expect("row is not locked while the request is in flight");
     drop(tx);
     assert_eq!(
-        deliver_due(&pool, &http_client()).await.unwrap(),
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
         0,
         "a leased delivery is not sent twice"
     );
@@ -891,4 +911,231 @@ async fn ops_webhook_endpoints_are_capped_per_workspace(pool: PgPool) {
         )
         .await;
     assert_eq!(st, StatusCode::BAD_REQUEST, "{body}");
+}
+
+/// A real key ring, so the delivery tests exercise sealed endpoint secrets.
+fn vault() -> std::sync::Arc<bf_core::secrets::Vault> {
+    use bf_core::secrets::{KeyRing, Vault};
+    let ring = KeyRing::from_pairs("t1", &[("t1", [9u8; 32])]).unwrap();
+    std::sync::Arc::new(Vault::new(ring))
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn ops_webhook_api_version_defaults_v1_and_v2_is_opt_in(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let (url1, seen1) = receiver(&[]).await;
+    let (url2, seen2) = receiver(&[]).await;
+    let v1 = endpoint(&api, &t, &url1, json!([])).await;
+    let v2 = endpoint(&api, &t, &url2, json!([])).await;
+    let ver: String = sqlx::query_scalar("SELECT api_version FROM webhook_endpoints WHERE id = $1")
+        .bind(Uuid::parse_str(v1["id"].as_str().unwrap()).unwrap())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(ver, "v1", "default");
+    sqlx::query("UPDATE webhook_endpoints SET api_version = 'v2' WHERE id = $1")
+        .bind(Uuid::parse_str(v2["id"].as_str().unwrap()).unwrap())
+        .execute(&pool)
+        .await
+        .unwrap();
+    let payload = conversion_payload(&t, Uuid::now_v7());
+    let id = outbox(&pool, "conversion.approved", payload.clone()).await;
+    assert_eq!(dispatch_outbox(&pool, &Mailer::Log).await.unwrap(), 1);
+    assert_eq!(
+        deliver_due(&pool, &http_client(), &vault()).await.unwrap(),
+        2
+    );
+
+    // v1: body and headers unchanged
+    let s1 = seen1.lock().unwrap();
+    let (h1, b1) = &s1[0];
+    assert_eq!(
+        serde_json::from_str::<Value>(b1).unwrap(),
+        json!({ "id": id, "topic": "conversion.approved", "data": payload })
+    );
+    assert!(h1.get("bf-api-version").is_none() && h1.get("bf-event-id").is_none());
+
+    // v2: envelope, new headers, same signature scheme
+    let s2 = seen2.lock().unwrap();
+    let (h2, b2) = &s2[0];
+    let b: Value = serde_json::from_str(b2).unwrap();
+    let evt = b["id"].as_str().unwrap();
+    assert!(evt.starts_with("evt_") && evt.len() == 40, "{evt}");
+    assert_eq!(b["api_version"], "2");
+    assert_eq!(b["type"], "conversion.approved");
+    assert_eq!(b["data"], payload);
+    assert!(
+        chrono::DateTime::parse_from_rfc3339(b["created_at"].as_str().unwrap()).is_ok(),
+        "{b}"
+    );
+    assert!(b.get("topic").is_none());
+    assert_eq!(h2["bf-api-version"], "2");
+    assert_eq!(h2["bf-event-id"], evt);
+    assert_eq!(h2["bf-event-type"], "conversion.approved");
+    assert_eq!(h2["bf-signature"], h2["x-bf-signature"]);
+    assert_signed(h2, b2, v2["secret"].as_str().unwrap());
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn ops_webhook_api_version_rejects_unknown_value(pool: PgPool) {
+    let _ = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let (url, _) = receiver(&[]).await;
+    let api = Api::new(&pool);
+    let e = endpoint(&api, &t, &url, json!([])).await;
+    let r = sqlx::query("UPDATE webhook_endpoints SET api_version = 'v3' WHERE id = $1")
+        .bind(Uuid::parse_str(e["id"].as_str().unwrap()).unwrap())
+        .execute(&pool)
+        .await;
+    assert!(r.is_err());
+}
+
+mod health {
+    use super::*;
+
+    fn health_app(pool: &PgPool) -> Router {
+        Api::new(pool).app
+    }
+
+    async fn get(app: &Router, path: &str) -> (StatusCode, Value) {
+        let res = app
+            .clone()
+            .oneshot(Request::get(path).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let st = res.status();
+        let b = axum::body::to_bytes(res.into_body(), 1 << 20)
+            .await
+            .unwrap();
+        (st, serde_json::from_slice(&b).unwrap_or(Value::Null))
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn healthz_200_no_auth(pool: PgPool) {
+        let (st, _) = get(&health_app(&pool), "/healthz").await;
+        assert_eq!(st, StatusCode::OK);
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn readyz_reports_migration_head(pool: PgPool) {
+        let (st, body) = get(&health_app(&pool), "/readyz").await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(body["migration_head"], bf_db::embedded_head());
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn readyz_503_when_behind_head(pool: PgPool) {
+        sqlx::query("DELETE FROM _sqlx_migrations WHERE version = (SELECT max(version) FROM _sqlx_migrations)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let (st, body) = get(&health_app(&pool), "/readyz").await;
+        assert_eq!(st, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["status"], "migrating");
+    }
+
+    #[sqlx::test(migrations = "../db/migrations")]
+    async fn readyz_503_when_db_down(pool: PgPool) {
+        let app = health_app(&pool);
+        pool.close().await;
+        let (st, body) = get(&app, "/readyz").await;
+        assert_eq!(st, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(body["status"], "db_unavailable");
+        let (st, _) = get(&app, "/healthz").await;
+        assert_eq!(st, StatusCode::OK);
+    }
+}
+
+// ---- contact request typing (B08)
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn contact_request_amount_requires_currency(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let base = "/api/v1/contact-requests";
+    let msg = |extra: Value| {
+        let email = format!("{}@x.io", Uuid::now_v7());
+        let mut b = json!({ "workspace": t.slug, "name": "A", "email": email, "message": "m" });
+        b.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        b
+    };
+    for bad in [
+        json!({ "amount_cents": 500 }),
+        json!({ "currency": "USD" }),
+        json!({ "amount_cents": -1, "currency": "USD" }),
+        json!({ "amount_cents": 5, "currency": "usd1" }),
+        json!({ "kind": "bogus" }),
+    ] {
+        let (st, body) = api
+            .call(Method::POST, base, None, Some(msg(bad.clone())))
+            .await;
+        assert_eq!(st, StatusCode::BAD_REQUEST, "{bad} {body}");
+    }
+    let (st, c) = api
+        .call(
+            Method::POST,
+            base,
+            None,
+            Some(msg(
+                json!({ "kind": "payout_dispute", "amount_cents": 500, "currency": "usd" }),
+            )),
+        )
+        .await;
+    assert_eq!(st, StatusCode::CREATED, "{c}");
+    assert_eq!(
+        (&c["kind"], &c["amount_cents"], &c["currency"]),
+        (&json!("payout_dispute"), &json!(500), &json!("USD"))
+    );
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn contact_request_defaults_to_general_inquiry(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let body = json!({ "workspace": t.slug, "name": "A", "email": "a@x.io", "message": "m" });
+    let (st, c) = api
+        .call(Method::POST, "/api/v1/contact-requests", None, Some(body))
+        .await;
+    assert_eq!(st, StatusCode::CREATED, "{c}");
+    assert_eq!(c["kind"], "general_inquiry");
+    assert!(c["amount_cents"].is_null() && c["currency"].is_null());
+    let id: Uuid = c["id"].as_str().unwrap().parse().unwrap();
+    let stored: String =
+        sqlx::query_scalar("SELECT kind::text FROM contact_requests WHERE id = $1")
+            .bind(id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(stored, "general_inquiry");
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn admin_filters_by_kind(pool: PgPool) {
+    let api = Api::new(&pool);
+    let t = tenant(&pool, "acme").await;
+    let base = "/api/v1/contact-requests";
+    for kind in [
+        "general_inquiry",
+        "technical_support",
+        "account_issue",
+        "payout_dispute",
+    ] {
+        let body = json!({ "workspace": t.slug, "name": "A", "email": format!("{kind}@x.io"), "message": "m", "kind": kind });
+        assert_eq!(
+            api.call(Method::POST, base, None, Some(body)).await.0,
+            StatusCode::CREATED
+        );
+    }
+    let (_, list) = api
+        .get(&format!("{base}?kind=payout_dispute"), &t.admin)
+        .await;
+    assert_eq!(list["total"], 1);
+    assert_eq!(list["items"][0]["kind"], "payout_dispute");
+    let (_, all) = api.get(base, &t.admin).await;
+    assert_eq!(all["total"], 4);
+    let (st, _) = api.get(&format!("{base}?kind=bogus"), &t.admin).await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
 }

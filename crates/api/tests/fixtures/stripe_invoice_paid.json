@@ -1,0 +1,3 @@
+{"id": "evt_sale_1", "type": "invoice.paid", "created": 1767225600,
+ "data": {"object": {"id": "in_1", "customer": "cus_1", "charge": "ch_1", "payment_intent": "pi_1",
+                     "amount_paid": 10000, "currency": "usd", "metadata": {"bf_ref": "CBCODE"}}}}

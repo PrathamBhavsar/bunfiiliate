@@ -10,6 +10,7 @@ serde.workspace = true
 serde_json.workspace = true
 sqlx = { workspace = true, features = ["json"] }
 uuid = { workspace = true }
+bf-core.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 utoipa = { version = "5", features = ["uuid", "chrono"] }
 

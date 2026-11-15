@@ -1,0 +1,84 @@
+name: bench-nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Authoritative: a stable self-hosted runner labelled `bench`. Enabled by setting the repo
+  # variable BENCH_SELF_HOSTED=true. A failure here fails the workflow (GitHub emails the owner).
+  bench-selfhosted:
+    if: ${{ vars.BENCH_SELF_HOSTED == 'true' }}
+    runs-on: [self-hosted, bench]
+    env:
+      DATABASE_URL: ${{ vars.BENCH_DATABASE_URL }}
+      BENCH_CLASS: bench-selfhosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Full bench run
+        run: bench/run.sh
+      - name: Compare to baseline
+        run: |
+          set +e
+          latest=$(ls -t bench/results/*.json | grep -v -- '-quick' | head -n1)
+          python3 -I bench/compare.py "$latest" "bench/baseline/${BENCH_CLASS}.json" | tee compare.txt
+          rc=${PIPESTATUS[0]}
+          { echo "## bench (self-hosted)"; echo '```'; cat compare.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" = 3 ]; then echo "::warning::no baseline for ${BENCH_CLASS}; see bench/README.md"; exit 0; fi
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-results-selfhosted
+          path: bench/results/*.json
+
+  # Advisory only: shared GitHub runners are too noisy for hard thresholds. Never fails the
+  # workflow; rps/p99 regressions are reported as warnings in the step summary. Request errors
+  # still fail the run.sh step, but continue-on-error keeps the workflow green.
+  bench-hosted:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://postgres:password@localhost:5432/postgres
+      BENCH_CLASS: ubuntu-latest-hosted
+      BENCH_NOISY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Install pinned oha
+        run: cargo install oha --version 1.16.0 --locked
+      - name: Full bench run
+        run: bench/run.sh
+      - name: Compare to baseline (advisory)
+        run: |
+          set +e
+          latest=$(ls -t bench/results/*.json | grep -v -- '-quick' | head -n1)
+          python3 -I bench/compare.py "$latest" "bench/baseline/${BENCH_CLASS}.json" | tee compare.txt
+          rc=${PIPESTATUS[0]}
+          { echo "## bench (hosted, advisory)"; echo '```'; cat compare.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" = 3 ]; then echo "::warning::no baseline for ${BENCH_CLASS}"; exit 0; fi
+          exit "$rc"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-results-hosted
+          path: bench/results/*.json

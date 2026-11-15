@@ -103,6 +103,16 @@ pub const REGISTER: Rule = Rule {
     per_ip: 10,
     per_email: 5,
 };
+pub const SIGNUP: Rule = Rule {
+    route: "signup",
+    per_ip: 10,
+    per_email: 5,
+};
+pub const RESET: Rule = Rule {
+    route: "reset",
+    per_ip: 10,
+    per_email: 5,
+};
 pub const CONTACT: Rule = Rule {
     route: "contact",
     per_ip: 10,
@@ -111,7 +121,7 @@ pub const CONTACT: Rule = Rule {
 
 /// Client address as set by the reverse proxy: the last `X-Forwarded-For` entry (the one our
 /// own proxy appended). Without a proxy there is none and only the per-email limit applies.
-fn client_ip(headers: &HeaderMap) -> Option<&str> {
+pub fn client_ip(headers: &HeaderMap) -> Option<&str> {
     let v = headers.get("x-forwarded-for")?.to_str().ok()?;
     v.rsplit(',')
         .next()

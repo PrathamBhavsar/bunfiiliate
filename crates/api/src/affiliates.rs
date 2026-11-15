@@ -69,7 +69,7 @@ pub struct Register {
     /// Slug of the workspace to join.
     workspace: String,
     email: String,
-    /// Min 8 characters.
+    /// Min 12 characters.
     password: String,
     payout_email: Option<String>,
 }
@@ -105,6 +105,7 @@ pub async fn register(
     let ws = bf_db::workspaces::workspace_id_by_slug(&s.pool, &req.workspace)
         .await?
         .ok_or(AppError::NotFound("workspace not found"))?;
+    crate::billing::enforce(&s.pool, ws, bf_core::billing::Limit::Affiliates).await?;
     let password = req.password;
     let password_hash = hash_password_bounded(password).await?;
     let user = User {
@@ -586,7 +587,8 @@ async fn insert_code(
     if !bf_db::programs::program_exists(&mut *tx, ws, spec.program_id).await? {
         return Err(AppError::NotFound("program not found"));
     }
-    if bf_db::affiliates::count_codes(&mut *tx, spec.affiliate_id).await? >= MAX_CODES_PER_AFFILIATE
+    if bf_db::affiliates::count_codes(&mut *tx, ws, spec.affiliate_id).await?
+        >= MAX_CODES_PER_AFFILIATE
     {
         return Err(bad("an affiliate can hold at most 100 referral codes"));
     }

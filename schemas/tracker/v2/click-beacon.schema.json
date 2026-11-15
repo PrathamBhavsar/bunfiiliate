@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bunfiiliate.dev/schemas/tracker/v2/click-beacon.schema.json",
+  "title": "Click beacon v2 (POST /v2/c)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "vid", "url"],
+  "anyOf": [{ "required": ["code"] }, { "required": ["click"] }],
+  "properties": {
+    "v": { "const": 2 },
+    "pk": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+    "code": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+    "click": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+    "vid": { "type": "string", "minLength": 8, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+    "url": { "type": "string", "maxLength": 2048, "pattern": "^https?://[^\\u0000]+$" },
+    "ref": { "type": "string", "maxLength": 2048, "pattern": "^[^\\u0000]*$" },
+    "ts": { "type": "integer", "minimum": 0 }
+  }
+}

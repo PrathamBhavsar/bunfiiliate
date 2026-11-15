@@ -1,16 +1,16 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Inbox, Search, TriangleAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
-import { errorMessage } from "@/lib/api";
 import { idOf, useResource, type ListFn, type ListParams } from "@/lib/use-resource";
 import { type Column, DataTable } from "./data-table";
 import { Button } from "./ui/button";
 import { Dialog, DialogDescription, DialogTitle, SheetContent } from "./ui/dialog";
 import { Input, Select } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
+import { EmptyState, ErrorState } from "./state";
 
 /** A select filter, or a `date` filter whose value is `YYYY-MM-DD` (empty = unset). */
 export type FilterDef = { id: string; label: string } & (
@@ -35,10 +35,21 @@ export type ResourceConfig<T extends { id: string }> = {
   detailTitle?: (row: T) => string;
   detail?: (row: T) => ReactNode;
   empty: { title: string; description: string };
+  /** Primary action in the empty state; when the header action does not already say it. */
+  emptyAction?: ReactNode;
 };
 
 /** A list page from one config: filters, table, pagination, detail sheet (`?id=`), and every state. */
-export function ResourceView<T extends { id: string }>({ config }: { config: ResourceConfig<T> }) {
+export function ResourceView<T extends { id: string }>({
+  config,
+  headingLevel = 1,
+}: {
+  config: ResourceConfig<T>;
+  /** 2 when the page already has its own h1 (a second list on the page). */
+  headingLevel?: 1 | 2;
+}) {
+  const Heading = headingLevel === 1 ? "h1" : "h2";
+  const headingId = headingLevel === 1 ? "page-title" : `${config.title.toLowerCase().replace(/\W+/g, "-")}-title`;
   const pageSize = config.pageSize ?? 25;
   const [params, setParams] = useState<ListParams>({ page: 1, pageSize, search: "", filters: {} });
   const { items, total, isLoading, isFetching, error, refetch } = useResource(config.list, params);
@@ -56,12 +67,12 @@ export function ResourceView<T extends { id: string }>({ config }: { config: Res
   const hasControls = Boolean(config.searchPlaceholder || config.filters?.length);
 
   return (
-    <section aria-labelledby="page-title" className="grid gap-3">
+    <section aria-labelledby={headingId} className="grid gap-3">
       <header className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h1 id="page-title" className="text-base font-semibold">
+          <Heading id={headingId} className="text-base font-semibold">
             {config.title}
-          </h1>
+          </Heading>
           {config.description && <p className="text-xs text-muted">{config.description}</p>}
         </div>
         {config.actions}
@@ -122,27 +133,24 @@ export function ResourceView<T extends { id: string }>({ config }: { config: Res
 
       <div className="overflow-hidden rounded-lg border border-border bg-surface">
         {error && !items.length ? (
-          <div role="alert" className="grid justify-items-center gap-2 px-4 py-12 text-center">
-            <TriangleAlert aria-hidden className="size-5 text-danger" />
-            <p className="font-medium">Could not load {config.title.toLowerCase()}</p>
-            <p className="text-xs text-muted">{errorMessage(error)}</p>
-            <Button size="sm" onClick={() => refetch()}>
-              Retry
-            </Button>
-          </div>
+          <ErrorState error={error} what={config.title.toLowerCase()} onRetry={refetch} />
         ) : !isLoading && items.length === 0 ? (
-          <div className="grid justify-items-center gap-1 px-4 py-12 text-center">
-            <Inbox aria-hidden className="size-5 text-muted" />
-            <p className="font-medium">{config.empty.title}</p>
-            <p className="max-w-sm text-xs text-muted">{config.empty.description}</p>
-            {config.placeholder && (
-              <span className="mt-1 rounded border border-dashed border-border px-1.5 py-0.5 text-xs text-muted">
-                Placeholder · lands in {config.placeholder}
-              </span>
-            )}
-          </div>
+          <EmptyState
+            title={config.empty.title}
+            description={config.empty.description}
+            action={
+              config.placeholder ? (
+                <span className="rounded border border-dashed border-border px-1.5 py-0.5 text-xs text-muted">
+                  Placeholder · lands in {config.placeholder}
+                </span>
+              ) : (
+                config.emptyAction
+              )
+            }
+          />
         ) : (
           <DataTable<T>
+            label={config.title}
             columns={config.columns}
             rows={items}
             loading={isLoading}

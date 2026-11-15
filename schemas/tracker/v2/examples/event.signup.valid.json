@@ -1,0 +1,7 @@
+{
+  "schema": "bf.event.v2",
+  "type": "signup",
+  "external_id": "usr_1",
+  "occurred_at": "2026-01-01T12:00:00Z",
+  "code": "AFF123"
+}

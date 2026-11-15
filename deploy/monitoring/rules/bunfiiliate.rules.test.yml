@@ -1,0 +1,29 @@
+# promtool test rules deploy/monitoring/rules/bunfiiliate.rules.test.yml
+rule_files:
+  - bunfiiliate.rules.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'bf_spool_shedding'
+        values: '0 0 1 1 1 1'
+      - series: 'up{job="bf-tracker"}'
+        values: '1 1 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: SpoolShedding
+        exp_alerts:
+          - exp_labels: {severity: page}
+            exp_annotations:
+              summary: "Spool disk full: tracker is answering 503 and dropping /r clicks"
+              runbook: "docs/ops/alerts.md#spoolshedding"
+      - eval_time: 1m
+        alertname: SpoolShedding
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: TrackerDown
+        exp_alerts:
+          - exp_labels: {severity: page, job: bf-tracker}
+            exp_annotations:
+              summary: "Tracker metrics endpoint is not answering"
+              runbook: "docs/ops/alerts.md#trackerdown"

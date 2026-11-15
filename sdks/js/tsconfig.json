@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "strict": true, "skipLibCheck": true, "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true, "declaration": true,
+    "outDir": "dist/esm", "rootDir": "src", "lib": ["ES2022", "DOM"], "types": ["node"]
+  },
+  "include": ["src"]
+}

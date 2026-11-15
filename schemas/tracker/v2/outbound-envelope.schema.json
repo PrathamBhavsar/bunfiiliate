@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bunfiiliate.dev/schemas/tracker/v2/outbound-envelope.schema.json",
+  "title": "Outbound webhook envelope v2 (api -> customer)",
+  "description": "Sent only to endpoints with api_version = v2. Consumers MUST ignore unknown fields (additive in v2.x).",
+  "type": "object",
+  "required": ["id", "api_version", "type", "created_at", "data"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^evt_[0-9a-fA-F-]{36}$" },
+    "api_version": { "const": "2" },
+    "type": { "type": "string", "pattern": "^[a-z_]+(\\.[a-z_]+)+$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "data": { "type": "object" }
+  }
+}
