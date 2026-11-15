@@ -70,3 +70,12 @@ Login is limited to 10/min per email and 30/min per IP, register/signup 5 per em
 
 ## Duplicate OpenAPI operation ids
 utoipa takes the function name as operationId; `approve` exists for affiliates and conversions, so openapi-typescript merges them and the SDK types are wrong for one. Give new handlers a unique `operation_id`.
+
+## Stale postmaster.pid after a reboot
+`pg_ctl start` on the pg16 dir fails with "lock file postmaster.pid already exists ... PID N" when macOS reused N for another process. Check `ps -p N` and that no pg16 postmaster runs, then remove the pid file. Always call `/opt/homebrew/opt/postgresql@16/bin/pg_ctl` by full path: `pg_ctl` on PATH is pg18 and reports "database files are incompatible".
+
+## Compose passes unset vars as empty strings
+`VAR: ${VAR:-}` sets `VAR=""` in the container, which `std::env::var_os(..).is_some()` treats as set. `BF_GEOIP_DB=""` made the tracker try to open an empty path and exit on first boot. `Config::from_lookup` and the tracker now read an empty value as unset; new optional env vars must do the same.
+
+## Docs drift from code
+A review of the launch docs found wrong ports (metrics 9100 tracker, 9101 api), missing required env (`JWT_SECRET`, `BF_MASTER_KEYS`, `BF_IP_SALT`), a required CLI flag left out, Rust 1.80 vs edition 2024 (1.85), and a "two-step sign-in" claim the login route never enforced. Copy commands and env lists from `.env.example` and the clap definitions, and check security claims against the route that enforces them.

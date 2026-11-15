@@ -394,6 +394,27 @@ async fn billing_cancel_of_another_subscription_does_not_downgrade(pool: PgPool)
     );
     assert_eq!(sub(&pool, t.ws).await.0, "pro");
     assert_eq!(sub(&pool, t.ws).await.1, "active");
+
+    // Same for a foreign past_due or a foreign active purchase while ours is live.
+    for (id, status, at) in [
+        ("e3", "past_due", "2026-03-03T00:00:00Z"),
+        ("e4", "active", "2026-03-04T00:00:00Z"),
+    ] {
+        let b = event(t.ws, Some(id), status, at, "pro").replace("sub_9", "sub_other");
+        let (_, r) = hook(&app, "lemonsqueezy", &b, signed(&b)).await;
+        assert_eq!(r["result"], "ignored", "{status}");
+    }
+    assert_eq!(sub(&pool, t.ws).await.1, "active");
+
+    // After our subscription is canceled, a new active purchase is accepted.
+    let b = event(t.ws, Some("e5"), "cancelled", "2026-03-05T00:00:00Z", "pro");
+    hook(&app, "lemonsqueezy", &b, signed(&b)).await;
+    assert_eq!(sub(&pool, t.ws).await.1, "canceled");
+    let b = event(t.ws, Some("e6"), "active", "2026-03-06T00:00:00Z", "pro")
+        .replace("sub_9", "sub_new");
+    let (_, r) = hook(&app, "lemonsqueezy", &b, signed(&b)).await;
+    assert_eq!(r["result"], "applied");
+    assert_eq!(sub(&pool, t.ws).await.1, "active");
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
