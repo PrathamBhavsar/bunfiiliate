@@ -44,7 +44,7 @@ A multi-arch image is published to `ghcr.io/prathambhavsar/bunfiiliate` on each 
 
 ## From source
 
-Needs Rust 1.80+ and Node 20+ (to minify `tracker.js`).
+Needs Rust 1.85+ and Node 20+ (to minify `tracker.js`).
 
 ```bash
 export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH   # macOS, brew rustup

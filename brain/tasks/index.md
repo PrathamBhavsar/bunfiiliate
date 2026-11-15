@@ -40,6 +40,8 @@ Source of truth for the DAG is `docs/PLAN.md` section 4. This page tracks status
 | F4 | feat/fix-tracker-spool | done, merged (coordinator); spool all-or-nothing + poison, dead-letter, trusted proxies, event queue lane, signed-timestamp generic webhook, tracker.js |
 | T60 | final gate (make ci, ocr, e2e) | done; `make ci` and `make e2e` green on staging, merged to local prod (not pushed); ocr not re-run on the full diff |
 
+| REL | feat/release-gate-fix | done, gate green (14 steps, delegated ocr), merged to local staging and prod; push, tag and manual checks await owner |
+
 Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/decisions/index.md).
 | A01 | feat/plan-a | done (envelope crypto, bf-core::secrets + Vault) |
 | A02 | feat/plan-a | done (sealed columns, shown once on create/rotate, web one-time reveal) |

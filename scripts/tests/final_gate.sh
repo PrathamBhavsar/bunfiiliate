@@ -25,7 +25,7 @@ mkdir -p "$T/g"; echo 'ALL STEPS PASSED' >"$T/g/report.md"
 
 git remote add origin https://github.com/someone-else/x.git
 if GATE_DIR="$T/g" "$ROOT/scripts/push-guard.sh" >/dev/null 2>&1; then bad push_guard_rejects_foreign_remote; else ok push_guard_rejects_foreign_remote; fi
-git remote set-url origin https://github.com/pratham-projects/x.git
+git remote set-url origin https://github.com/PrathamBhavsar/x.git
 echo dirty >c
 if GATE_DIR="$T/g" "$ROOT/scripts/push-guard.sh" >/dev/null 2>&1; then bad push_guard_rejects_dirty_tree; else ok push_guard_rejects_dirty_tree; fi
 rm c

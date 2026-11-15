@@ -438,6 +438,37 @@ async fn payouts_reversal_inside_an_open_batch_shrinks_the_payout(pool: PgPool) 
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
+async fn payouts_reversal_after_the_rail_took_the_line_keeps_the_sent_amount(pool: PgPool) {
+    let s = seed(&pool, true).await;
+    sale(&pool, &s, "o1", 10_000, s.a).await;
+    sale(&pool, &s, "o2", 30_000, s.a).await;
+    approve_due(&pool).await.unwrap();
+    let batch = create_batch(&pool, s.workspace, s.program, s.admin)
+        .await
+        .unwrap()
+        .unwrap();
+    approve_batch(&pool, s.workspace, batch, s.admin)
+        .await
+        .unwrap();
+    // The provider holds the full 4000 for this line (submitted, outcome unknown).
+    sqlx::query("UPDATE payouts SET rail_state = 'submitted' WHERE batch_id = $1")
+        .bind(batch)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    reverse(&pool, &s, "refund", "o2").await;
+    let amount: i64 = sqlx::query_scalar("SELECT amount_cents FROM payouts WHERE batch_id = $1")
+        .bind(batch)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(amount, 4_000, "amount sent to the provider must not shrink");
+    assert_eq!(status_of(&pool, "o2").await, "reversed");
+    assert_books(&pool).await;
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
 async fn payouts_provider_refunds_find_the_original_conversion(pool: PgPool) {
     let s = seed(&pool, false).await;
     let code = format!("A{}", s.program);

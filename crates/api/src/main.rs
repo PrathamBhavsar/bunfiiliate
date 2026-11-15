@@ -85,7 +85,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             ));
             tokio::select! {
                 () = api::worker::run(pool, mailer, vault) => {}
-                _ = tokio::signal::ctrl_c() => {}
+                () = bf_rt::shutdown_signal() => {}
             }
         }
         Command::Secrets { action } => {
@@ -138,9 +138,7 @@ async fn serve(with_worker: bool) -> Result<(), Box<dyn Error>> {
     let listener = tokio::net::TcpListener::bind(("0.0.0.0", cfg.api_port)).await?;
     tracing::info!(port = cfg.api_port, "api listening");
     axum::serve(listener, app(state))
-        .with_graceful_shutdown(async {
-            let _ = tokio::signal::ctrl_c().await;
-        })
+        .with_graceful_shutdown(bf_rt::shutdown_signal())
         .await?;
     metrics.abort();
     if let Some(w) = worker {

@@ -43,8 +43,8 @@ echo "k1:$(head -c32 /dev/urandom | base64)"
 | --- | --- |
 | 8080 | api |
 | 8081 | tracker |
-| 9100 | api Prometheus metrics (internal) |
-| 9101 | tracker Prometheus metrics (internal) |
+| 9100 | tracker Prometheus metrics (internal) |
+| 9101 | api Prometheus metrics (internal) |
 
 ## Durability mode
 

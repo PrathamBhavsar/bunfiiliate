@@ -797,8 +797,12 @@ pub(crate) async fn settle(
             // Clamped: a payout can be smaller than its claimed conversions (a clawback was
             // netted into it), and a negative one would make the whole batch unpayable. The
             // shortfall stays in the affiliate's payable and nets against the next batch.
+            // Not once a rail line is pending or submitted: the provider already holds the full
+            // amount, and settle_confirmed posts the stored amount, so shrinking it would book
+            // less cash out than left the bank.
             "UPDATE payouts SET amount_cents = GREATEST(amount_cents - $2, 0) \
-             WHERE id = $1 AND status IN ('draft', 'approved')",
+             WHERE id = $1 AND status IN ('draft', 'approved') \
+             AND COALESCE(rail_state, '') NOT IN ('pending', 'submitted')",
         )
         .bind(payout)
         .bind(conv.commission_cents)

@@ -9,20 +9,13 @@ bad() { echo "FAIL $1: $2"; FAIL=$((FAIL+1)); }
 
 # check_bench_numbers_fails_on_drift: work on a temp copy of the tree.
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-mkdir -p "$TMP/scripts" "$TMP/site" "$TMP/bench"
+mkdir -p "$TMP/scripts" "$TMP/site/src" "$TMP/docs"
 cp "$ROOT/scripts/check-bench-numbers.sh" "$TMP/scripts/"
-cp "$ROOT/site/index.html" "$TMP/site/"
-cp -R "$ROOT/bench/results" "$ROOT/bench/gen_docs.py" "$TMP/bench/"
+cp "$ROOT/site/src/brand.js" "$TMP/site/src/"
+cp "$ROOT/docs/benchmarks.md" "$TMP/docs/"
 if "$TMP/scripts/check-bench-numbers.sh" >/dev/null 2>&1; then ok check_bench_numbers_passes_on_clean_copy
 else bad check_bench_numbers_passes_on_clean_copy "clean copy failed"; fi
-python3 -I - "$TMP/site/index.html" <<'PY'
-import re, sys
-p = sys.argv[1]
-s = open(p, encoding="utf-8").read()
-s2 = re.sub(r'(data-metric="rps">)([0-9.]+)', lambda m: m.group(1) + str(float(m.group(2)) + 1), s, count=1)
-assert s != s2
-open(p, "w", encoding="utf-8").write(s2)
-PY
+sed -i.bak 's/27\.6k req\/s/99.9k req\/s/' "$TMP/site/src/brand.js"
 if "$TMP/scripts/check-bench-numbers.sh" >/dev/null 2>&1; then bad check_bench_numbers_fails_on_drift "drift not detected"
 else ok check_bench_numbers_fails_on_drift; fi
 

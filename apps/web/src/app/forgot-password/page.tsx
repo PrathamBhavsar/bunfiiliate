@@ -31,7 +31,7 @@ export default function ForgotPasswordPage() {
         <div className="grid gap-1">
           <h1 className="text-base font-semibold">Reset your password</h1>
           <p className="text-xs text-muted">
-            Enter an authenticator code or a recovery code. Accounts without two-step sign-in need an admin to reset.
+            Enter an authenticator code or a recovery code. Accounts without authenticator codes need an admin to reset.
           </p>
         </div>
         <div className="grid gap-1">

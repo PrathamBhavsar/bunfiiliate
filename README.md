@@ -107,7 +107,7 @@ flowchart TD
 - **Cookie-based sessions**: HttpOnly, `SameSite=Strict`, `Secure` JWT cookie (`bf_at`, 15-minute expiration).
 - **Refresh token rotation**: Opaque refresh tokens (`bf_rt`, 30-day expiration) stored as SHA-256 hashes; detection of token reuse immediately revokes the entire token family.
 - **Origin verification**: Strict origin header matching on mutating HTTP requests to prevent CSRF.
-- **Password security**: Password hashing with Argon2; optional TOTP 2FA with recovery codes; rate-limited, non-enumerating password reset.
+- **Password security**: Password hashing with Argon2; optional TOTP authenticator codes with recovery codes (used to reset your own password; sign-in itself is password-only); rate-limited, non-enumerating password reset.
 - **Secrets at rest**: webhook and provider secrets are encrypted with a rotating master key.
 
 | Env var | Used by | Meaning |
@@ -125,7 +125,7 @@ flowchart TD
 
 ### Prerequisites
 
-- **Rust**: rustc 1.80+ (recommended via `rustup`).
+- **Rust**: rustc 1.85+ (the workspace uses edition 2024) (recommended via `rustup`).
 - **PostgreSQL 16**: Running locally on port `5433` (port `5432` is reserved to avoid conflicts).
 - **Node.js**: Node 20+ (for minifying `tracker.js` and running documentation linters).
 
@@ -142,13 +142,13 @@ export PATH=/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH
 Start the dedicated PostgreSQL 16 cluster:
 
 ```bash
-/opt/homebrew/opt/postgresql@16/bin/pg_ctl -D ~/.bunfiiliate/pg16 -o "-p 5433 -k /tmp" start
+/opt/homebrew/opt/postgresql@16/bin/pg_ctl -D /path/to/pg16-data -o "-p 5433 -k /tmp" start
 ```
 
 Set the database connection string:
 
 ```bash
-export DATABASE_URL=postgres://pratham@localhost:5433/postgres
+export DATABASE_URL=postgres://postgres@localhost:5433/postgres
 ```
 
 ### Validate Toolchain & Run Tests
@@ -185,7 +185,7 @@ make deny      # Run cargo-deny dependency and license audit
    cargo run -p api -- serve --with-worker
    ```
 
-   The API server listens on port `8080` (Prometheus metrics on `9100`). OpenAPI documentation is available at `http://localhost:8080/api/openapi.json`.
+   The API server listens on port `8080` (Prometheus metrics on `9101`). OpenAPI documentation is available at `http://localhost:8080/api/openapi.json`.
 
 3. **Start the Hot-Path Tracker**:
 
@@ -193,7 +193,7 @@ make deny      # Run cargo-deny dependency and license audit
    cargo run -p tracker
    ```
 
-   The tracker listens on port `8081` (Prometheus metrics on `9101`).
+   The tracker listens on port `8081` (Prometheus metrics on `9100`).
 
 ---
 

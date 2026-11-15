@@ -54,6 +54,8 @@ impl Config {
     }
 
     pub fn from_lookup(get: impl Fn(&str) -> Option<String>) -> Result<Self, ConfigError> {
+        // An empty value is an unset one (Compose passes `${VAR:-}` as an empty string).
+        let get = |k: &str| get(k).filter(|v| !v.trim().is_empty());
         let required = |key: &'static str| get(key).ok_or(ConfigError::Missing(key));
         let port = |key: &'static str| {
             required(key)?
@@ -133,6 +135,27 @@ mod tests {
     }
 
     #[test]
+    fn empty_value_counts_as_unset() {
+        // Compose passes unset optional vars as "": an empty JWT_SECRETS must not matter, an
+        // empty required one must read as missing.
+        let empty_list = |k: &str| {
+            (k == "BF_JWT_SECRETS")
+                .then(String::new)
+                .or_else(|| lookup(k))
+        };
+        assert!(Config::from_lookup(empty_list).is_ok());
+        let empty_secret = |k: &str| {
+            if k == "JWT_SECRET" {
+                Some(String::new())
+            } else {
+                lookup(k)
+            }
+        };
+        let err = Config::from_lookup(empty_secret).unwrap_err();
+        assert_eq!(err, ConfigError::Missing("JWT_SECRET"));
+    }
+
+    #[test]
     fn rejects_short_jwt_secret() {
         let short = |k: &str| {
             (k == "JWT_SECRET")
@@ -174,4 +197,20 @@ mod tests {
         .unwrap_err();
         assert!(matches!(err, ConfigError::Weak(..)));
     }
+}
+
+/// Resolves on SIGINT, or on SIGTERM (what `docker stop` and systemd send) on unix.
+pub async fn shutdown_signal() {
+    #[cfg(unix)]
+    {
+        use tokio::signal::unix::{SignalKind, signal};
+        if let Ok(mut term) = signal(SignalKind::terminate()) {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {}
+                _ = term.recv() => {}
+            }
+            return;
+        }
+    }
+    let _ = tokio::signal::ctrl_c().await;
 }
