@@ -1104,3 +1104,11 @@ source = "api"
 kind = "self"
 role = "Affiliate"
 reason = "code must belong to the caller's affiliate row"
+
+[[route]]
+method = "get"
+path = "/api/v1/config"
+source = "api"
+kind = "public"
+role = "none"
+reason = "public runtime flags for the static web bundle; no tenant data"

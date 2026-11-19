@@ -87,6 +87,23 @@ async fn ws_count(pool: &PgPool) -> i64 {
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
+async fn config_reports_signup_enabled(pool: PgPool) {
+    let req = Request::builder()
+        .method("GET")
+        .uri("/api/v1/config")
+        .header(HOST, "bf.test")
+        .body(Body::empty())
+        .unwrap();
+    let res = app(pool).oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(res.into_body(), 1 << 20)
+        .await
+        .unwrap();
+    let body: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(body, json!({ "signup_enabled": true }));
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
 async fn signup_creates_workspace_and_logs_in(pool: PgPool) {
     let app = app(pool.clone());
     let res = signup(&app, "Acme", "a@x.io", PW, "1.1.1.1").await;

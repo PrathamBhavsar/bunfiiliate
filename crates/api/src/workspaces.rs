@@ -29,7 +29,7 @@ pub fn routes() -> Router<AppState> {
 }
 
 /// Self-serve signup is off unless `SIGNUP_ENABLED` is `1` or `true`.
-fn signup_enabled() -> bool {
+pub(crate) fn signup_enabled() -> bool {
     std::env::var("SIGNUP_ENABLED").is_ok_and(|v| matches!(v.trim(), "1" | "true"))
 }
 

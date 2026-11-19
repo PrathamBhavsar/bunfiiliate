@@ -241,6 +241,7 @@ fn public_routes_allowlist() {
         "api post /api/v1/auth/refresh",
         "api post /api/v1/auth/logout",
         "api get /api/v1/auth/csrf",
+        "api get /api/v1/config",
         "api post /api/v1/auth/password/reset",
         "api post /api/v1/auth/password/reset-with-token",
         "api post /api/v1/contact-requests",

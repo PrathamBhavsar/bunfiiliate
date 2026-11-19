@@ -490,6 +490,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Public runtime flags the statically exported web bundle reads. No auth. */
+        get: operations["config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contact-requests": {
         parameters: {
             query?: never;
@@ -1867,6 +1884,10 @@ export interface components {
             flagged_clicks: number;
             /** Format: int64 */
             revenue_cents: number;
+        };
+        ConfigView: {
+            /** @description Self-serve workspace signup is enabled (`SIGNUP_ENABLED`). */
+            signup_enabled: boolean;
         };
         ContactPatch: {
             /** @description `new`, `read` or `closed`. */
@@ -4285,6 +4306,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubscriptionView"];
+                };
+            };
+        };
+    };
+    config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigView"];
                 };
             };
         };

@@ -6,6 +6,7 @@ import { useEffect, type FormEvent } from "react";
 import { BootScreen } from "@/components/boot-screen";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { useConfig } from "@/lib/admin";
 import { errorMessage } from "@/lib/api";
 import { roleOf, useLogin, useMe } from "@/lib/auth";
 import { homeFor } from "@/lib/nav";
@@ -13,6 +14,7 @@ import { homeFor } from "@/lib/nav";
 export default function LoginPage() {
   const me = useMe();
   const login = useLogin();
+  const config = useConfig();
   const router = useRouter();
   const user = me.data;
 
@@ -58,9 +60,11 @@ export default function LoginPage() {
         <p className="text-xs text-muted">
           New affiliate? <Link href="/register" className="underline">Create an account</Link>
         </p>
-        <p className="text-xs text-muted">
-          Running a program? <Link href="/signup" className="underline">Create a workspace</Link>
-        </p>
+        {config.data?.signup_enabled && (
+          <p className="text-xs text-muted">
+            Running a program? <Link href="/signup" className="underline">Create a workspace</Link>
+          </p>
+        )}
       </form>
     </main>
   );
