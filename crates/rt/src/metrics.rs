@@ -153,7 +153,10 @@ pub fn router(render: fn() -> String, token: Option<String>) -> Router {
 /// task is dropped. Set `BF_METRICS_TOKEN` to require a bearer token. Never on the
 /// public tracker or API port. Failures are logged: metrics must not take the process down.
 pub async fn serve(default_addr: &str, render: fn() -> String) {
-    let addr = std::env::var("BF_METRICS_ADDR").unwrap_or_else(|_| default_addr.to_owned());
+    let addr = std::env::var("BF_METRICS_ADDR")
+        .ok()
+        .filter(|a| !a.trim().is_empty())
+        .unwrap_or_else(|| default_addr.to_owned());
     let token = std::env::var("BF_METRICS_TOKEN")
         .ok()
         .filter(|t| !t.is_empty());
