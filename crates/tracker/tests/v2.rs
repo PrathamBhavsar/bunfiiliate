@@ -504,3 +504,60 @@ async fn v2_queue_full_503_with_retry_after(pool: PgPool) {
     assert_eq!(error_code(res).await, "overloaded");
     std::fs::remove_dir_all(dir).ok();
 }
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn v2_in_flight_idempotency_retry_after_shedding(pool: PgPool) {
+    seed(&pool).await;
+    let dir = std::env::temp_dir().join(format!("bf-v2-test-{}", Uuid::now_v7()));
+    let t = start(
+        pool.clone(),
+        SpoolConfig::new(&dir),
+        "salt",
+        Geo::disabled(),
+        Arc::new(bf_core::secrets::Vault::plaintext()),
+    )
+    .await
+    .unwrap();
+    let app = router(t.state.clone());
+
+    // 1. Spool is shedding: first attempt fails with 503 and releases the key
+    t.state.spool.set_shedding(true);
+    let res = send(&app, v2("k-shed", SALE)).await;
+    assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+
+    // 2. Shedding clears: retry succeeds with 202 Accepted (key was released, not marked duplicate of lost event)
+    t.state.spool.set_shedding(false);
+    let res = send(&app, v2("k-shed", SALE)).await;
+    assert_eq!(res.status(), StatusCode::ACCEPTED);
+    let bytes = to_bytes(res.into_body(), 1 << 20).await.unwrap();
+    let v: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(v["status"], "accepted");
+    let accepted_id = v["id"].as_str().unwrap().to_owned();
+
+    // 3. Second attempt with committed key answers 200 Duplicate with the accepted id
+    let res = send(&app, v2("k-shed", SALE)).await;
+    assert_eq!(res.status(), StatusCode::OK);
+    let bytes = to_bytes(res.into_body(), 1 << 20).await.unwrap();
+    let v: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(v["status"], "duplicate");
+    assert_eq!(v["id"], accepted_id);
+
+    // 4. In-flight pending key answers 503 rather than duplicate
+    let pid = sqlx::query_scalar::<_, Uuid>("SELECT id FROM programs WHERE public_key = 'pk'")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let in_flight_id = Uuid::now_v7();
+    t.state.idem.claim(
+        pid,
+        "generic",
+        "k-inflight",
+        tracker::idem::digest(SALE.as_bytes()),
+        in_flight_id,
+    );
+    let res = send(&app, v2("k-inflight", SALE)).await;
+    assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(error_code(res).await, "overloaded");
+
+    std::fs::remove_dir_all(dir).ok();
+}

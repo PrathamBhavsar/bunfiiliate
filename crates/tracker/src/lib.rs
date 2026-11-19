@@ -42,7 +42,7 @@ use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 use bf_core::secrets::Vault;
-use event::{clip, ip_hash, normalize_ua, referrer_host, url_path, with_click};
+use event::{clip, ip_hash, normalize_ua, referrer_host, url_path, with_click, with_ref};
 use geo::Geo;
 use proxy::Trust;
 use snapshot::{CodeEntry, Snapshot};
@@ -213,16 +213,21 @@ async fn redirect(
         &headers,
         &ext,
     );
+    // Spool disk full: the visitor still gets to the landing page with ref=<code> so
+    // the client-side tracker can record the click once load clears, rather than a
+    // fake bf_click for a click never spooled. Redirecting beats a dead link.
+    if s.spool.is_shedding() {
+        metrics::spool_shed("r");
+        let location = with_ref(&entry.landing_url, &code);
+        let Ok(location) = HeaderValue::try_from(location) else {
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        };
+        return (StatusCode::FOUND, [(LOCATION, location)]).into_response();
+    }
     let location = with_click(&entry.landing_url, &click.id.to_string());
     let Ok(location) = HeaderValue::try_from(location) else {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     };
-    // Spool disk full: the visitor still gets to the landing page, but the click is lost
-    // (counted in `bf_spool_shed_total{route="r"}`). Redirecting beats a dead link.
-    if s.spool.is_shedding() {
-        metrics::spool_shed("r");
-        return (StatusCode::FOUND, [(LOCATION, location)]).into_response();
-    }
     match ingest(s, Record::Click(click)).await {
         Ok(()) => (StatusCode::FOUND, [(LOCATION, location)]).into_response(),
         Err(status) => status.into_response(),
@@ -490,6 +495,9 @@ async fn v2_conversion(
                 "Idempotency-Key was already used with a different body",
             ));
         }
+        idem::Claim::Pending => {
+            return Err(ApiError::from_status(StatusCode::SERVICE_UNAVAILABLE));
+        }
         idem::Claim::New => {}
     }
     let event = InboundEvent {
@@ -505,6 +513,7 @@ async fn v2_conversion(
         idem_state.release(pid, name, &external_id);
         return Err(ApiError::from_status(status));
     }
+    idem_state.commit(pid, name, &external_id);
     let body = axum::Json(serde_json::json!({"status": "accepted", "id": id}));
     Ok((source.accepted(), body).into_response())
 }
