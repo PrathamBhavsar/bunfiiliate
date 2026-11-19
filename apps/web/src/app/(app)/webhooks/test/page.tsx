@@ -71,6 +71,13 @@ function Tester() {
         Signs the payload with the program&apos;s own secret and delivers it to the real inbound endpoint, so you can check a
         Stripe, Paddle or generic secret without a provider account.
       </p>
+      <div role="note" className="grid gap-1 rounded border border-warning p-2 text-xs">
+        <p className="font-semibold text-warning">Not a sandbox.</p>
+        <p className="text-muted">
+          This signs a real sale-shaped event and posts it to the program&apos;s live inbound endpoint. It can create a
+          conversion, a commission and outbound webhook deliveries. Use a test program.
+        </p>
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="grid gap-1">
           <Label htmlFor="wt-program">Test program</Label>

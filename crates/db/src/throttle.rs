@@ -89,3 +89,19 @@ pub async fn clear(
         .await?;
     Ok(())
 }
+
+/// Delete rows that can no longer affect a decision: no lock in force and the failure window
+/// started before `now - RESET.cap` (the longest window, lock and doubling memory in any policy).
+/// Returns how many rows went.
+pub async fn purge_stale(db: &PgPool, now: DateTime<Utc>) -> Result<u64, sqlx::Error> {
+    let cutoff = now - bf_core::throttle::RESET.cap;
+    let done = sqlx::query(
+        "DELETE FROM auth_throttle WHERE window_started_at < $1 \
+         AND (locked_until IS NULL OR locked_until < $2)",
+    )
+    .bind(cutoff)
+    .bind(now)
+    .execute(db)
+    .await?;
+    Ok(done.rows_affected())
+}

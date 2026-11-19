@@ -38,12 +38,12 @@ Empirical load test results for `tracker` ingress endpoints under continuous con
 
 ## Publishing Rules
 
-These rules apply to every benchmark number in this repo, the README, and `site/index.html`.
+These rules apply to every benchmark number in this repo, the README, and the site copy (`site/src/brand.js`).
 
 1. Numbers are published only from a full `bench/run.sh` run whose result JSON (with its `hardware` block and git sha) is committed under `bench/results/`. Quick runs (`--quick`) are never published.
 2. Always state the hardware, the `BF_FSYNC` mode, and the localhost single-machine caveat (the NOTE above).
 3. Never mix `BF_FSYNC` modes in one claim. Quote `always` and `off` separately.
 4. These numbers are a floor for the measured machine, not a capacity claim.
 5. No comparison claims against other products without a run of both on the same hardware.
-6. Regenerate with `bench/run.sh --write-docs`. It rewrites this file and the datasheet in `site/index.html`. `scripts/check-bench-numbers.sh` (part of the final gate) fails if the site drifts from the latest result.
+6. Regenerate with `bench/run.sh --write-docs`. It rewrites this file and the benchmark facts in `site/src/brand.js`. `scripts/check-bench-numbers.sh` (part of the final gate) fails if the site drifts from the latest result.
 7. Regression gating: `python -I bench/compare.py RESULT BASELINE` against `bench/baseline/<hardware class>.json`. Updating a baseline requires a PR that touches `bench/baseline/*` and states the reason in the description.
