@@ -66,6 +66,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      # The api applies migrations at start; the tracker reads their tables at boot.
+      api:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-bunfiiliate}
       API_PORT: 8080
