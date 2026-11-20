@@ -8,8 +8,9 @@ alerting:
     - static_configs:
         - targets: ["alertmanager:9093"]
 scrape_configs:
-  # Metrics listen on 127.0.0.1 by default; set BF_METRICS_ADDR=0.0.0.0:910x on a private
-  # network (and BF_METRICS_TOKEN, see docs/ops/alerts.md) before scraping from a container.
+  # deploy/docker-compose.yml sets BF_METRICS_ADDR per service (tracker 9100, api 9101) on the
+  # compose network only. With BF_METRICS_TOKEN set, add `authorization: {credentials: <token>}`
+  # to each job (see docs/ops/alerts.md).
   - job_name: bf-tracker
     static_configs:
       - targets: ["tracker:9100"]

@@ -41,6 +41,10 @@ services:
       SIGNUP_ENABLED: ${SIGNUP_ENABLED:-0}
       BF_HSTS: ${BF_HSTS:-0}
       BF_JWT_SECRETS: ${BF_JWT_SECRETS:-}
+      # Reachable on the compose network only (no published port, not routed by Caddy), so the
+      # optional monitoring stack can scrape it. Set BF_METRICS_TOKEN to require a bearer token.
+      BF_METRICS_ADDR: 0.0.0.0:9101
+      BF_METRICS_TOKEN: ${BF_METRICS_TOKEN:-}
       TAX_REPORT_THRESHOLD_CENTS: ${TAX_REPORT_THRESHOLD_CENTS:-60000}
       RUST_LOG: ${RUST_LOG:-info}
     volumes:
@@ -73,6 +77,8 @@ services:
       BF_GEOIP_DB: ${BF_GEOIP_DB:-}
       BF_IP_SALT: ${BF_IP_SALT:?set BF_IP_SALT in .env (openssl rand -hex 32)}
       BF_TRUST_CF: ${BF_TRUST_CF:-0}
+      BF_METRICS_ADDR: 0.0.0.0:9100
+      BF_METRICS_TOKEN: ${BF_METRICS_TOKEN:-}
       BF_V1_SUNSET: ${BF_V1_SUNSET:-}
       # Caddy reaches the tracker over the compose network; believe its X-Forwarded-For, or
       # every click would be attributed to Caddy's own address.

@@ -7,7 +7,7 @@ openssl rand -hex 24 > deploy/monitoring/alert-token     # same value as BF_ALER
 docker compose -f deploy/compose.yml -f deploy/monitoring/compose.monitoring.yml --profile monitoring up -d
 ```
 
-The tracker and api expose `/metrics` on `127.0.0.1:9100` / `:9101` (`BF_METRICS_ADDR`, optional `BF_METRICS_TOKEN` bearer). Prometheus in a container needs them reachable on a private network (and the token set); never expose them publicly.
+The tracker and api expose `/metrics` on `127.0.0.1:9100` / `:9101` (`BF_METRICS_ADDR`, optional `BF_METRICS_TOKEN` bearer). The shipped compose file sets `BF_METRICS_ADDR=0.0.0.0:9100` (tracker) and `0.0.0.0:9101` (api) inside their containers, reachable on the compose network only: no published port, not routed by Caddy. Set `BF_METRICS_TOKEN` in `.env` to require a bearer token (then add `authorization: {credentials: ...}` to the scrape jobs in `deploy/monitoring/prometheus.yml`). Never expose these ports publicly.
 
 ## Delivery: in-app, super admins only
 
