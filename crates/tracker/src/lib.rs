@@ -508,12 +508,11 @@ async fn v2_conversion(
         payload,
         received_ms: now_ms(),
     };
-    let idem_state = s.idem.clone();
+    let reservation = idem::Reservation::new(s.idem.clone(), pid, name, external_id);
     if let Err(status) = ingest(s, Record::Event(event)).await {
-        idem_state.release(pid, name, &external_id);
         return Err(ApiError::from_status(status));
     }
-    idem_state.commit(pid, name, &external_id);
+    reservation.commit();
     let body = axum::Json(serde_json::json!({"status": "accepted", "id": id}));
     Ok((source.accepted(), body).into_response())
 }
