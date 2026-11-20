@@ -1,5 +1,14 @@
 # Changelog
 
+## [2026-11-20] Hardening after first Docker run (O2-O6, O9, O11, O12)
+
+- **Docker smoke** (colima, clean `docker compose up --build`): found the api crash loop from an empty `SMTP_URL` (same class as the GeoIP bug) and a tracker boot race. Fixed both, then ran the full flow in compose: bootstrap, program, affiliate, click, signed sale, conversion row, metrics reachable in-network only, `/api/v1/config`. All green, restarts 0.
+- **Fixed**: O2 (idempotency pending/committed + cancel-safe guard), O3 (shed redirect carries `ref=`), O4 (spool rollback across rotation), O5 (backup flag pid/atomic, dump validated before `--force`, `.partial`, no password in argv), O6 (per-service metrics addr), O9a/b, O11, O12. See `docs/audit/findings.md` (D1-D4 are new).
+- **Review**: antigravity read-only review of the diff caught a real race (guard released a key while the detached spool write still landed); the security hook caught backup trap removing another run's lock. Both fixed with tests.
+- **Workers**: agy (O2/O3, review) and opencode (O9/O11/O12) delivered. A kiro worker never started: a multi-line `--spec` broke zsh quoting. Use `--spec-file`. O5/O6 done by the coordinator.
+- **Still open**: O1 (TOTP at login), O7, O8, O9 rest, O10; owner steps: enable Pages, live rail/billing tests, SMTP, tag `v0.1.0`.
+- **Not done**: no push, no tag.
+
 ## [2026-11-16] Release readiness review + fixes (feat/release-gate-fix)
 
 - **Verdict before fixes**: not ready. Fresh gate on staging 094baf1: everything ok except `bench-numbers` (checked a deleted `site/index.html`); `ocr` never ran. prod is 154 commits behind staging, no tag or release exists, `origin/staging` is 32 commits behind, remote CI last ran Nov 7 (failed), Docker never run locally.
