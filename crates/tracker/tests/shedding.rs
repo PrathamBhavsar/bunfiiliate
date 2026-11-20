@@ -124,11 +124,11 @@ async fn redirect_still_302_while_shedding_but_records_no_click(pool: PgPool) {
         .await
         .unwrap();
     assert_eq!(res.status(), StatusCode::FOUND);
+    let loc = res.headers()["location"].to_str().unwrap();
+    assert!(loc.contains("ref=abc"), "expected ref=abc in {loc}");
     assert!(
-        res.headers()["location"]
-            .to_str()
-            .unwrap()
-            .contains("bf_click=")
+        !loc.contains("bf_click="),
+        "bf_click must not be present when shed in {loc}"
     );
     tokio::time::sleep(std::time::Duration::from_millis(300)).await;
     let n: i64 = sqlx::query_scalar("SELECT count(*) FROM clicks")

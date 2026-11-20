@@ -53,8 +53,8 @@ Scope: `crates/api`, `crates/db` and migrations; `crates/tracker`, `core`, `spoo
 | # | where | issue | why deferred |
 |---|-------|-------|--------------|
 | O1 | login (`routes.rs`) | TOTP is not enforced at sign-in | new feature (API + UI + e2e); copy is now honest. Next minor. |
-| O2 | `tracker/src/lib.rs`, `idem.rs` | in-flight idempotency key answers 200 duplicate; a 503 on the first attempt then loses the event | needs pending/committed key state; rare (needs a client retry during shedding). Next minor. |
-| O3 | `tracker/src/lib.rs` (`redirect` shed branch) | click shed under load returns `bf_click` for a click never spooled; affiliate loses credit | only while shedding; fix is `ref=<code>` in the shed Location. Next minor. |
+| O2 | `tracker/src/lib.rs`, `idem.rs` | in-flight idempotency key answers 200 duplicate; a 503 on the first attempt then loses the event | FIXED: pending/committed key state; tests: `in_flight_pending_state_and_failed_release`, `v2_in_flight_idempotency_retry_after_shedding` |
+| O3 | `tracker/src/lib.rs` (`redirect` shed branch) | click shed under load returns `bf_click` for a click never spooled; affiliate loses credit | FIXED: `ref=<code>` in shed Location redirect; tests: `ref_appended`, `redirect_still_302_while_shedding_but_records_no_click` |
 | O4 | `spool/src/lib.rs` | write failure after a segment rotation poisons the writer until restart; `/readyz` stays 200 | needs rollback of the rotation; disk-full coincident with a rotation only. Next minor, alert on `bf_spool_shedding` meanwhile. |
 | O5 | `deploy/backup/*` | stale `gc.paused` after a killed backup; `restore --force` drops schema before validating the dump; partial `.dump` not filtered; `DATABASE_URL` in argv | operator hazards, documented in `docs/ops/backup-restore.md`; run backup drill before relying on it. |
 | O6 | compose + `monitoring/prometheus.yml` | `BF_METRICS_ADDR` not set in compose, so the shipped Prometheus config cannot scrape | monitoring stack is optional and one env var is shared by two services; needs per-service vars. |
