@@ -508,11 +508,21 @@ async fn v2_conversion(
         payload,
         received_ms: now_ms(),
     };
+    // `ingest` finishes its spool write even if this request is cancelled, so the key's outcome
+    // (commit or release) must be decided by a task that is not cancelled with the request.
     let reservation = idem::Reservation::new(s.idem.clone(), pid, name, external_id);
-    if let Err(status) = ingest(s, Record::Event(event)).await {
+    let ingested = tokio::spawn(async move {
+        let r = ingest(s, Record::Event(event)).await;
+        if r.is_ok() {
+            reservation.commit();
+        }
+        r // an Err drops the reservation here, freeing the key
+    })
+    .await
+    .unwrap_or(Err(StatusCode::INTERNAL_SERVER_ERROR));
+    if let Err(status) = ingested {
         return Err(ApiError::from_status(status));
     }
-    reservation.commit();
     let body = axum::Json(serde_json::json!({"status": "accepted", "id": id}));
     Ok((source.accepted(), body).into_response())
 }
