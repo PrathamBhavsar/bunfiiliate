@@ -17,7 +17,7 @@ Scripts live in `deploy/backup/`. They need `pg_dump`, `pg_restore`, `psql` (set
 1. Pause spool GC by creating `$SPOOL_DIR/gc.paused`. The tracker's GC then deletes nothing, so no segment vanishes mid-copy. (Anything else that calls `bf_spool::delete_segments_below` honours the flag.)
 2. Copy the `checkpoint` file first, then the segments. The copied checkpoint can only be at or behind the segments' content.
 3. Run `pg_dump`. The database may be ahead of the copied checkpoint. That is safe: restore replays the spool from the checkpoint and inserts are idempotent (click id primary key, `ON CONFLICT DO NOTHING`; `crates/spool/tests/restore_replay.rs`).
-4. Resume GC (removed by a trap, also when the backup fails). If a backup is killed with `kill -9` the flag stays: delete `$SPOOL_DIR/gc.paused` by hand, otherwise the spool grows (the `SpoolDiskLow` alert will tell you).
+4. Resume GC (removed by a trap, also when the backup fails). The flag holds the backup's pid. After a `kill -9` it stays and GC stays paused until the next `backup.sh` run, which sees the dead pid, removes the flag and carries on (a live pid refuses to start a second backup). To resume sooner, delete `$SPOOL_DIR/gc.paused` by hand; otherwise the spool grows (the `SpoolDiskLow` alert will tell you).
 
 The active segment is copied while the tracker writes to it, so its tail may be torn. Replay stops at a torn record, as after a crash.
 
@@ -34,6 +34,8 @@ deploy/backup/restore.sh --dump $BF_BACKUP_DIR/pg/<ts>.dump \
 ```
 
 - Checksums are verified first; a mismatch or a missing `.sha256` aborts before anything is touched.
+- The dump is checked with `pg_restore --list` before anything is dropped, so an unreadable file fails with the target untouched. `pg_dump` writes `<ts>.dump.partial` and renames it when finished, so a killed backup leaves no half `*.dump`.
+- Scripts accept `postgres://user:password@...`: the password goes to `PGPASSWORD`, so it is not in `ps` output (use a URL-safe password).
 - A non-empty target database or spool dir is refused. `--force` restores with `pg_restore --clean --if-exists` and moves an existing spool dir aside to `<dir>.pre-restore.<unix-ts>` (never deletes it).
 - Start the tracker afterwards: it replays the spool from the restored checkpoint into Postgres before serving.
 

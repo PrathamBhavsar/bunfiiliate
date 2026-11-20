@@ -24,6 +24,8 @@ done
 
 verify() { [ -f "$1.sha256" ] || die "missing checksum file $1.sha256"; [ "$(cat "$1.sha256")" = "$(sha_of "$1")" ] || die "checksum mismatch: $1"; }
 verify "$dump"
+# An unreadable dump must fail now, before --force drops the schema.
+pgx pg_restore --list "$dump" >/dev/null || die "dump is not a readable pg_dump archive: $dump"
 if [ -n "$tar" ]; then verify "$tar"; [ -n "$sdir" ] || die "--spool-target required with --spool-tar"; fi
 
 tables=$(pgx psql "$url" -qAt -c "SELECT count(*) FROM pg_tables WHERE schemaname = 'public'")
