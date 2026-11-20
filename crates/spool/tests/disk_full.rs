@@ -93,6 +93,29 @@ async fn write_returns_full_on_enospc() {
 }
 
 #[tokio::test]
+async fn enospc_right_after_a_rotation_rolls_back_and_writer_survives() {
+    let d = tmp("rotate-enospc");
+    let fault = Arc::new(Fault::default());
+    // 32 bytes: the second record forces a rotation before it is written.
+    let cfg = SpoolConfig::new(&d)
+        .with_max_segment_size(32)
+        .with_fault(fault.clone());
+    let w = SpoolWriter::open(cfg).await.unwrap();
+    w.write(b"0123456789abcdef").await.unwrap();
+    fault.fail_enospc.store(1, Ordering::SeqCst);
+    let err = w.write(b"fedcba9876543210").await.unwrap_err();
+    assert!(matches!(err, SpoolError::Full), "{err:?}");
+    // Not poisoned: the next write rotates again and lands.
+    w.write(b"after").await.unwrap();
+    drop(w);
+    let got: Vec<Vec<u8>> = replay(&d, 0)
+        .unwrap()
+        .map(|r| r.payload().to_vec())
+        .collect();
+    assert_eq!(got, vec![b"0123456789abcdef".to_vec(), b"after".to_vec()]);
+}
+
+#[tokio::test]
 async fn gc_honours_pause_flag() {
     let d = tmp("pause");
     let w = SpoolWriter::open(SpoolConfig::new(&d).with_max_segment_size(32))

@@ -593,6 +593,10 @@ impl SpoolWriter {
                 // that no longer matches its place in the file.
                 let (start_offset, start_size) = (current_global_offset, current_size);
                 let mut rotated = false;
+                // Handle of the segment we started on, and segments created in this batch, so a
+                // failure after a rotation can still be undone.
+                let mut orig: Option<tokio::fs::File> = None;
+                let mut created: Vec<std::path::PathBuf> = Vec::new();
                 let mut failure: Option<io::Error> = None;
                 let mut acks = Vec::with_capacity(batch.len());
                 let mut flushes = Vec::new();
@@ -615,11 +619,14 @@ impl SpoolWriter {
                                 fsync_count_worker.fetch_add(1, Ordering::SeqCst);
                             }
                             let new_path = config.dir.join(segment_filename(current_global_offset));
-                            active_file = tokio::fs::OpenOptions::new()
+                            let new_file = tokio::fs::OpenOptions::new()
                                 .create(true)
                                 .append(true)
                                 .open(&new_path)
                                 .await?;
+                            created.push(new_path);
+                            let old = std::mem::replace(&mut active_file, new_file);
+                            orig.get_or_insert(old);
                             current_size = 0;
                             rotated = true;
                         }
@@ -682,17 +689,28 @@ impl SpoolWriter {
                     continue;
                 };
 
-                // Undo the batch. Across a segment rotation, or if the truncate itself fails,
-                // the file is in an unknown state: stop writing.
-                let rolled_back = if rotated {
+                // Undo the batch: truncate back to the start length. After a rotation, go back to
+                // the segment the batch started on and delete the segments it created. If the
+                // truncate or a delete fails the file is in an unknown state: stop writing.
+                let injected = fault
+                    .as_deref()
+                    .is_some_and(|f| Fault::take(&f.fail_truncates));
+                // A buffered write error surfaces on the next flush; drain it first.
+                let _ = active_file.flush().await;
+                let rolled_back = if injected {
                     false
+                } else if rotated {
+                    let Some(start_file) = orig.take() else {
+                        unreachable!("a rotation always keeps the starting segment");
+                    };
+                    let mut ok = start_file.set_len(start_size).await.is_ok();
+                    drop(std::mem::replace(&mut active_file, start_file));
+                    for path in &created {
+                        ok &= tokio::fs::remove_file(path).await.is_ok();
+                    }
+                    ok
                 } else {
-                    let injected = fault
-                        .as_deref()
-                        .is_some_and(|f| Fault::take(&f.fail_truncates));
-                    // A buffered write error surfaces on the next flush; drain it first.
-                    let _ = active_file.flush().await;
-                    !injected && active_file.set_len(start_size).await.is_ok()
+                    active_file.set_len(start_size).await.is_ok()
                 };
 
                 if rolled_back {
