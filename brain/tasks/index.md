@@ -92,3 +92,4 @@ Rules: [Pre-Merge Gate](/wisdom/pre-merge-gate.md). Decisions: [Decisions](/deci
 | C90 | feat/c90-final-gate | scripts done (`final-gate.sh`, `push-guard.sh`, `hygiene-check.sh`, release checklist); gate passes every step except `ocr` (no LLM endpoint configured) |
 | R1 | feat/release | done, merged (release.yml, web-asset.yml, docker.yml, docs/releasing.md) |
 | S1 | feat/site | done, merged (Vite vanilla marketing + docs site in `site/`, shared kit, rain ASCII scene, Pages workflow + smoke test; PRODUCT.md; finish review pending merge) |
+| HARD1 | fix/* (O2-O6, O9, O11, O12, D1-D4) | done, merged to local staging; Docker smoke green; gate rerun pending |

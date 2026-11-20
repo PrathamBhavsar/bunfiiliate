@@ -79,3 +79,12 @@ utoipa takes the function name as operationId; `approve` exists for affiliates a
 
 ## Docs drift from code
 A review of the launch docs found wrong ports (metrics 9100 tracker, 9101 api), missing required env (`JWT_SECRET`, `BF_MASTER_KEYS`, `BF_IP_SALT`), a required CLI flag left out, Rust 1.80 vs edition 2024 (1.85), and a "two-step sign-in" claim the login route never enforced. Copy commands and env lists from `.env.example` and the clap definitions, and check security claims against the route that enforces them.
+
+## orca worker-start with a long inline --spec
+A multi-line or quote-heavy `--spec "..."` in zsh can break (`dquote>`), and the agent TUI (kiro, opencode) then never starts while `worker-list` says ready. Write the task to a file and pass `--spec-file`, or tell a follow-up worker to read the file. Check `orca terminal read` if a worker is silent.
+
+## Pipes hide exit codes
+`cargo clippy ... | tail` then `&&` carries on after a failure. Check the real status (or `set -o pipefail`). macOS `sed -i` needs `-i ''`; edit files with python or the Edit tool.
+
+## First boot ordering in compose
+The tracker reads tables the api migrates. Depend on `api: service_healthy`, not only on postgres. Clippy `--all-targets` has a pre-existing `items_after_test_module` in `crates/rt/src/lib.rs`; `make ci` does not use it.

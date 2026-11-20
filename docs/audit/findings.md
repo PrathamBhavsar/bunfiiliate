@@ -48,16 +48,32 @@ Scope: `crates/api`, `crates/db` and migrations; `crates/tracker`, `core`, `spoo
 | O11b | login page | it always linked "Create a workspace", though signup is off by default | new public `GET /api/v1/config` (`signup_enabled`); the link renders only when the API says signup is on | `config_reports_signup_enabled`, `config_reports_signup_disabled`, e2e `login hides Create a workspace when signup is disabled` |
 | O12 | `bench/gen_docs.py` | `--write-docs` rendered the datasheet into the deleted `site/index.html` and crashed | writes `docs/benchmarks.md` and the `/r/:code` facts in `site/src/brand.js`; `--check` verifies both | `bench/tests/test_docs.sh` |
 
-### Open, accepted for v0.1.0 pre-release (each is a known limit, not a regression)
+### Fixed after the first Docker run and a second review (2026-11-19/20)
 
-| # | where | issue | why deferred |
-|---|-------|-------|--------------|
-| O1 | login (`routes.rs`) | TOTP is not enforced at sign-in | new feature (API + UI + e2e); copy is now honest. Next minor. |
+| # | where | defect | fix | test |
+|---|-------|--------|-----|------|
+| D1 | `api/src/mail.rs`, `notify.rs`, `rt/src/metrics.rs` | compose passes unset `SMTP_URL` as `""`: the api crashed on every boot ("invalid SMTP_URL"), the same empty-env class as R2 | empty `SMTP_URL`, `SMTP_FROM`, `BF_METRICS_ADDR` count as unset | real `docker compose up`: api healthy, full click, sale, conversion flow |
+| D2 | `deploy/docker-compose.yml` | tracker started before the api migrated and crash-looped twice on first boot | tracker `depends_on` api healthy | compose restarts=0 on a clean boot |
+| D3 | `tracker/src/idem.rs`, `lib.rs` | a cancelled request left its key `Pending` forever; a guard that released on cancel could free a key whose detached spool write still landed | `Reservation` guard; commit or release is decided in the spawned ingest task | `dropped_reservation_frees_pending_key_but_not_committed`, v2 tests |
+| D4 | `deploy/backup/backup.sh` | a refused second run removed the running backup's `gc.paused` through its EXIT trap | flag taken atomically (`noclobber`), trap installed only by the owner, removed only if it holds our pid | `backup_drill.sh` (live pid keeps its flag) |
+
+Rows below marked FIXED were open items in the first review; the remaining ones are still open.
+
+### Fixed (open items from the first review)
+
+| # | where | issue | status |
+|---|-------|-------|--------|
 | O2 | `tracker/src/lib.rs`, `idem.rs` | in-flight idempotency key answers 200 duplicate; a 503 on the first attempt then loses the event | FIXED: pending/committed key state; tests: `in_flight_pending_state_and_failed_release`, `v2_in_flight_idempotency_retry_after_shedding` |
 | O3 | `tracker/src/lib.rs` (`redirect` shed branch) | click shed under load returns `bf_click` for a click never spooled; affiliate loses credit | FIXED: `ref=<code>` in shed Location redirect; tests: `ref_appended`, `redirect_still_302_while_shedding_but_records_no_click` |
 | O4 | `spool/src/lib.rs` | FIXED: a failed batch after a segment rotation goes back to the starting segment (truncate) and deletes the segments it created; the writer is not poisoned | `enospc_right_after_a_rotation_rolls_back_and_writer_survives` |
 | O5 | `deploy/backup/*` | FIXED: stale `gc.paused` (pid in the flag, dead pid cleared by the next backup, INT/TERM trapped), `restore` checks `pg_restore --list` before `--force` drops the schema, dump written as `.partial` then renamed, password moved from argv to `PGPASSWORD` | `scripts/tests/backup_drill.sh` (junk dump, stale/live pid, pgx argv) |
 | O6 | compose + `monitoring/prometheus.yml` | FIXED: compose sets `BF_METRICS_ADDR` per service (tracker 9100, api 9101, compose network only) and optional `BF_METRICS_TOKEN` | `docker compose config` with the monitoring profile |
+
+### Open, accepted for v0.1.0 pre-release (each is a known limit, not a regression)
+
+| # | where | issue | why deferred |
+|---|-------|-------|--------------|
+| O1 | login (`routes.rs`) | TOTP is not enforced at sign-in | new feature (API + UI + e2e); copy is now honest. Next minor. |
 | O7 | migrations 0071, 0080 | non-`CONCURRENTLY` index builds; 0080 copies all of `clicks` in one transaction | fine on a fresh install; take a backup and a maintenance window before upgrading a large database. |
 | O8 | `tax.rs`, `payout_rails.rs`, `payout_requests.rs` | 1099 report buckets by batch `paid_at`; failed rail lines retry with the same idempotency key; cancelling a batch leaves its payout request `approved` | rail payouts are experimental until live-tested (see release checklist). |
 | O9 | `password_reset.rs`, affiliates/programs | reset lockout can be forced by anyone knowing the email; plan-limit race; public register can fill `max_affiliates` (the long-email login 500 and the unpurged `auth_throttle` are fixed above) | low impact, no data exposure. |
