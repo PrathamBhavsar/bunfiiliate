@@ -21,19 +21,24 @@ out=$BF_BACKUP_DIR
 mkdir -p "$out/pg" "$out/spool"
 stage=$(mktemp -d "$out/.stage.XXXXXX")
 
-resume() { rm -f "$SPOOL_DIR/gc.paused"; rm -rf "$stage"; }
-trap resume EXIT
-trap 'exit 143' INT TERM HUP
+trap 'rm -rf "$stage"' EXIT
+# Only the run that owns the flag may remove it.
+resume() { [ "$(cat "$SPOOL_DIR/gc.paused" 2>/dev/null)" = "$$" ] && rm -f "$SPOOL_DIR/gc.paused"; rm -rf "$stage"; }
 
 mkdir -p "$SPOOL_DIR"
-# The flag holds our pid. One left by a SIGKILLed backup (pid gone) would stop spool GC for good:
-# clear it. A live pid means another backup is running.
-if [ -f "$SPOOL_DIR/gc.paused" ]; then
+# 1. Pause GC. The flag holds our pid and is taken atomically (noclobber). One left by a SIGKILLed
+# backup (pid gone) would stop spool GC for good: clear it once. A live pid means another backup
+# is running; we exit without touching its flag (the trap is installed only after we own it).
+claim() { ( set -o noclobber; echo $$ > "$SPOOL_DIR/gc.paused" ) 2>/dev/null; }
+if ! claim; then
   old=$(cat "$SPOOL_DIR/gc.paused" 2>/dev/null || true)
   if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then die "another backup is running (pid $old)"; fi
   echo "removing stale $SPOOL_DIR/gc.paused (pid ${old:-unknown} is gone)" >&2
+  rm -f "$SPOOL_DIR/gc.paused"
+  claim || die "could not take $SPOOL_DIR/gc.paused"
 fi
-echo $$ > "$SPOOL_DIR/gc.paused"                             # 1. pause GC
+trap resume EXIT
+trap 'exit 143' INT TERM HUP
 if [ -f "$SPOOL_DIR/checkpoint" ]; then cp "$SPOOL_DIR/checkpoint" "$stage/checkpoint"; fi   # 2a
 find "$SPOOL_DIR" -maxdepth 1 -type f -name '*.wal' -exec cp {} "$stage/" \;                  # 2b
 tar -C "$stage" -cf "$out/spool/$ts.tar" .

@@ -76,6 +76,7 @@ echo 99999999 > "$t/spool/gc.paused"
 [ ! -e "$t/spool/gc.paused" ] || { echo "FAIL gc left paused after stale clear"; exit 1; }
 echo $$ > "$t/spool/gc.paused"
 if "$root/deploy/backup/backup.sh" >/dev/null 2>&1; then echo "FAIL live gc.paused ignored"; exit 1; fi
+[ "$(cat "$t/spool/gc.paused")" = "$$" ] || { echo "FAIL refused backup removed the running backup's flag"; exit 1; }
 rm -f "$t/spool/gc.paused"
 
 # pgx_keeps_password_out_of_argv: the tool sees a password-less url and PGPASSWORD
