@@ -54,6 +54,43 @@ impl Default for Idem {
     }
 }
 
+/// Holds a `New` claim. Dropping it frees a still-`Pending` key (ingest failed, or the request
+/// future was dropped on client disconnect); `release` leaves committed keys alone.
+pub struct Reservation {
+    idem: std::sync::Arc<Idem>,
+    program: Uuid,
+    source: &'static str,
+    external_id: String,
+}
+
+impl Reservation {
+    pub fn new(
+        idem: std::sync::Arc<Idem>,
+        program: Uuid,
+        source: &'static str,
+        external_id: String,
+    ) -> Self {
+        Self {
+            idem,
+            program,
+            source,
+            external_id,
+        }
+    }
+
+    pub fn commit(&self) {
+        self.idem
+            .commit(self.program, self.source, &self.external_id);
+    }
+}
+
+impl Drop for Reservation {
+    fn drop(&mut self) {
+        self.idem
+            .release(self.program, self.source, &self.external_id);
+    }
+}
+
 pub fn digest(body: &[u8]) -> [u8; 32] {
     Sha256::digest(body).into()
 }
@@ -170,6 +207,23 @@ mod tests {
         i.commit(p, "generic", "k1");
         assert_eq!(
             i.claim(p, "generic", "k1", digest(b"data"), Uuid::now_v7()),
+            Claim::Duplicate(b)
+        );
+    }
+
+    #[test]
+    fn dropped_reservation_frees_pending_key_but_not_committed() {
+        let i = std::sync::Arc::new(Idem::new(10));
+        let p = Uuid::now_v7();
+        let (a, b) = (Uuid::now_v7(), Uuid::now_v7());
+        assert_eq!(i.claim(p, "generic", "k", digest(b"x"), a), Claim::New);
+        drop(Reservation::new(i.clone(), p, "generic", "k".into()));
+        assert_eq!(i.claim(p, "generic", "k", digest(b"x"), b), Claim::New);
+        let r = Reservation::new(i.clone(), p, "generic", "k".into());
+        r.commit();
+        drop(r);
+        assert_eq!(
+            i.claim(p, "generic", "k", digest(b"x"), a),
             Claim::Duplicate(b)
         );
     }
