@@ -557,6 +557,38 @@ async fn auth_oversized_body_is_refused(pool: PgPool) {
 }
 
 #[sqlx::test(migrations = "../db/migrations")]
+async fn auth_long_email_is_refused_not_a_500(pool: PgPool) {
+    let app = app(pool);
+    // Not a repeated run: Postgres compresses text, so the address must look random to exceed
+    // the btree row limit on `auth_throttle`'s primary key.
+    let mut x = 0x2545_f491u32;
+    let email: String = (0..60_000)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            char::from(33 + (x % 94) as u8)
+        })
+        .collect();
+    let email = format!("{email}@x.io");
+    let req = Request::builder()
+        .method("POST")
+        .uri("/api/v1/auth/login")
+        .header(HOST, HOST_NAME)
+        .header(ORIGIN, ORIGIN_OK)
+        .header(CONTENT_TYPE, "application/json")
+        .header("x-csrf-token", "t")
+        .header(COOKIE, "bf_csrf=t")
+        .header("x-forwarded-for", "203.0.113.9")
+        .body(Body::from(
+            json!({ "email": email, "password": "x" }).to_string(),
+        ))
+        .unwrap();
+    let res = app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
 async fn jwt_token_version_bump_revokes(pool: PgPool) {
     let st = state(pool.clone());
     let app = app_with(st.clone());

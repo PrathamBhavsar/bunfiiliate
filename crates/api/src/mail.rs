@@ -112,10 +112,12 @@ pub enum Mailer {
 
 impl Mailer {
     pub fn from_env() -> Result<Self, String> {
-        let Ok(url) = std::env::var("SMTP_URL") else {
+        // Compose passes unset vars as "": empty counts as unset.
+        let set = |k| std::env::var(k).ok().filter(|v| !v.trim().is_empty());
+        let Some(url) = set("SMTP_URL") else {
             return Ok(Self::Log);
         };
-        let from = std::env::var("SMTP_FROM").unwrap_or_else(|_| DEFAULT_FROM.into());
+        let from = set("SMTP_FROM").unwrap_or_else(|| DEFAULT_FROM.into());
         let from = from
             .parse()
             .map_err(|e| format!("invalid SMTP_FROM: {e}"))?;

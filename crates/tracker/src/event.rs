@@ -86,6 +86,18 @@ pub fn with_click(url: &str, click_id: &str) -> String {
     format!("{base}{sep}bf_click={click_id}{frag}")
 }
 
+/// Append `ref=<code>` to a landing url, before any fragment.
+pub fn with_ref(url: &str, code: &str) -> String {
+    let (base, frag) = url.split_once('#').map_or((url, ""), |(b, f)| (b, f));
+    let sep = if base.contains('?') { '&' } else { '?' };
+    let frag = if frag.is_empty() {
+        String::new()
+    } else {
+        format!("#{frag}")
+    };
+    format!("{base}{sep}ref={code}{frag}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -137,6 +149,18 @@ mod tests {
         assert_eq!(
             with_click("https://a.com/p?x=1#top", "1"),
             "https://a.com/p?x=1&bf_click=1#top"
+        );
+    }
+
+    #[test]
+    fn ref_appended() {
+        assert_eq!(
+            with_ref("https://a.com/p", "abc"),
+            "https://a.com/p?ref=abc"
+        );
+        assert_eq!(
+            with_ref("https://a.com/p?x=1#top", "abc"),
+            "https://a.com/p?x=1&ref=abc#top"
         );
     }
 

@@ -2,7 +2,21 @@
 # Shared helpers for backup.sh / restore.sh / drill.sh.
 # Set PG_BIN to a directory holding pg_dump/pg_restore/psql when the default ones are not
 # the same major version as the server (pg_dump must be >= the server).
-pgx() { local t=$1; shift; if [ -n "${PG_BIN:-}" ]; then "$PG_BIN/$t" "$@"; else "$t" "$@"; fi; }
+# A postgres:// argument has its password moved to PGPASSWORD so it never shows in `ps` (the
+# password must be URL-safe, see self-hosting.md; it is not percent-decoded).
+pgx() {
+  local t=$1; shift; local bin=$t a=() x pw=""
+  [ -z "${PG_BIN:-}" ] || bin="$PG_BIN/$t"
+  for x in "$@"; do
+    case $x in
+      postgres://*|postgresql://*)
+        pw=$(printf '%s' "$x" | sed -nE 's#^[a-z]+://[^:/@]+:([^@]*)@.*#\1#p')
+        x=$(printf '%s' "$x" | sed -E 's#^([a-z]+://[^:/@]+):[^@]*@#\1@#');;
+    esac
+    a+=("$x")
+  done
+  if [ -n "$pw" ]; then PGPASSWORD=$pw "$bin" "${a[@]}"; else "$bin" "${a[@]}"; fi
+}
 die() { echo "error: $*" >&2; exit 1; }
 sha_of() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 # Replace the database name in a postgres:// URL.

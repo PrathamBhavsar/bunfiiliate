@@ -65,6 +65,24 @@ if "$root/deploy/backup/restore.sh" --dump "$dump" --spool-tar "$tarf" --target-
 for i in 1 2 3; do sleep 1; "$root/deploy/backup/backup.sh" >/dev/null; done
 [ "$(ls "$t/bk/pg"/*.dump | wc -l | tr -d ' ')" = 2 ] || { echo "FAIL retention"; exit 1; }
 
+# restore_force_rejects_garbage_dump_before_dropping_schema (checksum matches, content is not a dump)
+echo garbage > "$t/junk.dump"; sha_of "$t/junk.dump" > "$t/junk.dump.sha256"
+if "$root/deploy/backup/restore.sh" --dump "$t/junk.dump" --target-url "$dst_url" --force 2>/dev/null; then echo "FAIL junk dump accepted"; exit 1; fi
+[ "$(fingerprint "$dst_url")" = "$want" ] || { echo "FAIL junk dump touched target"; exit 1; }
+
+# stale_gc_paused_cleared_live_pid_refused: a dead pid is cleared, a live one blocks the backup
+echo 99999999 > "$t/spool/gc.paused"
+"$root/deploy/backup/backup.sh" >/dev/null 2>&1 || { echo "FAIL stale gc.paused blocked backup"; exit 1; }
+[ ! -e "$t/spool/gc.paused" ] || { echo "FAIL gc left paused after stale clear"; exit 1; }
+echo $$ > "$t/spool/gc.paused"
+if "$root/deploy/backup/backup.sh" >/dev/null 2>&1; then echo "FAIL live gc.paused ignored"; exit 1; fi
+[ "$(cat "$t/spool/gc.paused")" = "$$" ] || { echo "FAIL refused backup removed the running backup's flag"; exit 1; }
+rm -f "$t/spool/gc.paused"
+
+# pgx_keeps_password_out_of_argv: the tool sees a password-less url and PGPASSWORD
+mkdir -p "$t/fakebin"; printf '#!/bin/sh\necho "$PGPASSWORD $*"\n' > "$t/fakebin/tool"; chmod +x "$t/fakebin/tool"
+[ "$(PG_BIN="$t/fakebin" pgx tool postgres://u:s3cret@h:5432/db)" = "s3cret postgres://u@h:5432/db" ] || { echo "FAIL pgx password in argv"; exit 1; }
+
 # the drill itself
 "$root/deploy/backup/drill.sh" | tail -n1 | grep -qx PASS || { echo "FAIL drill"; exit 1; }
 echo "backup_drill: ok"

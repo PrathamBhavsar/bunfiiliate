@@ -21,19 +21,35 @@ out=$BF_BACKUP_DIR
 mkdir -p "$out/pg" "$out/spool"
 stage=$(mktemp -d "$out/.stage.XXXXXX")
 
-resume() { rm -f "$SPOOL_DIR/gc.paused"; rm -rf "$stage"; }
-trap resume EXIT
+trap 'rm -rf "$stage"' EXIT
+# Only the run that owns the flag may remove it.
+resume() { [ "$(cat "$SPOOL_DIR/gc.paused" 2>/dev/null)" = "$$" ] && rm -f "$SPOOL_DIR/gc.paused"; rm -rf "$stage"; }
 
 mkdir -p "$SPOOL_DIR"
-: > "$SPOOL_DIR/gc.paused"                                   # 1. pause GC
+# 1. Pause GC. The flag holds our pid and is taken atomically (noclobber). One left by a SIGKILLed
+# backup (pid gone) would stop spool GC for good: clear it once. A live pid means another backup
+# is running; we exit without touching its flag (the trap is installed only after we own it).
+claim() { ( set -o noclobber; echo $$ > "$SPOOL_DIR/gc.paused" ) 2>/dev/null; }
+if ! claim; then
+  old=$(cat "$SPOOL_DIR/gc.paused" 2>/dev/null || true)
+  if [ -n "$old" ] && kill -0 "$old" 2>/dev/null; then die "another backup is running (pid $old)"; fi
+  echo "removing stale $SPOOL_DIR/gc.paused (pid ${old:-unknown} is gone)" >&2
+  rm -f "$SPOOL_DIR/gc.paused"
+  claim || die "could not take $SPOOL_DIR/gc.paused"
+fi
+trap resume EXIT
+trap 'exit 143' INT TERM HUP
 if [ -f "$SPOOL_DIR/checkpoint" ]; then cp "$SPOOL_DIR/checkpoint" "$stage/checkpoint"; fi   # 2a
 find "$SPOOL_DIR" -maxdepth 1 -type f -name '*.wal' -exec cp {} "$stage/" \;                  # 2b
 tar -C "$stage" -cf "$out/spool/$ts.tar" .
 sha_of "$out/spool/$ts.tar" > "$out/spool/$ts.tar.sha256"
 
-pgx pg_dump -Fc --no-owner -f "$out/pg/$ts.dump" "$DATABASE_URL"                              # 3
+# 3. Dump to a name no `*.dump` glob matches, rename once complete (a killed dump leaves no
+# half file for restore or the drill to pick up).
+pgx pg_dump -Fc --no-owner -f "$out/pg/$ts.dump.partial" "$DATABASE_URL"
+mv "$out/pg/$ts.dump.partial" "$out/pg/$ts.dump"
 sha_of "$out/pg/$ts.dump" > "$out/pg/$ts.dump.sha256"
-resume; trap - EXIT                                                                            # 4
+resume; trap - EXIT INT TERM HUP                                                               # 4
 
 # Keep the newest $keep of each kind.
 prune() { ls -1 "$out/$1"/*."$2" 2>/dev/null | sort -r | tail -n +"$((keep + 1))" | while read -r f; do rm -f "$f" "$f.sha256"; done; }

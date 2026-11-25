@@ -39,6 +39,7 @@ describe('money tools', { serial: true }, () => {
 
     await app.open('/webhooks/test');
     await expect(screen.getByRole('heading', 'Webhook tester')).toBeVisible();
+    await expect(screen.getByText('Not a sandbox.')).toBeVisible();
     await screen.getByLabel('Test program').selectOption(PROGRAM);
     // The payload is prefilled per source.
     await expect(screen.getByLabel('JSON payload')).toHaveValue(/"amount_cents"/);

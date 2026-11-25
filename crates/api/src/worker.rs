@@ -163,6 +163,10 @@ pub async fn partition_maintenance(pool: &PgPool) -> Result<(), sqlx::Error> {
             "clicks_default holds rows: a month partition is missing"
         );
     }
+    let purged = bf_db::throttle::purge_stale(pool, now).await?;
+    if purged > 0 {
+        tracing::info!(rows = purged, "purged stale auth_throttle rows");
+    }
     Ok(())
 }
 

@@ -75,6 +75,15 @@ export function useLookups() {
   );
 }
 
+/** Public runtime flags (no session). A flag the API does not set stays off. */
+export function useConfig() {
+  return useQuery({
+    queryKey: ["config"],
+    queryFn: async ({ signal }) => ok(api.GET("/api/v1/config", { signal })),
+    staleTime: 5 * 60_000,
+  });
+}
+
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 /** Integer cents as `12.34 USD`. Display only; all math stays in integers. */

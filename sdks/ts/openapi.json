@@ -1543,6 +1543,27 @@
         ]
       }
     },
+    "/api/v1/config": {
+      "get": {
+        "tags": [
+          "ops"
+        ],
+        "summary": "Public runtime flags the statically exported web bundle reads. No auth.",
+        "operationId": "config",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/contact-requests": {
       "get": {
         "tags": [
@@ -7656,6 +7677,18 @@
           "revenue_cents": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "ConfigView": {
+        "type": "object",
+        "required": [
+          "signup_enabled"
+        ],
+        "properties": {
+          "signup_enabled": {
+            "type": "boolean",
+            "description": "Self-serve workspace signup is enabled (`SIGNUP_ENABLED`)."
           }
         }
       },

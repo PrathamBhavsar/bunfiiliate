@@ -96,7 +96,9 @@ impl Notifier for Composite {
 
 /// Mail notifier, only when `SMTP_URL` is set (default: none).
 pub fn mail_from_env(pool: &PgPool) -> Option<MailNotifier> {
-    std::env::var_os("SMTP_URL")?;
+    std::env::var("SMTP_URL")
+        .ok()
+        .filter(|v| !v.trim().is_empty())?;
     match Mailer::from_env() {
         Ok(mailer) => Some(MailNotifier {
             pool: pool.clone(),

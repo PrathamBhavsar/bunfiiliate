@@ -28,7 +28,8 @@ def row(fsync):
     for line in docs.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         if len(cells) >= 4 and cells[0] == "`/r/:code`" and cells[1] == fsync:
-            return float(cells[2]), float(cells[3].split()[0])
+            # rps is written as `27700 (27000 to 28000)` once the docs come from a schema v1 result.
+            return float(cells[2].split()[0]), float(cells[3].split()[0])
     sys.exit(f"no `/r/:code` row for BF_FSYNC={fsync} in docs/benchmarks.md")
 
 

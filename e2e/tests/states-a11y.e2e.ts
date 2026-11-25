@@ -54,6 +54,14 @@ async function seriousViolations({ browser }: Fx): Promise<string[]> {
 }
 
 describe('states and a11y', { serial: true }, () => {
+  test('login hides Create a workspace when signup is disabled', async ({ app, screen, browser }) => {
+    await browser.route(/\/api\/v1\/config$/, (route) => route.fulfill({ json: { signup_enabled: false } }));
+    await app.open('/login');
+    await expect(screen.getByRole('link', { name: 'Create an account' })).toBeVisible();
+    await expect(screen.getByRole('link', { name: 'Create a workspace' })).toHaveCount(0);
+    await browser.unrouteAll();
+  });
+
   test('sign in', async (f) => {
     await signIn({ app: f.app, screen: f.screen, browser: f.browser });
   });

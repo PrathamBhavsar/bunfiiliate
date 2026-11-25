@@ -28,6 +28,8 @@ use crate::{
 };
 
 const REFRESH_PATH: &str = "/api/v1/auth";
+/// RFC 5321 limit on the address; longer input is not a login we can serve.
+const MAX_EMAIL_LEN: usize = 254;
 
 struct CookieAuth;
 
@@ -45,7 +47,7 @@ impl Modify for CookieAuth {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        login, refresh, logout, me, csrf,
+        login, refresh, logout, me, csrf, config,
         password_reset::reset,
         admin_reset::issue,
         admin_reset::reset_with_token,
@@ -93,7 +95,7 @@ impl Modify for CookieAuth {
         tax::me_get, tax::me_put, tax::report_1099, invoice::invoice,
     ),
     components(schemas(
-        LoginRequest, UserView, workspaces::SignupRequest, password_reset::ResetRequest, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
+        LoginRequest, UserView, workspaces::SignupRequest, password_reset::ResetRequest, ConfigView, admin_reset::IssuedToken, admin_reset::ResetWithTokenRequest, totp::EnrolRequest, totp::EnrolResponse, totp::CodeRequest,
         totp::RecoveryCodes, totp::TotpStatus, ErrorBody, ErrorDetail, money::ConversionStatus, money::Account,
         billing::CheckoutRequest, billing::CheckoutResponse, billing::SubscriptionView,
         billing::PlanView, billing::UsageView, billing::ProviderView, billing::SetSecret,
@@ -109,6 +111,7 @@ pub struct ApiDoc;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/api/openapi.json", get(openapi))
+        .route("/api/v1/config", get(config))
         .route("/api/v1/auth/login", post(login))
         .route("/api/v1/auth/refresh", post(refresh))
         .route("/api/v1/auth/logout", post(logout))
@@ -270,8 +273,14 @@ async fn login(
     headers: HeaderMap,
     AppJson(req): AppJson<LoginRequest>,
 ) -> Result<(HeaderMap, Json<UserView>), AppError> {
-    limit::check(&s.limiter, &limit::LOGIN, &headers, &req.email)?;
-    let user = bf_db::auth::user_by_email(&s.pool, &req.email).await?;
+    let email = req.email.trim();
+    // The SMTP maximum. A longer address cannot be a user, and the throttle key (email|ip) would
+    // overflow `auth_throttle`'s btree primary key, failing the login with a 500.
+    if email.len() > MAX_EMAIL_LEN {
+        return Err(AppError::Unauthorized("invalid credentials"));
+    }
+    limit::check(&s.limiter, &limit::LOGIN, &headers, email)?;
+    let user = bf_db::auth::user_by_email(&s.pool, email).await?;
     // An unknown email verifies against a dummy hash so it costs the same as a wrong password.
     let hash = user
         .as_ref()
@@ -279,8 +288,8 @@ async fn login(
     let ok = verify_password_bounded(req.password, hash).await;
     // Backoff is per (email, address) so it slows a guesser without locking the account out. A
     // backed-off address gets the same 401 as a wrong password, even for the right one.
-    let throttle_key = limit::client_ip(&headers)
-        .map(|ip| format!("{}|{ip}", req.email.trim().to_ascii_lowercase()));
+    let throttle_key =
+        limit::client_ip(&headers).map(|ip| format!("{}|{ip}", email.to_ascii_lowercase()));
     let now = Utc::now();
     let backed_off = match &throttle_key {
         Some(k) => bf_db::throttle::is_locked(&s.pool, bf_db::throttle::LOGIN_IP, k, now).await?,
@@ -385,6 +394,25 @@ async fn refresh(
 #[derive(Serialize, ToSchema)]
 pub struct CsrfToken {
     token: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct ConfigView {
+    /// Self-serve workspace signup is enabled (`SIGNUP_ENABLED`).
+    signup_enabled: bool,
+}
+
+/// Public runtime flags the statically exported web bundle reads. No auth.
+#[utoipa::path(
+    get,
+    path = "/api/v1/config",
+    tag = "ops",
+    responses((status = 200, body = ConfigView))
+)]
+async fn config() -> Json<ConfigView> {
+    Json(ConfigView {
+        signup_enabled: workspaces::signup_enabled(),
+    })
 }
 
 /// CSRF token for the double-submit check; sets the `bf_csrf` cookie if missing.

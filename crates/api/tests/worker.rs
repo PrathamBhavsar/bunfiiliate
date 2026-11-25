@@ -1,4 +1,4 @@
-use api::worker::{approve_due, process_events, release_hold};
+use api::worker::{approve_due, partition_maintenance, process_events, release_hold};
 use bf_db::ledger::balance_for_affiliate;
 use bf_db::tracker::{InboundEvent, insert_events};
 use chrono::{DateTime, Duration, Utc};
@@ -742,4 +742,37 @@ async fn fraud_flagged_click_holds_conversion_until_released(pool: PgPool) {
     assert_eq!(approve_due(&pool).await.unwrap(), 1);
     assert_eq!(statuses().await, ["approved", "approved", "pending"]);
     assert_eq!(unbalanced_txns(&pool).await, 0);
+}
+
+#[sqlx::test(migrations = "../db/migrations")]
+async fn partition_upkeep_purges_stale_auth_throttle_rows(pool: PgPool) {
+    let now = Utc::now();
+    for (key, started, locked) in [
+        ("stale", now - Duration::hours(25), None),
+        ("fresh", now - Duration::minutes(1), None),
+        (
+            "locked",
+            now - Duration::hours(25),
+            Some(now + Duration::minutes(10)),
+        ),
+    ] {
+        sqlx::query(
+            "INSERT INTO auth_throttle (scope, key, window_started_at, locked_until) \
+             VALUES ('login_ip', $1, $2, $3)",
+        )
+        .bind(key)
+        .bind(started)
+        .bind(locked)
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    partition_maintenance(&pool).await.unwrap();
+
+    let keys: Vec<String> = sqlx::query_scalar("SELECT key FROM auth_throttle ORDER BY key")
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    assert_eq!(keys, ["fresh", "locked"]);
 }

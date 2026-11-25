@@ -5,7 +5,7 @@ Reproducible load benchmark for the tracker ingress (`/c`, `/r/:code`, `/v1/even
 ```bash
 bench/run.sh                 # full run -> bench/results/<date>-<sha>.json
 bench/run.sh --quick         # 2 s x 1 repeat, ->  ...-quick.json (never published)
-bench/run.sh --write-docs    # full run, then regenerate docs/benchmarks.md + site datasheet
+bench/run.sh --write-docs    # full run, then regenerate docs/benchmarks.md + site facts
 python -I bench/compare.py bench/results/X.json bench/baseline/<class>.json   # exit 0/1/3
 python -I bench/compare.py --self-test
 bench/tests/test_run.sh      # helper + quick-run tests (needs Postgres; BENCH_TEST_SKIP_QUICK=1 skips the run)
