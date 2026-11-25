@@ -3,6 +3,8 @@ all-features = true
 
 [advisories]
 version = 2
+# chrono unmaintained, no safe upgrade; transitive via sqlx. Revisit when a replacement lands.
+ignore = ["RUSTSEC-2026-0543"]
 
 [licenses]
 version = 2
